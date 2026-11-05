@@ -235,6 +235,21 @@ td .pill{white-space:nowrap}
 .sb-item.sub{height:32px;font-size:13px;padding:0 var(--s2)}
 .sb-item.sub.on{box-shadow:none;background:rgba(0,219,255,.12)}
 .shell.col .sb-sub{margin-left:0;padding-left:0;border-left:0}.shell.col .sb-item.sub .sb-lb{display:none}.shell.col .sb-item.sub::before{content:'•';margin:0 auto}
+
+.hkbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px;margin:6px 0;font-size:12px;line-height:1.35}.hkbar span{flex:1 1 220px;min-width:0}.hkbar .btn{flex:0 0 auto}
+@media(max-width:640px){.grid.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}.grid.g4>.kpi{padding:var(--s3);min-width:0}.kpi .v{font-size:24px}.kpi .l,.kpi .n{overflow-wrap:anywhere}}
+
+.fbtn,.fpact,.ccards{display:none}.fpanel{display:contents}
+.ccard{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:var(--s3);margin-bottom:10px;box-shadow:var(--sh1)}.ccard .row{margin:6px 0}.ccard dl{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;margin:8px 0}.ccard dt{color:var(--txt2)}.ccard dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:760px){.ccards{display:block}#tbl .tw{display:none}}
+@media(max-width:900px){.filters{display:grid;grid-template-columns:1fr auto;gap:8px}.filters #fq{min-width:0!important;width:100%}.fbtn{display:inline-flex;align-items:center}.fpanel{display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:#fff}.fpanel.open{display:grid}.fpanel select{width:100%;min-width:0}.fpact{display:flex;gap:8px;grid-column:1/-1}}
+@media(max-width:480px){.fpanel,.fpanel.open{grid-template-columns:1fr}}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.evd{margin-top:4px}.evd summary{cursor:pointer;color:var(--pet);font-weight:600}.evd[open]{background:#f6fbfd;padding:6px;border-radius:6px}
+.hojetw{max-height:none}#mrraviso .row{gap:12px;margin-bottom:6px}
+@media(max-width:760px){.hojetw table{min-width:640px}}
+@media(max-width:640px){.grid.g2,.grid.g3{grid-template-columns:minmax(0,1fr)}.filters>select,.filters>input,.filters>label{max-width:100%;min-width:0}.filters>input[type=text]{min-width:0!important;flex:1 1 140px}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -3081,7 +3096,7 @@ async function lkImport() {
   UI.pesqSel = req.pedidoId;
   const known = ok.map(u => S.solutions.find(r => (r.fontes || []).some(f => normUrl(f.u) === normUrl(u)))).filter(Boolean);
   log(`Pedido de importação por link gerado (${ok.length} link(s)).${known.length ? ' Já há fonte igual em: ' + known.map(r => r.nome).join('; ') + ' — a importação complementará o registro.' : ''} `, 'ok');
-  UI.busy = 'Lendo os links pelo backend…'; render();
+  UI.busy = window.__HOSTED__ ? `Importando ${ok.length} link(s)… isso pode levar alguns segundos.` : 'Lendo os links pelo backend…'; render();
   try { const r = await bkChamar('importar', req, `pedido-importar-link-${req.pedidoId}.json`); UI.busy = ''; if (r.via === 'direto') { await lkResponse(r.resp); return; } log('Pedido de importação gerado como arquivo (este ambiente não chama o backend). Execute-o no backend e importe a resposta.', 'ok'); }
   catch (e) { UI.busy = ''; log('✖ Backend: ' + e.message, 'bad'); toast(e.message); }
   render();
@@ -3136,12 +3151,12 @@ async function lkResponse(j) {
 function lkCard() {
   const pend = S.pesq.filter(p => p.tipo === 'importar_link' && p.status !== 'incorporada' && p.status !== 'descartada').slice(0, 4), be = aiCfg().backendUrl;
   return `<div class="card" style="border-left:4px solid var(--ciano)"><h3>Importar por link (TDN ou enxoval de vendas)</h3>
-  <p class="sm">Cole 1 a ${LK_MAX_URLS} links (um por linha) de páginas do TDN ou do portal/enxoval TOTVS. O backend lê a página e os materiais diretamente vinculados (páginas TOTVS e anexos PDF/DOCX/PPTX/XLSX); o aplicativo extrai nome, finalidade, funcionalidades, dores, segmentos, requisitos e integrações, mostra a prévia e só grava depois da sua revisão.</p>
+  <p class="sm">${window.__HOSTED__ ? `<b>Cole o link para importar o conteúdo para a Base de Soluções.</b> Aceita 1 a ${LK_MAX_URLS} links (um por linha) do TDN ou do portal/enxoval TOTVS. O servidor lê a página e os materiais vinculados; você revisa a prévia antes de gravar.` : `Cole 1 a ${LK_MAX_URLS} links (um por linha) de páginas do TDN ou do portal/enxoval TOTVS. O backend lê a página e os materiais diretamente vinculados (páginas TOTVS e anexos PDF/DOCX/PPTX/XLSX); o aplicativo extrai nome, finalidade, funcionalidades, dores, segmentos, requisitos e integrações, mostra a prévia e só grava depois da sua revisão.`}</p>
   <textarea data-i="lkurls" rows="2" style="width:100%" placeholder="https://tdn.totvs.com/x/…  (um link por linha)">${esc(UI.lkUrls || '')}</textarea>
   ${(UI.lkErr || []).map(b => `<div class="alert b sm"><b>${esc(b.u || 'Links')}</b>: ${esc(b.m)}</div>`).join('')}
   <div class="row sm" style="margin-top:6px"><b>Escopo da leitura</b><label>páginas vinculadas (0–6) <input type="number" min="0" max="6" data-c="lkopt" data-f="paginas" value="${LK_OPT().paginas}" style="width:64px"></label><label>anexos (0–4) <input type="number" min="0" max="4" data-c="lkopt" data-f="anexos" value="${LK_OPT().anexos}" style="width:64px"></label><label>volume máx. por página <select data-c="lkopt" data-f="maxChars">${[[100000, '100 mil caracteres'], [300000, '300 mil caracteres'], [800000, '800 mil caracteres']].map(([v, l]) => `<option value="${v}" ${LK_OPT().maxChars === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label><span class="muted">Só links diretos da página principal; nunca percorre o TDN inteiro.</span></div>
-  <div class="row" style="margin-top:6px"><button class="btn pri" data-a="lkImport">Importar para a Base de Soluções</button><label class="btn ghost" style="cursor:pointer">Importar resposta do backend<input type="file" id="f-lk" accept=".json" hidden></label></div>
-  <div class="alert i sm"><b>Como funciona neste ambiente.</b> O artefato não consegue abrir outros sites (CSP) nem guardar credenciais. O botão gera o arquivo de pedido; envie-o ao seu backend${be ? ` (<a href="${esc(be)}" target="_blank" rel="noopener noreferrer">${esc(be)}</a>)` : ' (configure em Configurações de IA)'} — a página do backend também aceita colar os links direto —, baixe a resposta e importe-a aqui. Páginas que exigem login só são lidas se o backend tiver a credencial TDN configurada (segredo <code>TDN_COOKIE</code> ou <code>TDN_AUTH_HEADER</code>); caso contrário o aplicativo informa a limitação e você pode anexar o material em “Importar materiais” (HTML salvo, PDF, DOCX, PPTX).</div>
+  <div class="row" style="margin-top:6px"><button class="btn pri" data-a="lkImport">Importar para a Base de Soluções</button>${window.__HOSTED__ ? '' : '<label class="btn ghost" style="cursor:pointer">Importar resposta do backend<input type="file" id="f-lk" accept=".json" hidden></label>'}</div>
+  ${window.__HOSTED__ ? '<div class="alert i sm">Páginas que exigem login do TDN não podem ser lidas: nesse caso o aplicativo informa o motivo e você pode anexar o material (PDF, DOCX, PPTX, HTML salvo) em “Importar materiais”.</div>' : `<div class="alert i sm"><b>Como funciona neste ambiente.</b> O artefato não consegue abrir outros sites (CSP) nem guardar credenciais. O botão gera o arquivo de pedido; envie-o ao seu backend${be ? ` (<a href="${esc(be)}" target="_blank" rel="noopener noreferrer">${esc(be)}</a>)` : ' (configure em Configurações de IA)'} — a página do backend também aceita colar os links direto —, baixe a resposta e importe-a aqui. Páginas que exigem login só são lidas se o backend tiver a credencial TDN configurada (segredo <code>TDN_COOKIE</code> ou <code>TDN_AUTH_HEADER</code>); caso contrário o aplicativo informa a limitação e você pode anexar o material em “Importar materiais” (HTML salvo, PDF, DOCX, PPTX).</div>`}
   ${pend.map(p => `<div class="row sm"><b>${esc(p.alvo)}</b>${pill(p.status, p.status === 'aguardando' ? 'info' : p.status === 'falhou' ? 'bad' : 'warn')}<span class="muted">${esc(dtBR(p.at))}</span><span class="sp"></span>${p.status === 'aguardando' ? `<button class="btn ghost sm" data-a="lkReq" data-id="${p.id}">Baixar pedido de novo</button>` : ''}<button class="btn ghost sm" data-a="pesqRm" data-id="${p.id}">Remover</button></div>`).join('')}</div>`;
 }
 function lkRecBody(rec) {
@@ -4301,10 +4316,11 @@ if (HOST) { delete AI_PROV.pagina; const i = AI_PROV_IDS.indexOf('pagina'); if (
 
 /* aviso permanente enquanto não houver chave utilizável: a ferramenta funciona sem IA, mas lembra de conectar */
 function hkBanner() {
+  if (UI.view === 'ia') return ''; /* a tela de IA já mostra o estado das chaves */
   const salvas = AI_PROV_IDS.filter(p => hkChave(p)), pad = iaInit().provedor;
-  const ir = '<button class="btn sm" data-a="nav" data-v="ia">Conectar minha chave</button>';
-  if (!salvas.length) return `<div class="alert w" role="status"><b>Nenhuma chave de IA conectada.</b> Carteira, diagnóstico e recomendações funcionam normalmente; só os recursos com IA (pesquisa, OCR, análise semântica reforçada) ficam indisponíveis até você conectar a sua chave. ${ir}</div>`;
-  if (!hkChave(pad)) return `<div class="alert w" role="status"><b>O provedor padrão (${esc(AI_PROV[pad]?.nome || pad)}) está sem chave.</b> Você tem chave de ${esc(salvas.map(p => AI_PROV[p].nome).join(', '))}: marque-o como padrão ou cadastre a chave faltante. ${ir}</div>`;
+  const ir = '<button class="btn sm" data-a="nav" data-v="ia">Configurar IA</button>';
+  if (!salvas.length) return `<div class="alert w hkbar" role="status"><span><b>Sem chave de IA.</b> Carteira e diagnóstico funcionam; pesquisa, OCR e análise reforçada precisam da sua chave.</span>${ir}</div>`;
+  if (!hkChave(pad)) return `<div class="alert w hkbar" role="status"><span><b>Provedor padrão (${esc(AI_PROV[pad]?.nome || pad)}) sem chave.</b> Há chave de ${esc(salvas.map(p => AI_PROV[p].nome).join(', '))}: defina-o como padrão ou cadastre a faltante.</span>${ir}</div>`;
   return '';
 }
 /* cartão "Minhas chaves de IA" (substitui a conexão manual com backend) */
@@ -5930,7 +5946,7 @@ function vGeral(forExport) {
   const tipos = s.count(s.opps, o => o.tipo), prio = s.count(s.opps, o => o.prio), conf = s.count(s.opps, o => o.conf), segd = s.count(s.cs, c => segName(c.segInfo.id) || 'Sem segmento definido');
   const k = (v, l, n = '', c = '') => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div><div class="n">${n}</div></div>`;
   let h = `<div class="grid g4">${k(s.n, 'Clientes importados', 'FATO • planilha')}${k(s.withF, 'Com ficha confirmada', `${s.pct(s.withF, s.n)}% da carteira`, 'm')}${k(S.inbox.length + s.cs.filter(c => c.doc.k === 'sugerida').length, 'Fichas/docs pendentes', 'sugeridas ou sem cliente', 'w')}${k(s.need.length, 'Clientes a validar', 'conflito, vínculo sugerido ou segmento inferido', 'r')}${k(s.opps.length, 'Oportunidades', `${s.opps.filter(o => o.modo === 'investigacao').length} são investigação recomendada`)}</div>`;
-  h += segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard());
+  h += (forExport ? '' : hojeCard()) + segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard());
   h += `<div class="grid g2" style="margin-top:14px"><div class="card"><h3>Qualidade dos dados</h3>${bars(s.dq.map(([l, v]) => [l, v, `${v}/${s.n} (${s.pct(v, s.n)}%)`]))}</div>
   <div class="card"><h3>Distribuição por segmento</h3>${bars(segd.map(([l, v]) => [l, v, `${v} (${s.pct(v, s.n)}%)`]))}<p class="muted sm">${s.cs.filter(c => c.segInfo.mode === 'inferido').length} cliente(s) com segmento ${chip('INFERÊNCIA')}.</p></div></div>
   <div class="card"><h3>Faturamento recorrente identificado em fichas</h3>`;
@@ -5950,21 +5966,32 @@ function filtered() {
   const f = UI.f, q = norm(f.q); let a = clients().filter(c => (!q || norm(`${c.name} ${c.code} ${c.cnpj} ${fmtCnpj(c.cnpj)} ${c.city} ${c.seg}`).includes(q) || (digits(f.q).length >= 4 && (c.cnpj || '').includes(digits(f.q)))) && (!f.seg || (c.segInfo.id || 'none') === f.seg) && (!f.fs || c.fstat.k === f.fs) && (!f.prio || c.opps[0]?.prio === f.prio) && (!f.conf || c.opps[0]?.conf === f.conf) && (!f.dq || dqTest(c, f.dq)) && facetTest(c, f));
   const so = { score: (x, y) => (y.topScore ?? -1) - (x.topScore ?? -1), nome: (x, y) => x.name.localeCompare(y.name), mrr: (x, y) => (y.mrr ?? -1) - (x.mrr ?? -1), comp: (x, y) => complet(x).pct - complet(y).pct }[f.sort]; return a.sort(so);
 }
+function cliCard(c) {
+  const o = c.opps[0];
+  return `<article class="ccard"><div class="row"><div><b>${esc(c.name)}</b><div class="muted sm">${esc(c.code)}${c.city ? ' • ' + esc(c.city) : ''}</div></div><span class="sp"></span>${o ? pill(o.prio + ' ' + o.score, PRIOK[o.prio]) : ''}</div>
+  <div class="row sm">${fPill(c)}${c.conflicts.length ? pill('⚠ ' + c.conflicts.length, 'bad') : ''}${compPill(c)}</div>
+  <dl class="sm"><dt>Segmento</dt><dd>${esc(segName(c.segInfo.id) || '—')}${c.segInfo.mode === 'inferido' ? ' ' + chip('INFERÊNCIA') : ''}</dd><dt>MRR (planilha)</dt><dd>${fmtBRL(c.mrr)}</dd><dt>Produtos</dt><dd>${c.productsIdent.map(p => esc(p.nome)).join(', ') || '<span class="muted">não identificado</span>'}</dd><dt>Oportunidade</dt><dd>${o ? esc(o.nome) + (o.modo === 'investigacao' ? ' ' + chip('HIPÓTESE') : '') + ` <span class="muted">conf. ${o.conf}</span>` : '<span class="muted">—</span>'}</dd></dl>
+  <div class="row"><button class="btn pri sm" data-a="open" data-k="${esc(c.key)}">Detalhes</button><button class="btn ghost sm" data-a="openTab" data-k="${esc(c.key)}" data-v="cadastro">Editar cadastro</button>${upBtn(c)}</div></article>`;
+}
 function tbl() {
   const a = filtered(), sh = a.slice(0, UI.lim);
-  return `<div class="muted sm" style="margin-bottom:6px">${a.length} cliente(s)</div><div class="tw"><table><thead><tr><th>Código</th><th>Cliente</th><th>Segmento</th><th>Produtos</th><th class="r">MRR (planilha)</th><th>Ficha</th><th>Completude</th><th>Principal oportunidade</th><th>Score</th></tr></thead><tbody>${sh.map(c => { const o = c.opps[0]; return `<tr class="clk" data-a="open" data-k="${esc(c.key)}"><td class="nw">${esc(c.code)}</td><td><b>${esc(c.name)}</b><div class="muted sm">${esc(c.city)}</div></td><td class="sm">${esc(segName(c.segInfo.id) || '—')}${c.segInfo.mode === 'inferido' ? ' ' + chip('INFERÊNCIA') : ''}${(c.segInfo.sec || []).map(x => ' <span class="pill p-off">+' + esc(segName(x) || x) + '</span>').join('')}</td><td class="sm">${c.productsIdent.map(p => esc(p.nome)).join(', ') || '<span class="muted">não identificado</span>'}</td><td class="r nw">${fmtBRL(c.mrr)}</td><td>${fPill(c)}${c.conflicts.length ? ' ' + pill('⚠ ' + c.conflicts.length, 'bad') : ''}${['nao_carregada', 'revisao', 'erro'].includes(c.fstat.k) ? '<div>' + upBtn(c) + '</div>' : ''}</td><td>${compPill(c)}</td><td class="sm">${o ? esc(o.nome) + (o.modo === 'investigacao' ? ' ' + chip('HIPÓTESE') : '') : '<span class="muted">—</span>'}</td><td>${o ? `${pill(o.prio + ' ' + o.score, PRIOK[o.prio])} <span class="muted sm">conf. ${o.conf}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>${a.length > UI.lim ? `<button class="btn ghost" style="margin-top:8px" data-a="more">Mostrar mais (${a.length - UI.lim})</button>` : ''}`;
+  return `<div class="muted sm" style="margin-bottom:6px">${a.length} cliente(s)</div><div class="tw"><table><thead><tr><th>Código</th><th>Cliente</th><th>Segmento</th><th>Produtos</th><th class="r">MRR (planilha)</th><th>Ficha</th><th>Completude</th><th>Principal oportunidade</th><th>Score</th></tr></thead><tbody>${sh.map(c => { const o = c.opps[0]; return `<tr class="clk" data-a="open" data-k="${esc(c.key)}"><td class="nw">${esc(c.code)}</td><td><b>${esc(c.name)}</b><div class="muted sm">${esc(c.city)}</div></td><td class="sm">${esc(segName(c.segInfo.id) || '—')}${c.segInfo.mode === 'inferido' ? ' ' + chip('INFERÊNCIA') : ''}${(c.segInfo.sec || []).map(x => ' <span class="pill p-off">+' + esc(segName(x) || x) + '</span>').join('')}</td><td class="sm">${c.productsIdent.map(p => esc(p.nome)).join(', ') || '<span class="muted">não identificado</span>'}</td><td class="r nw">${fmtBRL(c.mrr)}</td><td>${fPill(c)}${c.conflicts.length ? ' ' + pill('⚠ ' + c.conflicts.length, 'bad') : ''}${['nao_carregada', 'revisao', 'erro'].includes(c.fstat.k) ? '<div>' + upBtn(c) + '</div>' : ''}</td><td>${compPill(c)}</td><td class="sm">${o ? esc(o.nome) + (o.modo === 'investigacao' ? ' ' + chip('HIPÓTESE') : '') : '<span class="muted">—</span>'}</td><td>${o ? `${pill(o.prio + ' ' + o.score, PRIOK[o.prio])} <span class="muted sm">conf. ${o.conf}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div><div class="ccards">${sh.map(cliCard).join('')}</div>${a.length > UI.lim ? `<button class="btn ghost" style="margin-top:8px" data-a="more">Mostrar mais (${a.length - UI.lim})</button>` : ''}`;
 }
+function fbtnTxt() { const n = Object.keys(FLBL).filter(k => k !== 'q' && UI.f[k]).length; return 'Filtros' + (n ? ` (${n})` : ''); }
 function vClientes() {
   if (!clients().length) return needData(); const f = UI.f;
   const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`;
-  return `<div class="filters"><input type="text" id="fq" placeholder="Buscar nome, código, CNPJ, cidade…" value="${esc(f.q)}" style="min-width:260px" data-i="fq">
+  return `<div class="filters"><input type="text" id="fq" placeholder="Buscar nome, código, CNPJ, cidade…" value="${esc(f.q)}" style="min-width:260px" data-i="fq" aria-label="Buscar cliente">
+  <button class="btn ghost fbtn" id="fbtn" data-a="fToggle" aria-expanded="${UI.fOpen ? 'true' : 'false'}" aria-controls="fpanel">${fbtnTxt()}</button>
+  <div class="fpanel ${UI.fOpen ? 'open' : ''}" id="fpanel" role="group" aria-label="Filtros">
   <select data-c="fseg">${opt('', 'Todos os segmentos', f.seg)}${KB.segments.map(s => opt(s.id, s.nome, f.seg)).join('')}${opt('none', 'Sem segmento', f.seg)}</select>
   <select data-c="ffs">${opt('', 'Qualquer status de ficha', f.fs)}${opt('nao_carregada', 'Clientes sem ficha de faturamento', f.fs)}${Object.entries(FSTAT).filter(([k]) => k !== 'nao_carregada').map(([k, l]) => opt(k, l, f.fs)).join('')}</select>
   <select data-c="fprio">${opt('', 'Qualquer prioridade', f.prio)}${['Alta', 'Média', 'Baixa'].map(x => opt(x, x, f.prio)).join('')}</select>
   <select data-c="fconf">${opt('', 'Qualquer confiança', f.conf)}${['alto', 'médio', 'baixo'].map(x => opt(x, x, f.conf)).join('')}</select>
   <select data-c="fdq">${opt('', 'Qualquer qualidade de dados', f.dq)}${Object.entries(DQF).map(([k, l]) => opt(k, l, f.dq)).join('')}</select>
   ${facetBar(f)}
-  <select data-c="fsort">${opt('score', 'Ordenar: maior score', f.sort)}${opt('nome', 'Ordenar: nome', f.sort)}${opt('mrr', 'Ordenar: MRR', f.sort)}${opt('comp', 'Ordenar: completude', f.sort)}</select></div><div id="fch">${fchips()}</div><p class="muted sm">Completude mede dados disponíveis — não indica potencial comercial.</p><div id="tbl">${tbl()}</div>`;
+  <select data-c="fsort">${opt('score', 'Ordenar: maior score', f.sort)}${opt('nome', 'Ordenar: nome', f.sort)}${opt('mrr', 'Ordenar: MRR', f.sort)}${opt('comp', 'Ordenar: completude', f.sort)}</select>
+  <div class="fpact"><button class="btn pri sm" data-a="fApply">Aplicar</button><button class="btn ghost sm" data-a="fclr" data-k="*">Limpar</button></div></div></div><div id="fch">${fchips()}</div><p class="muted sm">Completude mede dados disponíveis — não indica potencial comercial.</p><div id="tbl">${tbl()}</div>`;
 }
 
 /* ---------- Cliente ---------- */
@@ -6019,10 +6046,11 @@ function vSeg() {
 function vPlano() {
   if (!clients().length) return needData(); const p = UI.plan, q = norm(p.q);
   const all = planRows(), rows = all.filter(r => (!q || norm(r.cliente + r.evid + r.acao).includes(q)) && (!p.tipo || (p.tipo === 'Validação' ? r.tipo === 'Validação' : r.tipo === p.tipo)) && (!p.prio || r.prio === p.prio) && (p.st || !r.dec || r.dec.valid !== 'descartada') && (!p.st || (r.dec ? r.dec.valid + '|' + r.dec.sit : actOf(r.id, r.key).status || 'Pendente').split('|').includes(p.st)));
+  UI.planScope = rows;
   const ST = ['Pendente', 'Em andamento', 'Concluído', 'Descartado'], o = (v, cur) => `<option ${v === cur ? 'selected' : ''}>${v}</option>`, ov = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`;
   return `<div class="alert i sm">Responsável e prazo são <b>manuais</b> e começam vazios. Em oportunidades, <b>validação</b> e <b>situação comercial</b> são dimensões separadas, registradas no cliente; tarefas de validação usam status simples. Prioridade = score transparente (ver Critérios); <b>não</b> é probabilidade de fechamento.</div>
   <div class="filters"><input type="text" placeholder="Buscar…" value="${esc(p.q)}" data-i="pq" style="min-width:220px"><select data-c="ptipo"><option value="">Todos os tipos</option>${['Expansão', 'Cross-sell', 'Serviços', 'Otimização', 'Retenção', 'Validação', 'Mercado'].map(x => o(x, p.tipo)).join('')}</select><select data-c="pprio"><option value="">Toda prioridade</option>${['Alta', 'Média', 'Baixa', 'Validação'].map(x => o(x, p.prio)).join('')}</select><select data-c="pst"><option value="">Toda validação/situação</option>${[...Object.entries(VALID_L), ...Object.entries(SIT_L)].map(([k, l]) => ov(k, l, p.st)).join('')}${ST.map(x => o(x, p.st)).join('')}</select><span class="sp"></span><button class="btn" data-a="expCSV">CSV</button><button class="btn ghost" data-a="expXLSX">XLSX</button></div>
-  <div class="muted sm" style="margin-bottom:6px">${rows.length} de ${all.length} linhas${all.some(r => r.dec?.valid === 'descartada') ? ' • oportunidades descartadas ficam ocultas até filtrar por "Descartada"' : ''}</div><div class="tw"><table><thead><tr><th>Prioridade</th><th>Cliente</th><th>Evidência</th><th>Ação</th><th>Responsável</th><th>Prazo</th><th>Validação / Situação</th></tr></thead><tbody>${rows.slice(0, 400).map(r => { const a = actOf(r.id, r.key); return `<tr><td>${pill(r.prio + (r.score >= 0 ? ' ' + r.score : ''), PRIOK[r.prio])}<div class="sm muted">${esc(r.tipo)}${r.conf !== '—' ? ' • conf. ' + r.conf : ''}</div></td><td>${r.key ? `<a href="#" data-a="open" data-k="${esc(r.key)}">${esc(r.cliente)}</a>` : esc(r.cliente)}</td><td class="sm" style="max-width:360px">${esc(r.evid.slice(0, 380))}${r.evid.length > 380 ? '…' : ''}</td><td class="sm" style="max-width:280px">${esc(r.acao)}</td><td><input type="text" value="${esc(a.resp || '')}" data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="resp" style="width:120px"></td><td><input type="date" value="${esc(a.prazo || '')}" data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="prazo"></td><td>${r.dec ? `<div class="sm">${pill(VALID_L[r.dec.valid], r.dec.valid === 'validada' ? 'ok' : r.dec.valid === 'descartada' ? 'bad' : 'warn')} ${pill(SIT_L[r.dec.sit], 'info')}</div><a href="#" class="sm" data-a="openOpp" data-k="${esc(r.key)}">decidir no cliente</a> • <a href="#" class="sm" data-a="dxOpenLnk" data-k="${esc(r.key)}" data-id="${esc(r.id.slice(('opp:' + r.key + ':').length))}">Ver Diagnóstico Completo</a>` : `<select data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="status">${ST.map(x => o(x, a.status || 'Pendente')).join('')}</select>`}</td></tr>`; }).join('')}</tbody></table></div>${rows.length > 400 ? '<p class="muted sm">Exibindo 400 primeiras; refine os filtros ou exporte.</p>' : ''}${fbBox()}`;
+  <div class="muted sm" style="margin-bottom:6px">${rows.length} de ${all.length} linhas${all.some(r => r.dec?.valid === 'descartada') ? ' • oportunidades descartadas ficam ocultas até filtrar por "Descartada"' : ''}</div>${planBulkBar(rows)}<div class="tw"><table><thead><tr><th><span class="sr">Selecionar</span></th><th>Prioridade</th><th>Cliente</th><th>Evidência</th><th>Ação</th><th>Responsável</th><th>Prazo</th><th>Validação / Situação</th></tr></thead><tbody>${rows.slice(0, 400).map(r => { const a = actOf(r.id, r.key); return `<tr><td><input type="checkbox" data-c="psel" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" ${(UI.planSel || {})[r.id] !== undefined ? 'checked' : ''} aria-label="Selecionar ação de ${esc(r.cliente)}"></td><td>${pill(r.prio + (r.score >= 0 ? ' ' + r.score : ''), PRIOK[r.prio])}<div class="sm muted">${esc(r.tipo)}${r.conf !== '—' ? ' • conf. ' + r.conf : ''}</div></td><td>${r.key ? `<a href="#" data-a="open" data-k="${esc(r.key)}">${esc(r.cliente)}</a>` : esc(r.cliente)}</td><td class="sm" style="max-width:360px">${r.evid.length > 160 ? `${esc(r.evid.slice(0, 160))}… <details class="evd"><summary>Ver evidência completa</summary>${esc(r.evid)}</details>` : esc(r.evid)}</td><td class="sm" style="max-width:280px">${esc(r.acao)}</td><td><input type="text" value="${esc(a.resp || '')}" data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="resp" style="width:120px"></td><td><input type="date" value="${esc(a.prazo || '')}" data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="prazo"></td><td>${r.dec ? `<div class="sm">${pill(VALID_L[r.dec.valid], r.dec.valid === 'validada' ? 'ok' : r.dec.valid === 'descartada' ? 'bad' : 'warn')} ${pill(SIT_L[r.dec.sit], 'info')}</div><a href="#" class="sm" data-a="openOpp" data-k="${esc(r.key)}">decidir no cliente</a> • <a href="#" class="sm" data-a="dxOpenLnk" data-k="${esc(r.key)}" data-id="${esc(r.id.slice(('opp:' + r.key + ':').length))}">Ver Diagnóstico Completo</a><div class="sm">${a.status === 'Concluído' ? pill('Ação concluída', 'ok') + ` <a href="#" data-a="planReabrir" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}">reabrir</a>` : `<a href="#" data-a="hojeOk" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}">marcar ação concluída</a>`}</div>` : `<select data-c="act" data-id="${esc(r.id)}" data-k="${esc(r.key || '')}" data-f="status">${ST.map(x => o(x, a.status || 'Pendente')).join('')}</select>`}</td></tr>`; }).join('')}</tbody></table></div>${rows.length > 400 ? '<p class="muted sm">Exibindo 400 primeiras; refine os filtros ou exporte.</p>' : ''}${fbBox()}`;
 }
 
 /* ---------- Critérios ---------- */
@@ -6218,7 +6246,7 @@ function vSolucoes() {
   <div class="row" style="margin-bottom:10px"><input type="text" data-i="solq" value="${esc(UI.solQ)}" placeholder="Buscar nome, sigla, linha, termo ou conteúdo (funcionalidades, dores, finalidade)…" style="min-width:260px"><select data-c="solf" data-f="tipo">${optS('', 'Todos os tipos', f.tipo)}${Object.entries(TIPOS).map(([k, l]) => optS(k, l, f.tipo)).join('')}</select><select data-c="solf" data-f="st">${optS('', 'Qualquer status', f.st)}${STATUS_SOL.map(x => optS(x, x, f.st)).join('')}</select><select data-c="solf" data-f="rs">${optS('', 'Qualquer validação de referência', f.rs)}${Object.entries(REF_ST).map(([k, l]) => optS(k, l, f.rs)).join('')}${optS('sem', 'Sem situação registrada', f.rs)}</select><select data-c="solf" data-f="grupo">${optS('', 'Todos os grupos', f.grupo)}${REF24.GRUPOS.map(g => optS(g, g, f.grupo)).join('')}</select><select data-c="solf" data-f="arq">${optS('', 'Ativas', f.arq)}${optS('1', 'Arquivadas', f.arq)}</select><span class="sp"></span><button class="btn pri" data-a="solNew">+ Nova solução</button><button class="btn ghost" data-a="solSeed" title="Recria apenas registros iniciais que foram removidos">Restaurar base inicial</button></div>
   ${smCard()}
   <div class="grid g2"><label class="drop" data-drop="f-sol"><b>Importar materiais</b><br><span class="muted sm">PDF (com texto), XLSX, XLS, CSV, DOCX, PPTX, HTML, TXT, MD — extrai, mostra prévia e só grava após revisão</span><input type="file" id="f-sol" multiple accept=".pdf,.xlsx,.xls,.csv,.docx,.pptx,.html,.htm,.txt,.md" hidden></label>
-  <div class="card" style="margin:0"><h4>Pesquisa assistida</h4><p class="sm">Pesquisa em Portal TOTVS/TDN/Central de Atendimento via backend externo (Gemini). Configure em <a href="#" data-a="nav" data-v="ia">Configurações de IA</a>.</p><div class="row"><select id="ps-seg">${KB.segments.map(g => optS(g.id, g.nome, '')).join('')}</select><button class="btn ghost sm" data-a="pesqSegBtn">Pesquisar soluções para este segmento</button></div></div></div>`;
+  <div class="card" style="margin:0"><h4>Pesquisa assistida</h4><p class="sm">${window.__HOSTED__ ? 'Pesquisa em Portal TOTVS/TDN/Central de Atendimento com a sua chave de IA. Configure em' : 'Pesquisa em Portal TOTVS/TDN/Central de Atendimento via backend externo (Gemini). Configure em'} <a href="#" data-a="nav" data-v="ia">Configurações de IA</a>.</p><div class="row"><select id="ps-seg">${KB.segments.map(g => optS(g.id, g.nome, '')).join('')}</select><button class="btn ghost sm" data-a="pesqSegBtn">Pesquisar soluções para este segmento</button></div></div></div>`;
   h += lkCard(); h += prodRegCard(); h += ref24Panel(); if (UI.solEdit) h += solForm(); h += solImportCard(); if (sel && !UI.solEdit) h += solDetail(sel);
   h += `<div class="card"><h3>Registros (${list.length}${list.length !== all.length ? ' de ' + all.length : ''})</h3><div class="tw"><table><thead><tr><th>Nome</th><th>Sigla / ID interno</th><th>Tipo</th><th>Linha / categoria</th><th>Segmentos</th><th>Status</th><th>Validação da referência</th><th>Fontes</th><th>Atualizado</th></tr></thead><tbody>${list.map(r => `<tr class="clk" data-a="solView" data-id="${r.id}"><td><b>${esc(r.nome)}</b>${r.pend?.some(p => !p.resolvido) ? ' ' + pill('conflito', 'bad') : ''}${solConflicts(r).some(k => !k.pend) ? ' ' + pill('fontes divergem', 'bad') : ''}<div class="muted sm">${esc(r.origem)}${(r.notasInt || []).length ? ' • ' + r.notasInt.length + ' nota(s) interna(s)' : ''}</div></td><td class="sm nw">${esc(r.sigla || '—')}<div class="muted">${esc(r.refId || '')}</div></td><td class="sm">${esc(TIPOS[r.tipo])}${r.tipo === 'servico' ? `<div class="muted">${esc(r.fornecedor || 'fornecedor?')}</div>` : ''}</td><td class="sm">${esc(r.linha || '—')}<div class="muted">${esc(r.categoria || '')}</div></td><td class="sm">${r.segmentos.map(id => esc(segName(id) || id)).join(', ') || '—'}</td><td>${pill(r.status, ST_SOL[r.status] || 'off')}</td><td>${r.refStatus ? pill(REF_ST[r.refStatus], REF_STK[r.refStatus]) : '<span class="muted sm">—</span>'}</td><td class="sm">${(r.fontes || []).slice(0, 2).map(f => esc(f.t)).join('<br>')}${(r.fontes || []).length > 2 ? `<div class="muted">+${r.fontes.length - 2}</div>` : ''}</td><td class="nw sm">${esc(r.atualizadoEm)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Nenhum registro.</td></tr>'}</tbody></table></div></div>`;
   return h;
@@ -6262,7 +6290,7 @@ function vIA() {
     <div><h4>Exatamente o que será enviado</h4><pre class="sm" style="white-space:pre-wrap;max-height:260px;overflow:auto">${esc(JSON.stringify(fin, null, 1))}</pre><p class="sm muted">CNPJ, e-mails e valores em R$ digitados acima são removidos automaticamente.</p></div></div>
     <div class="row"><button class="btn pri" data-a="pesqGo">Gerar arquivo de pedido</button><button class="btn ghost" data-a="pesqNo">Cancelar</button></div></div>`;
   }
-  h += `<div class="card"><h3>Pesquisas</h3><div class="row"><label class="btn ghost" style="cursor:pointer">Importar resposta do backend<input type="file" id="f-ai2" accept=".json" hidden></label><span class="muted sm">Comandos: “Pesquisar soluções para este cliente” (página do cliente), “Pesquisar soluções para este segmento” (Base de Soluções e Segmentos) e “Atualizar informações deste produto” (detalhe da solução).</span></div>
+  h += `<div class="card"><h3>Pesquisas</h3><div class="row">${window.__HOSTED__ ? '' : '<label class="btn ghost" style="cursor:pointer">Importar resposta do backend<input type="file" id="f-ai2" accept=".json" hidden></label>'}<span class="muted sm">Comandos: “Pesquisar soluções para este cliente” (página do cliente), “Pesquisar soluções para este segmento” (Base de Soluções e Segmentos) e “Atualizar informações deste produto” (detalhe da solução).</span></div>
   ${S.pesq.length ? S.pesq.map(pesqCard).join('') : '<p class="muted">Nenhuma pesquisa.</p>'}</div>
   <div class="card"><h3>Documentação consultada em ${AI_CONSULTA}</h3><ul class="sm">${AI_DOCS.map(d => `<li><a href="${d.u}" target="_blank" rel="noopener noreferrer">${esc(d.t)}</a></li>`).join('')}</ul></div>`;
   return h;
@@ -6442,6 +6470,7 @@ function tabEco(c) {
 
 /* ---------- Aba: Diagnóstico executivo ---------- */
 function tabDiag(c) {
+  if (window.__HOSTED__ && ME && ME.id) { S.meta.exec ||= {}; if (S.meta.exec.nome === undefined) S.meta.exec.nome = ME.nome || ''; if (S.meta.exec.contato === undefined) S.meta.exec.contato = ME.id; } /* pré-preenche só se nunca editado; vazio digitado pelo usuário é respeitado */
   const mode = UI.execMode || 'interno', M = execModel(c, mode), E = S.meta.exec || {}, cand = execCandidates(c);
   const chk = (id, l, extra = '') => `<label class="sm"><input type="checkbox" data-c="execOk" data-k="${kk(c)}" data-id="${esc(id)}" ${c.exec.ok[id] ? 'checked' : ''}> ${l}</label>${extra}`;
   return `<div class="card"><div class="row"><h3>Diagnóstico executivo</h3><span class="sp"></span><div class="seg2"><button data-a="execMode" data-v="interno" class="${mode === 'interno' ? 'on' : ''}">Interno</button><button data-a="execMode" data-v="cliente" class="${mode === 'cliente' ? 'on' : ''}">Cliente</button></div></div>
@@ -6504,7 +6533,7 @@ function segCard(forExport) {
   const I = segIntel(), t = I.tot, comp = mrrComp(), prec = S.meta.mrrPrec || 'ficha';
   let h = `<div class="card" id="segintel"><div class="row"><h3>Inteligência por Segmento de Atuação</h3><span class="sp"></span>${forExport ? '' : `<button class="btn ghost sm" data-a="segCfg" aria-expanded="${!!UI.segCfg}">${UI.segCfg ? 'Fechar configurações' : 'Configurar contagem, MRR e segmentos'}</button>`}</div>
   <p class="sm">Unidade de contagem: <b>${esc(UNIT_L[I.u])}</b> • MRR: competência de referência <b>${esc(comp)}</b>, somente valores recorrentes • Precedência em caso de divergência: <b>${prec === 'planilha' ? 'planilha' : 'ficha da competência'}</b> (tolerância ${mrrTol()}%)</p>
-  ${t.semComp ? `<div class="alert sm">${t.semComp} conta(s) com MRR na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'}): ficam fora das somas como <b>desconhecido</b> (desconhecido ≠ zero). ${forExport ? '' : 'Declare a competência da planilha nas configurações.'}</div>` : ''}
+  ${forExport ? (t.semComp ? `<div class="alert sm">${t.semComp} conta(s) com MRR na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'}): ficam fora das somas como <b>desconhecido</b> (desconhecido ≠ zero).</div>` : '') : mrrAviso(t)}
   ${t.div ? `<div class="alert b sm">${t.div} conta(s) com divergência entre MRR da planilha e da ficha na mesma competência: aplicada a precedência configurada; os dois valores nunca são somados. Veja o filtro "Com conflitos".</div>` : ''}
   ${!forExport && UI.segCfg ? segCfgPanel() : ''}
   <div class="tw"><table class="segtbl"><caption class="sm muted" style="text-align:left">Clique ou pressione Enter em um segmento para abrir a lista de clientes filtrada.</caption><thead><tr><th>Segmento (principal)</th><th class="r">Clientes</th><th class="r">% da carteira</th><th class="r">MRR identificado</th><th class="r">Participação no MRR conhecido</th><th>Cobertura do MRR</th><th>Cobertura de fichas</th><th class="r">Dados estratégicos incompletos</th><th class="r">Oportunidades fundamentadas</th>${forExport ? '' : '<th></th>'}</tr></thead><tbody>
@@ -6542,6 +6571,65 @@ function segStudyPanel(id) {
   <div><h4>Evidências dos clientes ${chip('FATO')}<span class="muted sm"> (${n} cliente(s), só dados confirmados)</span></h4>${li([...hosp.map(([k, v]) => `<li>Hospedagem ${esc(k)}: ${v}</li>`), ...reg.map(([k, v]) => `<li>Regime ${esc(k)}: ${v}</li>`), `<li>Release em produção confirmada: ${cs.filter(relConf).length}</li>`, ...prods.slice(0, 6).map(([k, v]) => `<li>Contratação identificada — ${esc(k)}: ${v}</li>`), ...Object.entries(fm).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `<li>Oportunidade com evidência individual — ${esc(k)}: ${v}</li>`)])}</div>
   <div><h4>Hipóteses comerciais ${chip('HIPÓTESE')}</h4>${li([...(g.dores || []).map(d => `<li>${esc(d)}</li>`), ...(g.demandas || []).map(d => `<li>Demanda provável: ${esc(d)}</li>`), ...(g.aplicacoes || []).map(a => `<li>${esc(solById(a.sol)?.nome || a.sol)}: ${esc(a.porque)}</li>`)])}</div></div></div>`;
 }
+
+/* ---------- Aviso de MRR com competência (mesmo estado das configurações: refComp / mrrComp / mrrPlanComp) ---------- */
+function mrrEstados() {
+  const r = { n: 0, conhecido: 0, zero: 0, semCompPlan: 0, semValor: 0, semFicha: 0 };
+  clients().forEach(c => { const m = mrrOf(c); r.n++; if (m.v != null) { r.conhecido++; if (m.v === 0) r.zero++; } else if (m.semComp) r.semCompPlan++; else r.semValor++; if (m.fic == null) r.semFicha++; });
+  return r;
+}
+function mrrAviso(t) {
+  const e = mrrEstados(); if (!e.n || (!e.semCompPlan && !e.semValor && !e.semFicha && !t.semComp)) return '';
+  const mi = (c, v, l) => `<label class="sm">${l} <input type="month" data-c="${c}" value="${esc(v || '')}" pattern="\\d{4}-\\d{2}" placeholder="AAAA-MM" aria-label="${esc(l)}" style="width:150px"></label>`;
+  const parts = [`<b>${e.conhecido}</b> de ${e.n} conta(s) com MRR conhecido${e.zero ? ` (${e.zero} com valor confirmado igual a zero)` : ''}`];
+  if (e.semCompPlan) parts.push(`<b>${e.semCompPlan}</b> desconhecido: valor na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'})`);
+  if (e.semValor) parts.push(`<b>${e.semValor}</b> desconhecido: sem valor em nenhuma fonte`);
+  if (e.semFicha) parts.push(`<b>${e.semFicha}</b> sem ficha na competência ${esc(mrrComp())}`);
+  return `<div class="alert sm" id="mrraviso" role="status"><div class="row">${mi('mrrRef', mrrComp(), 'Competência de referência')}${mi('mrrPlanComp', S.meta.mrrPlanComp, 'Competência do MRR da planilha')}</div>
+  <div>${parts.join(' • ')}.</div><div class="muted">Desconhecido não é zero: contas sem dado ficam fora das somas. Ao alterar a competência, indicadores e cobertura de fichas são recalculados.</div></div>`;
+}
+
+/* ---------- Painel "Hoje" (usa o score e as regras do plano de ação; sem motor próprio) ---------- */
+const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const isoBR = s => s ? s.split('-').reverse().join('/') : '';
+function hojeRows() {
+  const hoje = hojeISO(), seen = new Set(), out = [];
+  planRows().forEach(r => {
+    if (r.score < 0 || !r.dec || seen.has(r.id)) return; seen.add(r.id);
+    const a = actOf(r.id, r.key);
+    if (r.dec.valid === 'descartada' || ['encerrada', 'contratada'].includes(r.dec.sit) || ['Concluído', 'Descartado'].includes(a.status)) return;
+    const p = a.prazo || ''; if (p && p > hoje) return;
+    out.push({ ...r, a, sit: !p ? 'sem prazo' : p < hoje ? 'vencida' : 'hoje' });
+  });
+  return out.sort((x, y) => y.score - x.score || (x.a.prazo || '9999-99-99').localeCompare(y.a.prazo || '9999-99-99'));
+}
+function hojeCard() {
+  const all = hojeRows(), top = all.slice(0, 5);
+  if (!top.length) return `<div class="card" id="hoje"><h3>Hoje</h3><p class="muted sm">Nenhuma ação aberta vencida, prevista para hoje ou sem prazo. Ações com prazo futuro continuam no <a href="#" data-a="nav" data-v="plano">Plano de ação</a>.</p></div>`;
+  const sp = s => s === 'vencida' ? pill('Vencida', 'bad') : s === 'hoje' ? pill('Hoje', 'warn') : pill('Sem prazo', 'off');
+  return `<div class="card" id="hoje"><div class="row"><h3>Hoje</h3><span class="pill p-info">${top.length} de ${all.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="nav" data-v="plano">Ver plano de ação</button></div>
+  <div class="tw hojetw"><table><thead><tr><th>Cliente</th><th>Ação</th><th>Prioridade / score</th><th>Prazo</th><th>Responsável</th><th></th></tr></thead><tbody>${top.map(r => `<tr><td><a href="#" data-a="open" data-k="${esc(r.key)}">${esc(r.cliente)}</a></td><td class="sm">${esc(r.acao)}</td><td class="nw">${pill(r.prio + ' ' + r.score, PRIOK[r.prio])}</td><td class="nw">${sp(r.sit)}${r.a.prazo ? ' <span class="sm">' + isoBR(r.a.prazo) + '</span>' : ''}</td><td class="sm">${esc(r.a.resp || '—')}</td><td class="nw"><button class="btn ghost sm" data-a="openOpp" data-k="${esc(r.key)}">Abrir ação</button> <button class="btn sm" data-a="hojeOk" data-id="${esc(r.id)}" data-k="${esc(r.key)}">Concluir</button></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+/* ---------- Plano de ação: seleção e atribuição de responsável em lote ---------- */
+function planBulkBar(scope) {
+  const sel = UI.planSel || (UI.planSel = {}), ids = Object.keys(sel), inScope = new Set(scope.map(r => r.id)), dentro = ids.filter(i => inScope.has(i)).length;
+  return `<div class="alert i sm" id="pbar" role="region" aria-label="Atribuição em lote"><div class="row"><b>${ids.length} selecionada(s)</b><span class="muted">${dentro} dentro do filtro atual (${scope.length} linhas filtradas)${ids.length - dentro ? ` • ${ids.length - dentro} fora do filtro` : ''}</span><span class="sp"></span>
+  <button class="btn ghost sm" data-a="planSelAll">Selecionar as ${scope.length} filtradas</button><button class="btn ghost sm" data-a="planSelClr" ${ids.length ? '' : 'disabled'}>Limpar seleção</button></div>
+  <div class="row"><label class="sm">Responsável <input type="text" data-i="pbulk" value="${esc(UI.planBulk || '')}" placeholder="nome do responsável" style="width:200px"></label><button class="btn sm" data-a="planBulkGo" ${ids.length ? '' : 'disabled'}>Atribuir à seleção</button><button class="btn ghost sm" data-a="planBulkMe" ${ids.length && (ME.nome || ME.id) ? '' : 'disabled'}>Atribuir a mim</button></div></div>`;
+}
+function planBulkGo(resp) {
+  const sel = UI.planSel || {}, ids = Object.keys(sel); resp = String(resp || '').trim();
+  if (!ids.length) return toast('Selecione ao menos uma ação.');
+  if (!resp) return toast('Informe o responsável.');
+  const subst = ids.filter(id => { const a = actOf(id, sel[id] || null); return a.resp && a.resp !== resp; }).length;
+  if (subst && !confirm(`${subst} das ${ids.length} ação(ões) selecionada(s) já têm outro responsável e serão substituídas por “${resp}”. Continuar?`)) return;
+  let ok = 0; const falhas = [];
+  ids.forEach(id => { try { setAct(id, sel[id] || null, { resp }); delete sel[id]; ok++; } catch (e) { falhas.push(id); } });
+  UI.planBulk = ''; render();
+  toast(falhas.length ? `${ok} atualizada(s); ${falhas.length} falharam e continuam selecionadas.` : `Responsável definido em ${ok} ação(ões).`);
+}
+
 function remindCard() {
   const L = clients().flatMap(ctReminders).filter(x => x.nivel === 'alerta' || x.nivel === 'passada').sort((a, b) => a.d - b.d); const decl = clients().flatMap(ctReminders).filter(x => x.nivel === 'declarada').length;
   if (!L.length && !decl) return '';
@@ -6638,7 +6726,7 @@ function solOfficialHead(r) {
   return `<div class="card" style="border-left:4px solid var(--ok);margin:8px 0"><h4>Informação oficial ${pill('fontes oficiais', 'ok')}</h4><p class="sm">Sigla oficial: <b>${esc(r.sigla || '—')}</b> • ID interno: <b>${esc(r.refId || '—')}</b>${r.codOferta ? ` • Código de oferta: <b>${esc(r.codOferta)}</b>` : ''} • Grupo: ${esc(r.grupo || '—')} • Validação: ${r.refStatus ? pill(REF_ST[r.refStatus], REF_STK[r.refStatus]) : pill('sem situação registrada', 'off')}</p>${r.refNota ? `<p class="sm"><b>Nota de validação:</b> ${esc(r.refNota)}</p>` : ''}${r.finalidade ? `<p class="sm"><b>Finalidade:</b> ${esc(r.finalidade)}</p>` : ''}${(r.processos || []).length ? `<p class="sm"><b>Processos:</b> ${r.processos.map(esc).join(' • ')}</p>` : ''}${p.some(x => x.escopo) ? `<p class="sm"><b>Requisitos por funcionalidade/integração:</b></p><ul class="sm">${p.filter(x => x.escopo).map(x => `<li><b>${esc(x.escopo)}</b>: ${esc(x.t)} ${x.u ? `<a href="${esc(x.u)}" target="_blank" rel="noopener noreferrer">${esc(x.f || hostOf(x.u))}</a>` : esc(x.f || '')}</li>`).join('')}</ul>` : ''}${(r.lacunas || []).length ? `<div class="alert sm"><b>Lacunas:</b> ${r.lacunas.map(esc).join(' ')}</div>` : ''}<p class="muted sm">Consulta: ${esc(r.consultadoEm || r.atualizadoEm)}</p></div>`;
 }
 
-function retbl() { const t = $('#tbl'); if (t) t.innerHTML = tbl(); const f = $('#fch'); if (f) f.innerHTML = fchips(); }
+function retbl() { const t = $('#tbl'); if (t) t.innerHTML = tbl(); const f = $('#fch'); if (f) f.innerHTML = fchips(); const b = $('#fbtn'); if (b) b.textContent = fbtnTxt(); }
 
 /* ===== DIAGNÓSTICO EXECUTIVO: modelo, prévia HTML e PDF real (jsPDF) ===== */
 const cut = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s; };
@@ -6735,6 +6823,15 @@ async function execExport(key) {
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
 const ACT = {
   nav: t => { UI.view = t.dataset.v; UI.sbOpen = false; render(); window.scrollTo(0, 0); },
+  hojeOk: t => { setAct(t.dataset.id, t.dataset.k || null, { status: 'Concluído' }); render(); toast('Ação concluída.'); },
+  planReabrir: t => { setAct(t.dataset.id, t.dataset.k || null, { status: 'Pendente' }); render(); },
+  planSelAll: () => { UI.planSel ||= {}; (UI.planScope || []).forEach(r => { UI.planSel[r.id] = r.key || ''; }); render(); },
+  planSelClr: () => { UI.planSel = {}; render(); },
+  planBulkGo: () => planBulkGo(UI.planBulk),
+  planBulkMe: () => planBulkGo(ME.nome || ME.id),
+  fToggle: () => { UI.fOpen = !UI.fOpen; render(); const b = $('#fbtn'); if (b) b.focus(); },
+  fApply: () => { UI.fOpen = false; render(); const b = $('#fbtn'); if (b) b.focus(); },
+  openTab: (t, e) => { e.preventDefault(); UI.sel = t.dataset.k; UI.view = 'cliente'; UI.ctab = t.dataset.v; render(); window.scrollTo(0, 0); },
   open: (t, e) => { e.preventDefault(); UI.sel = t.dataset.k; UI.view = 'cliente'; render(); window.scrollTo(0, 0); cnAutoAoAbrir(t.dataset.k); },
   openSeg: t => { UI.segSel = t.dataset.id || null; UI.view = 'segmentos'; render(); window.scrollTo(0, 0); },
   more: () => { UI.lim += 300; retbl(); },
@@ -6892,6 +6989,8 @@ document.addEventListener('change', async e => {
     case 'kind': case 'vi': { const cl = S.clients[t.dataset.k], f = cl.fichas.find(x => x.id === t.dataset.f), it = f.items.find(x => x.id === t.dataset.i); if (c === 'kind') { it.kind = v; it.kindMode = 'manual'; } else it.vi = +v; reanalyze([cl.key]); render(); break; }
     case 'segov': { if (v) S.meta.segOv[t.dataset.k] = v; else delete S.meta.segOv[t.dataset.k]; touchMeta(); reanalyze([t.dataset.k]); render(); break; }
     case 'mg': { const cl = S.clients[t.dataset.k]; cl.mgmt[t.dataset.f] = v; touchC(cl.key); if (t.dataset.f === 'notes') { reanalyze([cl.key]); render(); } break; }
+    case 'psel': { UI.planSel ||= {}; if (t.checked) UI.planSel[t.dataset.id] = t.dataset.k || ''; else delete UI.planSel[t.dataset.id]; const b = $('#pbar'); if (b) b.outerHTML = planBulkBar(UI.planScope || []); break; }
+    case 'mrrRef': { if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return toast('Use AAAA-MM.'); if (S.meta.mrrComp) { S.meta.mrrComp = v || null; touchMeta(); } setRefComp(v); break; }
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
   }
@@ -6902,6 +7001,7 @@ document.addEventListener('input', e => {
   if (t.dataset.i === 'tdq') { TD_VIEW.q = t.value; const p = t.selectionStart; render(); const n = $('[data-i=tdq]'); n?.focus(); n?.setSelectionRange(p, p); return; }
   if (t.dataset.i === 'cnq') { UI.cn.q = t.value; return; }
   if (t.dataset.i === 'fq') { UI.f.q = t.value; UI.lim = 200; retbl(); }
+  if (t.dataset.i === 'pbulk') { UI.planBulk = t.value; return; }
   if (t.dataset.i === 'lkurls') { UI.lkUrls = t.value; return; }
   if (t.dataset.i === 'prodq') { UI.prodQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=prodq]'); n.focus(); n.setSelectionRange(p, p); }
   if (t.dataset.i === 'solq') { UI.solQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=solq]'); n.focus(); n.setSelectionRange(p, p); }

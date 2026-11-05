@@ -8,7 +8,7 @@ function segCard(forExport) {
   const I = segIntel(), t = I.tot, comp = mrrComp(), prec = S.meta.mrrPrec || 'ficha';
   let h = `<div class="card" id="segintel"><div class="row"><h3>Inteligência por Segmento de Atuação</h3><span class="sp"></span>${forExport ? '' : `<button class="btn ghost sm" data-a="segCfg" aria-expanded="${!!UI.segCfg}">${UI.segCfg ? 'Fechar configurações' : 'Configurar contagem, MRR e segmentos'}</button>`}</div>
   <p class="sm">Unidade de contagem: <b>${esc(UNIT_L[I.u])}</b> • MRR: competência de referência <b>${esc(comp)}</b>, somente valores recorrentes • Precedência em caso de divergência: <b>${prec === 'planilha' ? 'planilha' : 'ficha da competência'}</b> (tolerância ${mrrTol()}%)</p>
-  ${t.semComp ? `<div class="alert sm">${t.semComp} conta(s) com MRR na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'}): ficam fora das somas como <b>desconhecido</b> (desconhecido ≠ zero). ${forExport ? '' : 'Declare a competência da planilha nas configurações.'}</div>` : ''}
+  ${forExport ? (t.semComp ? `<div class="alert sm">${t.semComp} conta(s) com MRR na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'}): ficam fora das somas como <b>desconhecido</b> (desconhecido ≠ zero).</div>` : '') : mrrAviso(t)}
   ${t.div ? `<div class="alert b sm">${t.div} conta(s) com divergência entre MRR da planilha e da ficha na mesma competência: aplicada a precedência configurada; os dois valores nunca são somados. Veja o filtro "Com conflitos".</div>` : ''}
   ${!forExport && UI.segCfg ? segCfgPanel() : ''}
   <div class="tw"><table class="segtbl"><caption class="sm muted" style="text-align:left">Clique ou pressione Enter em um segmento para abrir a lista de clientes filtrada.</caption><thead><tr><th>Segmento (principal)</th><th class="r">Clientes</th><th class="r">% da carteira</th><th class="r">MRR identificado</th><th class="r">Participação no MRR conhecido</th><th>Cobertura do MRR</th><th>Cobertura de fichas</th><th class="r">Dados estratégicos incompletos</th><th class="r">Oportunidades fundamentadas</th>${forExport ? '' : '<th></th>'}</tr></thead><tbody>
@@ -46,6 +46,65 @@ function segStudyPanel(id) {
   <div><h4>Evidências dos clientes ${chip('FATO')}<span class="muted sm"> (${n} cliente(s), só dados confirmados)</span></h4>${li([...hosp.map(([k, v]) => `<li>Hospedagem ${esc(k)}: ${v}</li>`), ...reg.map(([k, v]) => `<li>Regime ${esc(k)}: ${v}</li>`), `<li>Release em produção confirmada: ${cs.filter(relConf).length}</li>`, ...prods.slice(0, 6).map(([k, v]) => `<li>Contratação identificada — ${esc(k)}: ${v}</li>`), ...Object.entries(fm).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `<li>Oportunidade com evidência individual — ${esc(k)}: ${v}</li>`)])}</div>
   <div><h4>Hipóteses comerciais ${chip('HIPÓTESE')}</h4>${li([...(g.dores || []).map(d => `<li>${esc(d)}</li>`), ...(g.demandas || []).map(d => `<li>Demanda provável: ${esc(d)}</li>`), ...(g.aplicacoes || []).map(a => `<li>${esc(solById(a.sol)?.nome || a.sol)}: ${esc(a.porque)}</li>`)])}</div></div></div>`;
 }
+
+/* ---------- Aviso de MRR com competência (mesmo estado das configurações: refComp / mrrComp / mrrPlanComp) ---------- */
+function mrrEstados() {
+  const r = { n: 0, conhecido: 0, zero: 0, semCompPlan: 0, semValor: 0, semFicha: 0 };
+  clients().forEach(c => { const m = mrrOf(c); r.n++; if (m.v != null) { r.conhecido++; if (m.v === 0) r.zero++; } else if (m.semComp) r.semCompPlan++; else r.semValor++; if (m.fic == null) r.semFicha++; });
+  return r;
+}
+function mrrAviso(t) {
+  const e = mrrEstados(); if (!e.n || (!e.semCompPlan && !e.semValor && !e.semFicha && !t.semComp)) return '';
+  const mi = (c, v, l) => `<label class="sm">${l} <input type="month" data-c="${c}" value="${esc(v || '')}" pattern="\\d{4}-\\d{2}" placeholder="AAAA-MM" aria-label="${esc(l)}" style="width:150px"></label>`;
+  const parts = [`<b>${e.conhecido}</b> de ${e.n} conta(s) com MRR conhecido${e.zero ? ` (${e.zero} com valor confirmado igual a zero)` : ''}`];
+  if (e.semCompPlan) parts.push(`<b>${e.semCompPlan}</b> desconhecido: valor na planilha sem competência declarada (${S.meta.mrrPlanComp ? 'declarada ' + esc(S.meta.mrrPlanComp) + ', diferente da referência' : 'não declarada'})`);
+  if (e.semValor) parts.push(`<b>${e.semValor}</b> desconhecido: sem valor em nenhuma fonte`);
+  if (e.semFicha) parts.push(`<b>${e.semFicha}</b> sem ficha na competência ${esc(mrrComp())}`);
+  return `<div class="alert sm" id="mrraviso" role="status"><div class="row">${mi('mrrRef', mrrComp(), 'Competência de referência')}${mi('mrrPlanComp', S.meta.mrrPlanComp, 'Competência do MRR da planilha')}</div>
+  <div>${parts.join(' • ')}.</div><div class="muted">Desconhecido não é zero: contas sem dado ficam fora das somas. Ao alterar a competência, indicadores e cobertura de fichas são recalculados.</div></div>`;
+}
+
+/* ---------- Painel "Hoje" (usa o score e as regras do plano de ação; sem motor próprio) ---------- */
+const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const isoBR = s => s ? s.split('-').reverse().join('/') : '';
+function hojeRows() {
+  const hoje = hojeISO(), seen = new Set(), out = [];
+  planRows().forEach(r => {
+    if (r.score < 0 || !r.dec || seen.has(r.id)) return; seen.add(r.id);
+    const a = actOf(r.id, r.key);
+    if (r.dec.valid === 'descartada' || ['encerrada', 'contratada'].includes(r.dec.sit) || ['Concluído', 'Descartado'].includes(a.status)) return;
+    const p = a.prazo || ''; if (p && p > hoje) return;
+    out.push({ ...r, a, sit: !p ? 'sem prazo' : p < hoje ? 'vencida' : 'hoje' });
+  });
+  return out.sort((x, y) => y.score - x.score || (x.a.prazo || '9999-99-99').localeCompare(y.a.prazo || '9999-99-99'));
+}
+function hojeCard() {
+  const all = hojeRows(), top = all.slice(0, 5);
+  if (!top.length) return `<div class="card" id="hoje"><h3>Hoje</h3><p class="muted sm">Nenhuma ação aberta vencida, prevista para hoje ou sem prazo. Ações com prazo futuro continuam no <a href="#" data-a="nav" data-v="plano">Plano de ação</a>.</p></div>`;
+  const sp = s => s === 'vencida' ? pill('Vencida', 'bad') : s === 'hoje' ? pill('Hoje', 'warn') : pill('Sem prazo', 'off');
+  return `<div class="card" id="hoje"><div class="row"><h3>Hoje</h3><span class="pill p-info">${top.length} de ${all.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="nav" data-v="plano">Ver plano de ação</button></div>
+  <div class="tw hojetw"><table><thead><tr><th>Cliente</th><th>Ação</th><th>Prioridade / score</th><th>Prazo</th><th>Responsável</th><th></th></tr></thead><tbody>${top.map(r => `<tr><td><a href="#" data-a="open" data-k="${esc(r.key)}">${esc(r.cliente)}</a></td><td class="sm">${esc(r.acao)}</td><td class="nw">${pill(r.prio + ' ' + r.score, PRIOK[r.prio])}</td><td class="nw">${sp(r.sit)}${r.a.prazo ? ' <span class="sm">' + isoBR(r.a.prazo) + '</span>' : ''}</td><td class="sm">${esc(r.a.resp || '—')}</td><td class="nw"><button class="btn ghost sm" data-a="openOpp" data-k="${esc(r.key)}">Abrir ação</button> <button class="btn sm" data-a="hojeOk" data-id="${esc(r.id)}" data-k="${esc(r.key)}">Concluir</button></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+/* ---------- Plano de ação: seleção e atribuição de responsável em lote ---------- */
+function planBulkBar(scope) {
+  const sel = UI.planSel || (UI.planSel = {}), ids = Object.keys(sel), inScope = new Set(scope.map(r => r.id)), dentro = ids.filter(i => inScope.has(i)).length;
+  return `<div class="alert i sm" id="pbar" role="region" aria-label="Atribuição em lote"><div class="row"><b>${ids.length} selecionada(s)</b><span class="muted">${dentro} dentro do filtro atual (${scope.length} linhas filtradas)${ids.length - dentro ? ` • ${ids.length - dentro} fora do filtro` : ''}</span><span class="sp"></span>
+  <button class="btn ghost sm" data-a="planSelAll">Selecionar as ${scope.length} filtradas</button><button class="btn ghost sm" data-a="planSelClr" ${ids.length ? '' : 'disabled'}>Limpar seleção</button></div>
+  <div class="row"><label class="sm">Responsável <input type="text" data-i="pbulk" value="${esc(UI.planBulk || '')}" placeholder="nome do responsável" style="width:200px"></label><button class="btn sm" data-a="planBulkGo" ${ids.length ? '' : 'disabled'}>Atribuir à seleção</button><button class="btn ghost sm" data-a="planBulkMe" ${ids.length && (ME.nome || ME.id) ? '' : 'disabled'}>Atribuir a mim</button></div></div>`;
+}
+function planBulkGo(resp) {
+  const sel = UI.planSel || {}, ids = Object.keys(sel); resp = String(resp || '').trim();
+  if (!ids.length) return toast('Selecione ao menos uma ação.');
+  if (!resp) return toast('Informe o responsável.');
+  const subst = ids.filter(id => { const a = actOf(id, sel[id] || null); return a.resp && a.resp !== resp; }).length;
+  if (subst && !confirm(`${subst} das ${ids.length} ação(ões) selecionada(s) já têm outro responsável e serão substituídas por “${resp}”. Continuar?`)) return;
+  let ok = 0; const falhas = [];
+  ids.forEach(id => { try { setAct(id, sel[id] || null, { resp }); delete sel[id]; ok++; } catch (e) { falhas.push(id); } });
+  UI.planBulk = ''; render();
+  toast(falhas.length ? `${ok} atualizada(s); ${falhas.length} falharam e continuam selecionadas.` : `Responsável definido em ${ok} ação(ões).`);
+}
+
 function remindCard() {
   const L = clients().flatMap(ctReminders).filter(x => x.nivel === 'alerta' || x.nivel === 'passada').sort((a, b) => a.d - b.d); const decl = clients().flatMap(ctReminders).filter(x => x.nivel === 'declarada').length;
   if (!L.length && !decl) return '';
@@ -142,4 +201,4 @@ function solOfficialHead(r) {
   return `<div class="card" style="border-left:4px solid var(--ok);margin:8px 0"><h4>Informação oficial ${pill('fontes oficiais', 'ok')}</h4><p class="sm">Sigla oficial: <b>${esc(r.sigla || '—')}</b> • ID interno: <b>${esc(r.refId || '—')}</b>${r.codOferta ? ` • Código de oferta: <b>${esc(r.codOferta)}</b>` : ''} • Grupo: ${esc(r.grupo || '—')} • Validação: ${r.refStatus ? pill(REF_ST[r.refStatus], REF_STK[r.refStatus]) : pill('sem situação registrada', 'off')}</p>${r.refNota ? `<p class="sm"><b>Nota de validação:</b> ${esc(r.refNota)}</p>` : ''}${r.finalidade ? `<p class="sm"><b>Finalidade:</b> ${esc(r.finalidade)}</p>` : ''}${(r.processos || []).length ? `<p class="sm"><b>Processos:</b> ${r.processos.map(esc).join(' • ')}</p>` : ''}${p.some(x => x.escopo) ? `<p class="sm"><b>Requisitos por funcionalidade/integração:</b></p><ul class="sm">${p.filter(x => x.escopo).map(x => `<li><b>${esc(x.escopo)}</b>: ${esc(x.t)} ${x.u ? `<a href="${esc(x.u)}" target="_blank" rel="noopener noreferrer">${esc(x.f || hostOf(x.u))}</a>` : esc(x.f || '')}</li>`).join('')}</ul>` : ''}${(r.lacunas || []).length ? `<div class="alert sm"><b>Lacunas:</b> ${r.lacunas.map(esc).join(' ')}</div>` : ''}<p class="muted sm">Consulta: ${esc(r.consultadoEm || r.atualizadoEm)}</p></div>`;
 }
 
-function retbl() { const t = $('#tbl'); if (t) t.innerHTML = tbl(); const f = $('#fch'); if (f) f.innerHTML = fchips(); }
+function retbl() { const t = $('#tbl'); if (t) t.innerHTML = tbl(); const f = $('#fch'); if (f) f.innerHTML = fchips(); const b = $('#fbtn'); if (b) b.textContent = fbtnTxt(); }

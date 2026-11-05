@@ -64,10 +64,11 @@ if (HOST) { delete AI_PROV.pagina; const i = AI_PROV_IDS.indexOf('pagina'); if (
 
 /* aviso permanente enquanto não houver chave utilizável: a ferramenta funciona sem IA, mas lembra de conectar */
 function hkBanner() {
+  if (UI.view === 'ia') return ''; /* a tela de IA já mostra o estado das chaves */
   const salvas = AI_PROV_IDS.filter(p => hkChave(p)), pad = iaInit().provedor;
-  const ir = '<button class="btn sm" data-a="nav" data-v="ia">Conectar minha chave</button>';
-  if (!salvas.length) return `<div class="alert w" role="status"><b>Nenhuma chave de IA conectada.</b> Carteira, diagnóstico e recomendações funcionam normalmente; só os recursos com IA (pesquisa, OCR, análise semântica reforçada) ficam indisponíveis até você conectar a sua chave. ${ir}</div>`;
-  if (!hkChave(pad)) return `<div class="alert w" role="status"><b>O provedor padrão (${esc(AI_PROV[pad]?.nome || pad)}) está sem chave.</b> Você tem chave de ${esc(salvas.map(p => AI_PROV[p].nome).join(', '))}: marque-o como padrão ou cadastre a chave faltante. ${ir}</div>`;
+  const ir = '<button class="btn sm" data-a="nav" data-v="ia">Configurar IA</button>';
+  if (!salvas.length) return `<div class="alert w hkbar" role="status"><span><b>Sem chave de IA.</b> Carteira e diagnóstico funcionam; pesquisa, OCR e análise reforçada precisam da sua chave.</span>${ir}</div>`;
+  if (!hkChave(pad)) return `<div class="alert w hkbar" role="status"><span><b>Provedor padrão (${esc(AI_PROV[pad]?.nome || pad)}) sem chave.</b> Há chave de ${esc(salvas.map(p => AI_PROV[p].nome).join(', '))}: defina-o como padrão ou cadastre a faltante.</span>${ir}</div>`;
   return '';
 }
 /* cartão "Minhas chaves de IA" (substitui a conexão manual com backend) */

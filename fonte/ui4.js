@@ -172,6 +172,7 @@ function tabEco(c) {
 
 /* ---------- Aba: Diagnóstico executivo ---------- */
 function tabDiag(c) {
+  if (window.__HOSTED__ && ME && ME.id) { S.meta.exec ||= {}; if (S.meta.exec.nome === undefined) S.meta.exec.nome = ME.nome || ''; if (S.meta.exec.contato === undefined) S.meta.exec.contato = ME.id; } /* pré-preenche só se nunca editado; vazio digitado pelo usuário é respeitado */
   const mode = UI.execMode || 'interno', M = execModel(c, mode), E = S.meta.exec || {}, cand = execCandidates(c);
   const chk = (id, l, extra = '') => `<label class="sm"><input type="checkbox" data-c="execOk" data-k="${kk(c)}" data-id="${esc(id)}" ${c.exec.ok[id] ? 'checked' : ''}> ${l}</label>${extra}`;
   return `<div class="card"><div class="row"><h3>Diagnóstico executivo</h3><span class="sp"></span><div class="seg2"><button data-a="execMode" data-v="interno" class="${mode === 'interno' ? 'on' : ''}">Interno</button><button data-a="execMode" data-v="cliente" class="${mode === 'cliente' ? 'on' : ''}">Cliente</button></div></div>

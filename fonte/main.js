@@ -1,6 +1,15 @@
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
 const ACT = {
   nav: t => { UI.view = t.dataset.v; UI.sbOpen = false; render(); window.scrollTo(0, 0); },
+  hojeOk: t => { setAct(t.dataset.id, t.dataset.k || null, { status: 'Concluído' }); render(); toast('Ação concluída.'); },
+  planReabrir: t => { setAct(t.dataset.id, t.dataset.k || null, { status: 'Pendente' }); render(); },
+  planSelAll: () => { UI.planSel ||= {}; (UI.planScope || []).forEach(r => { UI.planSel[r.id] = r.key || ''; }); render(); },
+  planSelClr: () => { UI.planSel = {}; render(); },
+  planBulkGo: () => planBulkGo(UI.planBulk),
+  planBulkMe: () => planBulkGo(ME.nome || ME.id),
+  fToggle: () => { UI.fOpen = !UI.fOpen; render(); const b = $('#fbtn'); if (b) b.focus(); },
+  fApply: () => { UI.fOpen = false; render(); const b = $('#fbtn'); if (b) b.focus(); },
+  openTab: (t, e) => { e.preventDefault(); UI.sel = t.dataset.k; UI.view = 'cliente'; UI.ctab = t.dataset.v; render(); window.scrollTo(0, 0); },
   open: (t, e) => { e.preventDefault(); UI.sel = t.dataset.k; UI.view = 'cliente'; render(); window.scrollTo(0, 0); cnAutoAoAbrir(t.dataset.k); },
   openSeg: t => { UI.segSel = t.dataset.id || null; UI.view = 'segmentos'; render(); window.scrollTo(0, 0); },
   more: () => { UI.lim += 300; retbl(); },
@@ -158,6 +167,8 @@ document.addEventListener('change', async e => {
     case 'kind': case 'vi': { const cl = S.clients[t.dataset.k], f = cl.fichas.find(x => x.id === t.dataset.f), it = f.items.find(x => x.id === t.dataset.i); if (c === 'kind') { it.kind = v; it.kindMode = 'manual'; } else it.vi = +v; reanalyze([cl.key]); render(); break; }
     case 'segov': { if (v) S.meta.segOv[t.dataset.k] = v; else delete S.meta.segOv[t.dataset.k]; touchMeta(); reanalyze([t.dataset.k]); render(); break; }
     case 'mg': { const cl = S.clients[t.dataset.k]; cl.mgmt[t.dataset.f] = v; touchC(cl.key); if (t.dataset.f === 'notes') { reanalyze([cl.key]); render(); } break; }
+    case 'psel': { UI.planSel ||= {}; if (t.checked) UI.planSel[t.dataset.id] = t.dataset.k || ''; else delete UI.planSel[t.dataset.id]; const b = $('#pbar'); if (b) b.outerHTML = planBulkBar(UI.planScope || []); break; }
+    case 'mrrRef': { if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return toast('Use AAAA-MM.'); if (S.meta.mrrComp) { S.meta.mrrComp = v || null; touchMeta(); } setRefComp(v); break; }
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
   }
@@ -168,6 +179,7 @@ document.addEventListener('input', e => {
   if (t.dataset.i === 'tdq') { TD_VIEW.q = t.value; const p = t.selectionStart; render(); const n = $('[data-i=tdq]'); n?.focus(); n?.setSelectionRange(p, p); return; }
   if (t.dataset.i === 'cnq') { UI.cn.q = t.value; return; }
   if (t.dataset.i === 'fq') { UI.f.q = t.value; UI.lim = 200; retbl(); }
+  if (t.dataset.i === 'pbulk') { UI.planBulk = t.value; return; }
   if (t.dataset.i === 'lkurls') { UI.lkUrls = t.value; return; }
   if (t.dataset.i === 'prodq') { UI.prodQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=prodq]'); n.focus(); n.setSelectionRange(p, p); }
   if (t.dataset.i === 'solq') { UI.solQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=solq]'); n.focus(); n.setSelectionRange(p, p); }

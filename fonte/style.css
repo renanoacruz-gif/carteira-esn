@@ -230,3 +230,18 @@ td .pill{white-space:nowrap}
 .sb-item.sub{height:32px;font-size:13px;padding:0 var(--s2)}
 .sb-item.sub.on{box-shadow:none;background:rgba(0,219,255,.12)}
 .shell.col .sb-sub{margin-left:0;padding-left:0;border-left:0}.shell.col .sb-item.sub .sb-lb{display:none}.shell.col .sb-item.sub::before{content:'•';margin:0 auto}
+
+.hkbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px;margin:6px 0;font-size:12px;line-height:1.35}.hkbar span{flex:1 1 220px;min-width:0}.hkbar .btn{flex:0 0 auto}
+@media(max-width:640px){.grid.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}.grid.g4>.kpi{padding:var(--s3);min-width:0}.kpi .v{font-size:24px}.kpi .l,.kpi .n{overflow-wrap:anywhere}}
+
+.fbtn,.fpact,.ccards{display:none}.fpanel{display:contents}
+.ccard{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:var(--s3);margin-bottom:10px;box-shadow:var(--sh1)}.ccard .row{margin:6px 0}.ccard dl{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;margin:8px 0}.ccard dt{color:var(--txt2)}.ccard dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:760px){.ccards{display:block}#tbl .tw{display:none}}
+@media(max-width:900px){.filters{display:grid;grid-template-columns:1fr auto;gap:8px}.filters #fq{min-width:0!important;width:100%}.fbtn{display:inline-flex;align-items:center}.fpanel{display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:#fff}.fpanel.open{display:grid}.fpanel select{width:100%;min-width:0}.fpact{display:flex;gap:8px;grid-column:1/-1}}
+@media(max-width:480px){.fpanel,.fpanel.open{grid-template-columns:1fr}}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.evd{margin-top:4px}.evd summary{cursor:pointer;color:var(--pet);font-weight:600}.evd[open]{background:#f6fbfd;padding:6px;border-radius:6px}
+.hojetw{max-height:none}#mrraviso .row{gap:12px;margin-bottom:6px}
+@media(max-width:760px){.hojetw table{min-width:640px}}
+@media(max-width:640px){.grid.g2,.grid.g3{grid-template-columns:minmax(0,1fr)}.filters>select,.filters>input,.filters>label{max-width:100%;min-width:0}.filters>input[type=text]{min-width:0!important;flex:1 1 140px}}
