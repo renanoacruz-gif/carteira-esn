@@ -62,6 +62,14 @@ if (HOST && !window.claude) {
 }
 if (HOST) { delete AI_PROV.pagina; const i = AI_PROV_IDS.indexOf('pagina'); if (i >= 0) AI_PROV_IDS.splice(i, 1); }
 
+/* aviso permanente enquanto não houver chave utilizável: a ferramenta funciona sem IA, mas lembra de conectar */
+function hkBanner() {
+  const salvas = AI_PROV_IDS.filter(p => hkChave(p)), pad = iaInit().provedor;
+  const ir = '<button class="btn sm" data-a="nav" data-v="ia">Conectar minha chave</button>';
+  if (!salvas.length) return `<div class="alert w" role="status"><b>Nenhuma chave de IA conectada.</b> Carteira, diagnóstico e recomendações funcionam normalmente; só os recursos com IA (pesquisa, OCR, análise semântica reforçada) ficam indisponíveis até você conectar a sua chave. ${ir}</div>`;
+  if (!hkChave(pad)) return `<div class="alert w" role="status"><b>O provedor padrão (${esc(AI_PROV[pad]?.nome || pad)}) está sem chave.</b> Você tem chave de ${esc(salvas.map(p => AI_PROV[p].nome).join(', '))}: marque-o como padrão ou cadastre a chave faltante. ${ir}</div>`;
+  return '';
+}
 /* cartão "Minhas chaves de IA" (substitui a conexão manual com backend) */
 function hkCard() {
   const rows = AI_PROV_IDS.map(p => { const k = hkChave(p); return `<tr><td><b>${esc(AI_PROV[p].nome)}</b></td><td>${k ? pill('chave ' + hkFim(k), 'ok') : pill('sem chave', 'off')}</td><td><input type="password" id="hk-${p}" autocomplete="off" placeholder="${k ? 'substituir chave' : 'cole sua chave'}" style="width:100%"></td><td class="nw"><button class="btn sm" data-a="hkSalvar" data-p="${p}">Salvar</button> ${k ? `<button class="btn ghost sm" data-a="hkRemover" data-p="${p}">Remover</button>` : ''}</td></tr>`; }).join('');

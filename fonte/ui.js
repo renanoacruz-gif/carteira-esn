@@ -36,7 +36,7 @@ const VIEWS = [['importar', 'Importar'], ['geral', 'Visão geral'], ['clientes',
 function render() {
   paintShell();
   const V = { importar: vImport, geral: vGeral, clientes: vClientes, cliente: vCliente, diag: vDiag, segmentos: vSeg, plano: vPlano, criterios: vCrit, base: vBase, solucoes: vSolucoes, ia: vIA, refs: vRefs, consol: vConsol, conta: vConta, dados: vDados, integra: vIntegra, cnpj: vCnpj, mercado: vMercado, pend: vPend }[UI.view];
-  $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + V();
+  $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + (window.__HOSTED__ ? hkBanner() : '') + V();
   paintModal();
 }
 const needData = () => `<div class="card empty"><h2>Nenhum dado importado</h2><p>Importe a planilha da carteira para iniciar. Nenhum dado de exemplo é carregado.</p><button class="btn pri" data-a="nav" data-v="importar">Ir para Importar</button></div>`;
