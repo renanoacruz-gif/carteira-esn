@@ -64,28 +64,6 @@ function mrrAviso(t) {
   <div>${parts.join(' • ')}.</div><div class="muted">Desconhecido não é zero: contas sem dado ficam fora das somas. Ao alterar a competência, indicadores e cobertura de fichas são recalculados.</div></div>`;
 }
 
-/* ---------- Painel "Hoje" (usa o score e as regras do plano de ação; sem motor próprio) ---------- */
-const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const isoBR = s => s ? s.split('-').reverse().join('/') : '';
-function hojeRows() {
-  const hoje = hojeISO(), seen = new Set(), out = [];
-  planRows().forEach(r => {
-    if (r.score < 0 || !r.dec || seen.has(r.id)) return; seen.add(r.id);
-    const a = actOf(r.id, r.key);
-    if (r.dec.valid === 'descartada' || ['encerrada', 'contratada'].includes(r.dec.sit) || ['Concluído', 'Descartado'].includes(a.status)) return;
-    const p = a.prazo || ''; if (p && p > hoje) return;
-    out.push({ ...r, a, sit: !p ? 'sem prazo' : p < hoje ? 'vencida' : 'hoje' });
-  });
-  return out.sort((x, y) => y.score - x.score || (x.a.prazo || '9999-99-99').localeCompare(y.a.prazo || '9999-99-99'));
-}
-function hojeCard() {
-  const all = hojeRows(), top = all.slice(0, 5);
-  if (!top.length) return `<div class="card" id="hoje"><h3>Hoje</h3><p class="muted sm">Nenhuma ação aberta vencida, prevista para hoje ou sem prazo. Ações com prazo futuro continuam no <a href="#" data-a="nav" data-v="plano">Plano de ação</a>.</p></div>`;
-  const sp = s => s === 'vencida' ? pill('Vencida', 'bad') : s === 'hoje' ? pill('Hoje', 'warn') : pill('Sem prazo', 'off');
-  return `<div class="card" id="hoje"><div class="row"><h3>Hoje</h3><span class="pill p-info">${top.length} de ${all.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="nav" data-v="plano">Ver plano de ação</button></div>
-  <div class="tw hojetw"><table><thead><tr><th>Cliente</th><th>Ação</th><th>Prioridade / score</th><th>Prazo</th><th>Responsável</th><th></th></tr></thead><tbody>${top.map(r => `<tr><td><a href="#" data-a="open" data-k="${esc(r.key)}">${esc(r.cliente)}</a></td><td class="sm">${esc(r.acao)}</td><td class="nw">${pill(r.prio + ' ' + r.score, PRIOK[r.prio])}</td><td class="nw">${sp(r.sit)}${r.a.prazo ? ' <span class="sm">' + isoBR(r.a.prazo) + '</span>' : ''}</td><td class="sm">${esc(r.a.resp || '—')}</td><td class="nw"><button class="btn ghost sm" data-a="openOpp" data-k="${esc(r.key)}">Abrir ação</button> <button class="btn sm" data-a="hojeOk" data-id="${esc(r.id)}" data-k="${esc(r.key)}">Concluir</button></td></tr>`).join('')}</tbody></table></div></div>`;
-}
-
 /* ---------- Plano de ação: seleção e atribuição de responsável em lote ---------- */
 function planBulkBar(scope) {
   const sel = UI.planSel || (UI.planSel = {}), ids = Object.keys(sel), inScope = new Set(scope.map(r => r.id)), dentro = ids.filter(i => inScope.has(i)).length;

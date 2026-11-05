@@ -77,7 +77,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT);
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT);
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;
@@ -167,6 +167,7 @@ document.addEventListener('change', async e => {
     case 'kind': case 'vi': { const cl = S.clients[t.dataset.k], f = cl.fichas.find(x => x.id === t.dataset.f), it = f.items.find(x => x.id === t.dataset.i); if (c === 'kind') { it.kind = v; it.kindMode = 'manual'; } else it.vi = +v; reanalyze([cl.key]); render(); break; }
     case 'segov': { if (v) S.meta.segOv[t.dataset.k] = v; else delete S.meta.segOv[t.dataset.k]; touchMeta(); reanalyze([t.dataset.k]); render(); break; }
     case 'mg': { const cl = S.clients[t.dataset.k]; cl.mgmt[t.dataset.f] = v; touchC(cl.key); if (t.dataset.f === 'notes') { reanalyze([cl.key]); render(); } break; }
+    case 'opf': { const f = OPF(); f[t.dataset.f] = v; f.lim = 30; render(); break; }
     case 'psel': { UI.planSel ||= {}; if (t.checked) UI.planSel[t.dataset.id] = t.dataset.k || ''; else delete UI.planSel[t.dataset.id]; const b = $('#pbar'); if (b) b.outerHTML = planBulkBar(UI.planScope || []); break; }
     case 'mrrRef': { if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return toast('Use AAAA-MM.'); if (S.meta.mrrComp) { S.meta.mrrComp = v || null; touchMeta(); } setRefComp(v); break; }
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;

@@ -10,7 +10,7 @@ function vMercado() {
 }
 function mkCarteira() {
   const sg = mkSegCarteira(), n = clients().length;
-  let h = `<div class="card"><h3>Inteligência Comercial — visão da carteira</h3><p class="sm">Panorama dos segmentos presentes na carteira (${n} cliente(s); ${sg.com.length} segmento(s) com estudo). Para uma conta específica use a <a href="#" data-a="mkVis" data-v="individual">Visão individual</a>; para pesquisar um recorte, a <a href="#" data-a="mkVis" data-v="segmento">Visão por segmento</a>. Contexto de mercado não é evidência individual do cliente.</p></div>`;
+  let h = `<div class="card"><h3>Inteligência de Mercado — visão da carteira</h3><p class="sm">Panorama dos segmentos presentes na carteira (${n} cliente(s); ${sg.com.length} segmento(s) com estudo). Para uma conta específica use a <a href="#" data-a="mkVis" data-v="individual">Visão individual</a>; para pesquisar um recorte, a <a href="#" data-a="mkVis" data-v="segmento">Visão por segmento</a>. Contexto de mercado não é evidência individual do cliente.</p></div>`;
   h += mkDiag() + covResumoCarteira() + motorSugHtml() + mkEstudos() + `<p class="sm muted">Última atualização por IA: <b>${mkUlt() ? esc(fmtDate(mkUlt())) : 'nunca'}</b>. A atualização é <b>manual</b>: não há agendador, portanto nenhum monitoramento automático.</p>`;
   const l = S.insights.slice().sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   h += `<h3 style="margin:14px 0 4px">Insights registrados (${l.length})</h3>${l.length ? l.slice(0, 60).map(mkCard).join('') : '<div class="card"><p class="sm muted">Nenhum insight registrado: notícias recentes aparecem após “Atualizar” (busca web real) ou cadastro manual com fonte e data. Os estudos acima já cobrem os segmentos da carteira.</p></div>'}`;
@@ -30,7 +30,7 @@ function fatoRm(key, id) { const c = S.clients[key]; if (!c) return; c.fatos = (
 function mkIndividual() {
   const m = UI.mk, q = norm(m.cq), all = clients().slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const lst = all.filter(c => !q || norm(`${c.name} ${c.code} ${c.cnpj}`).includes(q) || c.key === m.cli).slice(0, 200), c = m.cli && S.clients[m.cli];
-  let h = `<div class="card"><h3>Inteligência Comercial — visão individual</h3><p class="sm">Analise uma conta por vez. Tudo abaixo pertence ao cliente selecionado; ao trocar de cliente nada é misturado.</p>
+  let h = `<div class="card"><h3>Inteligência de Mercado — visão individual</h3><p class="sm">Analise uma conta por vez. Tudo abaixo pertence ao cliente selecionado; ao trocar de cliente nada é misturado.</p>
   <div class="row"><label class="sm">Buscar <input type="text" data-c="mk" data-f="cq" value="${esc(m.cq)}" placeholder="nome, código ou CNPJ (Enter)" style="min-width:240px"></label>
   <label class="sm">Cliente <select data-c="mk" data-f="cli" style="min-width:300px"><option value="">— selecione (${lst.length}${all.length > lst.length ? ' de ' + all.length : ''}) —</option>${lst.map(x => optS(x.key, `${x.name}${x.code ? ' • ' + x.code : ''}`, m.cli)).join('')}</select></label></div></div>`;
   if (!all.length) return h + `<div class="card empty"><p>Carteira vazia. Importe a planilha em Importar dados para analisar clientes.</p><button class="btn pri" data-a="nav" data-v="importar">Importar dados</button></div>`;

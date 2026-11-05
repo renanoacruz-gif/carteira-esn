@@ -120,22 +120,36 @@ function rxMercado(c) {
     emPanel(c) +
     (!ind.length && !ins.length && !(c.fatos || []).length ? `<p class="sm">Sem pesquisa individual: use <a href="#" data-a="mkIndiv" data-k="${esc(c.key)}">Inteligência Comercial → visão individual</a> para pesquisar ou registrar fatos, e “Pesquisar soluções para este cliente” para IA. Nada é simulado.</p>` : '');
 }
+function rxValidar(c, o) {
+  const p = []; if (typeof o.validar === 'string' && o.validar) p.push(o.validar);
+  p.push(o.modo === 'investigacao' || !(o.evInd || []).length ? 'Confirmar com o cliente se a necessidade existe (ainda é hipótese)' : 'Confirmar se a evidência reflete a situação atual');
+  if ((o.sols || []).length) p.push('se já usa solução equivalente (ausência na ficha não prova ausência de contrato) e se há dependências/restrições');
+  return p.join('; ') + '.';
+}
+function rxMotivo(c, o) {
+  const f = fundOf(o), p = [];
+  if (f.documental) p.push('há trecho de documento/ficha do cliente apontando a necessidade'); if (f.historico) p.push('o histórico de contratação/cadastro do cliente sustenta o tema'); if (f.segmento) p.push('o segmento sugere a necessidade (hipótese até confirmar no cliente)');
+  const s = (o.sols || [])[0]; if (s && s.finalidade) p.push(`capacidade documentada: ${String(s.finalidade).slice(0, 180)}`);
+  return p.length ? p.join('; ') + '.' : 'Sem indício individual: aderência apenas por tema; validar com o cliente.';
+}
 function rxRecHtml(c, r) {
   const o = r.o, sols = o.sols || [], ct = sols.map(s => ({ s, e: contratEstado(c, s.id) })), ind = o.evInd || [], k = RX_CL[r.cl];
   const aderTxt = sols.length ? sols.map(s => `${s.nome}: ${s.integraProtheus === true ? 'integração com Protheus documentada na fonte' : s.integraProtheus === false ? 'NÃO integra com Protheus segundo a fonte' : 'compatibilidade com Protheus não verificada'}`).join('; ') : 'ação de relacionamento (sem solução de produto)';
-  return `<div class="opp ${o.modo === 'investigacao' ? 'inv' : ''}"><div class="row"><h4>${esc(o.nome)}</h4>${pill(k[0], k[1])}${avPill(c, o)}<span class="sp"></span><button class="btn pri sm" data-a="dxOpen" data-k="${esc(c.key)}" data-id="${esc(o.id)}">Ver Diagnóstico Completo</button></div>
-  ${avBar(c, o)}<table class="chain"><tbody>
+  return `<div class="opp ${o.modo === 'investigacao' ? 'inv' : ''}"><div class="row"><h4>${esc(o.nome)}</h4>${pill(OP_CL[opClasse(r)][0], OP_CL[opClasse(r)][1])}${jdPill(c, o)}${['ajuste', 'generica', 'incorreta'].includes((avGet(c, o.ruleId) || {}).classe) ? avPill(c, o) : ''}<span class="sp"></span><button class="btn pri sm" data-a="dxOpen" data-k="${esc(c.key)}" data-id="${esc(o.id)}">Ver Diagnóstico Completo</button></div>
+  ${jdBar(c, o)}<table class="chain"><tbody>
   <tr><th>Solução/serviço</th><td>${sols.length ? sols.map(s => esc(s.nome)).join(', ') : '<span class="muted">—</span>'}</td></tr>
   <tr><th>Necessidade atendida</th><td>${chip(o.modo === 'evidencia' ? 'INFERÊNCIA' : 'HIPÓTESE')} ${esc(o.problema || '')}</td></tr>
   <tr><th>Evidência do cliente</th><td>${ind.length ? ind.slice(0, 3).map(e => `${chip(e.cls)} ${esc(String(e.text).slice(0, 240))} <span class="muted sm">— ${esc(e.src || '')}</span>`).join('<br>') : '<span class="muted">Sem evidência individual.</span>'}</td></tr>
   <tr><th>Cadeia semântica</th><td>${semCadeiaHtml(o) || '—'}</td></tr>
-  <tr><th>Aderência</th><td>${chip('INFERÊNCIA')} ${o.crit?.aderencia ?? '—'}/3 — ${esc(aderTxt)}</td></tr>
+  <tr><th>Motivo da aderência</th><td>${chip('INFERÊNCIA')} ${o.crit?.aderencia ?? '—'}/3 — ${esc(rxMotivo(c, o))} <div class="muted sm">${esc(aderTxt)}</div></td></tr>
   <tr><th>Benefício possível</th><td>${chip('HIPÓTESE')} ${esc(o.impacto || '—')}</td></tr>
   <tr><th>Contratação identificada</th><td>${ct.length ? ct.map(x => `${esc(x.s.nome)}: ${pill(CT_EST[x.e], CT_EST_K[x.e])}`).join(' ') : '<span class="muted">—</span>'}</td></tr>
   <tr><th>Dependências</th><td>${(o.deps || []).length ? '<ul class="sm">' + o.deps.map(d => `<li>${esc(d)}</li>`).join('') + '</ul>' : '<span class="muted">—</span>'}</td></tr>
+  <tr><th>Confiança</th><td>${esc(String(o.conf ?? '—'))} <span class="muted sm">(confiança da análise, não probabilidade de fechamento)</span></td></tr>
+  <tr><th>O que validar</th><td>${esc(rxValidar(c, o))}</td></tr>
   <tr><th>Pergunta de validação</th><td>${esc((o.perg || [])[0] || '—')}</td></tr>
   <tr><th>Próxima ação</th><td>${esc(o.acao || '—')}</td></tr></tbody></table>
-  <div class="muted sm">Classificação: ${esc(r.why)}</div></div>`;
+  <details class="sm"><summary>Síntese de abordagem</summary>${abHtml(c, o)}</details><div class="muted sm">Classificação: ${esc(r.why)}</div></div>`;
 }
 function rxHtml(c) {
   const recs = rxRecs(c), g = ctxLacunas(c), fontes = ctxFontes(c);

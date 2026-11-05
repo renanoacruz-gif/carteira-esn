@@ -88,6 +88,7 @@ function rxProxima(c, recs, perg, acoes) {
   ${desc.length ? `<h4>Perguntas de descoberta <span class="muted sm">(sem evidência suficiente para priorizar; baseadas nos processos típicos do segmento)</span></h4><ol class="sm">${desc.map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : ''}
   <h4>Interlocutores sugeridos por função ${chip('HIPÓTESE')}</h4>${itl.length ? '<ul class="sm">' + itl.map(x => `<li><b>${esc(x.f)}</b> <span class="muted">— ${esc(x.n.join('; '))}</span></li>`).join('') + '</ul><p class="muted sm">Sugestão por função, sem nomes: confirme quem exerce o papel no cliente.</p>' : '<p class="muted sm">Sem recomendações ativas para sugerir funções.</p>'}
   <h4>Ações práticas</h4>${acoes.length ? '<ul class="sm">' + acoes.map(p => `<li>${esc(p)}</li>`).join('') + '</ul>' : '<p class="muted sm">Nenhuma recomendação priorizada ainda; investigue as hipóteses acima.</p>'}
+  <h4>Síntese de abordagem <span class="muted sm">(motivo, assunto, solução possível, pergunta; nada é enviado)</span></h4>${abCliHtml(c)}
   <div class="row"><button class="btn pri sm" data-a="rxCopiar" data-k="${esc(c.key)}">Copiar roteiro da abordagem</button><button class="btn ghost sm" data-a="rxBaixar" data-k="${esc(c.key)}">Baixar .txt</button></div>`;
 }
 

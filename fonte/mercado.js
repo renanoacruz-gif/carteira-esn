@@ -156,7 +156,7 @@ function mkEstudos() {
 function vMercadoSeg() {
   const m = UI.mk, T = aiTarefa('mercado'), ult = mkUlt(), modo = bkModo(), q = norm(m.fq);
   const list = S.insights.filter(i => (!m.fseg || i.escopo?.seg === m.fseg) && (!m.fuf || i.escopo?.uf === m.fuf) && (!m.fcl || i.classe === m.fcl) && (!q || norm(`${i.titulo} ${i.impacto} ${i.fonte?.nome}`).includes(q))).sort((a, b) => (b.datas?.evento || b.datas?.publicacao || b.at.slice(0, 10)).localeCompare(a.datas?.evento || a.datas?.publicacao || a.at.slice(0, 10)));
-  let h = `<div class="card"><h3>Inteligência Comercial</h3><p class="sm">Notícias, indicadores, tendências, riscos, oportunidades e mudanças regulatórias por recorte de mercado. <b>Contexto de mercado não é evidência individual</b> do cliente: serve para preparar abordagem e perguntas, não para afirmar necessidade, elegibilidade ou contratação.</p>
+  let h = `<div class="card"><h3>Inteligência de Mercado</h3><p class="sm">Notícias, indicadores, tendências, riscos, oportunidades e mudanças regulatórias por recorte de mercado. <b>Contexto de mercado não é evidência individual</b> do cliente: serve para preparar abordagem e perguntas, não para afirmar necessidade, elegibilidade ou contratação.</p>
   <div class="row"><label class="sm">Segmento <select data-c="mk" data-f="seg"><option value="">—</option>${KB.segments.map(s => optS(s.id, s.nome, m.seg)).join('')}</select></label>
   <label class="sm">Subsegmento <input type="text" data-c="mk" data-f="sub" value="${esc(m.sub)}" placeholder="opcional (ex.: autopeças)" ${m.seg ? '' : 'disabled'} style="max-width:200px"></label>
   <label class="sm">Região (UF) <select data-c="mk" data-f="uf"><option value="">Brasil</option>${UFS.map(u => optS(u, u, m.uf)).join('')}</select></label>

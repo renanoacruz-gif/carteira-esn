@@ -46,8 +46,8 @@ function decCtl(c, o) {
   return `<div class="dec" data-k="${esc(c.key)}" data-r="${esc(o.ruleId)}"><div class="row sm">
     <label>Validação <select data-f="valid">${Object.entries(VALID_L).map(([k, l]) => optS(k, l, d.valid)).join('')}</select></label>
     <label>Nível <select data-f="nivel"><option value="">—</option>${Object.entries(VNIVEL_L).map(([k, l]) => optS(k, l, d.nivel)).join('')}</select></label>
-    <label>Situação comercial <select data-f="sit">${Object.entries(SIT_L).map(([k, l]) => optS(k, l, d.sit)).join('')}</select></label>
-    <label>Contratação <select data-f="contr"><option value="">Derivada dos documentos</option>${Object.entries(CONTR_L).map(([k, l]) => optS(k, l, d.contr)).join('')}</select></label></div>
+    <label>Contratação <select data-f="contr"><option value="">Derivada dos documentos</option>${Object.entries(CONTR_L).map(([k, l]) => optS(k, l, d.contr)).join('')}</select></label>
+    <details class="sm"><summary>Acompanhamento comercial (opcional)</summary><label>Situação comercial <select data-f="sit">${Object.entries(SIT_L).map(([k, l]) => optS(k, l, d.sit)).join('')}</select></label></details></div>
     <div class="row sm"><input type="text" data-f="nota" value="${esc(d.nota)}" placeholder="Nota (obrigatória p/ validada, descartada e contratada: como/quando/fonte)" style="flex:1;min-width:260px"><button class="btn sm" data-a="decOpp">Registrar decisão</button></div>
     <div class="muted sm">${esc(cd.t)}${d.mig ? ` • migrado de ${esc(d.mig.de)} em ${esc(d.mig.em)}${d.mig.revisar ? ' — <b>revisar</b>' : ''}` : ''}${d.at ? ` • decisão em ${esc(fmtDate(d.at))}` : ''}${d.hist.length ? ` • ${d.hist.length} alteração(ões) no histórico` : ''}</div></div>`;
 }
@@ -57,7 +57,7 @@ function dimsHtml(c, o) {
   return `<div class="row sm dims"><span class="muted">Fundamentação:</span> ${f.length ? f.map(x => pill(x, 'info')).join(' ') : pill('sem evidência individual — investigação recomendada', 'off')}
   <span class="muted">Validação:</span> ${pill(VALID_L[D.valid] + (D.nivel ? ' — ' + VNIVEL_L[D.nivel] : ''), D.valid === 'validada' ? 'ok' : D.valid === 'descartada' ? 'bad' : 'warn')}
   <span class="muted">Contratação:</span> ${pill(CONTR_L[D.contr.k], D.contr.k === 'identificada' ? 'ok' : 'off')}
-  <span class="muted">Situação:</span> ${pill(SIT_L[D.sit], D.sit === 'contratada' ? 'ok' : D.sit === 'encerrada' ? 'off' : 'info')}</div>`;
+  ${D.sit === 'nao_iniciada' ? '' : `<span class="muted">Situação:</span> ${pill(SIT_L[D.sit], D.sit === 'contratada' ? 'ok' : D.sit === 'encerrada' ? 'off' : 'info')}`}</div>`;
 }
 
 /* ---------- Migração de classificações legadas (idempotente, sem perda) ---------- */
