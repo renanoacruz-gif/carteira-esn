@@ -8,7 +8,7 @@ GCOL.consolsnap = { arr: () => S.msnap, ref: null, d: new Set(), x: new Set() };
 const MAX_SNAP = 40;
 const sigOf = o => { const s = JSON.stringify(o); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return s.length + ':' + h; };
 const isEmptyV = v => v == null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
-const completeness = c => (c.code ? 3 : 0) + (c.cnpj ? 3 : 0) + (c.fichas?.length || 0) * 2 + (c.docs?.length || 0) * 2 + Object.keys(c.act || {}).length + (c.contratos?.length || 0) * 2 + (c.mrr != null ? 1 : 0);
+const completeness = c => (c.code ? 3 : 0) + (c.cnpj ? 3 : 0) + (c.fichas?.length || 0) * 2 + (c.docs || []).filter(d => !d.prv).length * 2 + Object.keys(c.act || {}).length + (c.contratos?.length || 0) * 2 + (c.mrr != null ? 1 : 0);
 const ownerOf = c => norm(c.mgmt?.owner || '');
 const ownersOk = (a, b) => { const x = ownerOf(a), y = ownerOf(b); return !x || !y || x === y; };
 const mainFirst = (a, b) => completeness(b) > completeness(a) ? [b, a] : [a, b];

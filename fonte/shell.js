@@ -104,7 +104,7 @@ function paintModal() {
   if (!m) { if (host.firstChild) { host.innerHTML = ''; document.body.classList.remove('mdl'); modalFrom?.isConnected && modalFrom.focus(); modalFrom = null; } return; }
   if (host.firstChild) return;
   modalFrom = document.activeElement; document.body.classList.add('mdl');
-  host.innerHTML = `<div class="mdl-bg" data-a="mdClose"><div class="mdl-box" role="dialog" aria-modal="true" aria-labelledby="mdt" aria-describedby="mdb" data-a-stop="1"><h2 id="mdt">${m.t}</h2><p id="mdb">${m.b}</p><div class="row mdl-act"><button type="button" class="btn ghost" data-a="${m.cancel}" id="mdcancel">Cancelar</button><button type="button" class="btn ${m.ok[2]}" data-a="${m.ok[0]}">${m.ok[1]}</button></div></div></div>`;
+  host.innerHTML = `<div class="mdl-bg" data-a="mdClose"><div class="mdl-box" role="dialog" aria-modal="true" aria-labelledby="mdt" aria-describedby="mdb" data-a-stop="1"><h2 id="mdt">${m.t}</h2><div id="mdb">${m.b}</div><div class="row mdl-act"><button type="button" class="btn ghost" data-a="${m.cancel}" id="mdcancel">Cancelar</button>${m.alt ? `<button type="button" class="btn ${m.alt[2]}" data-a="${m.alt[0]}">${m.alt[1]}</button>` : ''}<button type="button" class="btn ${m.ok[2]}" data-a="${m.ok[0]}">${m.ok[1]}</button></div></div></div>`;
   $('#mdcancel').focus();
 }
 /* ---------- tooltips (um único elemento, posicionado por JS: nunca cortado por rolagem) ---------- */

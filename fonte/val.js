@@ -61,7 +61,7 @@ const vFmtV = v => typeof v === 'number' ? v.toLocaleString('pt-BR', { minimumFr
 function valDocs(c) {
   const out = [];
   (c.fichas || []).forEach(f => out.push({ tipo: 'Ficha', hash: f.hash, nome: f.file, at: f.at, state: f.state, by: f.by, comps: fichaComps(f), itens: f.items || [], texto: f.matchText || '', trunc: f.itemsTrunc || 0, dup: f.dupComps }));
-  (c.docs || []).forEach(d => out.push({ tipo: d.ocr ? 'Print (OCR)' : 'Documento / ata', hash: d.hash, nome: d.name, at: d.at, state: d.state, by: d.by, comps: [], itens: [], texto: d.text || '', trunc: d.trunc ? 1 : 0, ocr: !!d.ocr }));
+  (c.docs || []).filter(d => !d.prv).forEach(d => out.push({ tipo: d.ocr ? 'Print (OCR)' : 'Documento / ata', hash: d.hash, nome: d.name, at: d.at, state: d.state, by: d.by, comps: [], itens: [], texto: d.text || '', trunc: d.trunc ? 1 : 0, ocr: !!d.ocr }));
   (c.cdocs || []).forEach(d => out.push({ tipo: 'Documento de contrato/cadastro', hash: d.hash || d.id, nome: d.name || d.file || '(sem nome)', at: d.at, state: d.state, comps: [], itens: [], texto: d.text || '' }));
   return out.filter(d => d.hash);
 }

@@ -12,7 +12,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const log = (t, k = '') => { UI.log.unshift({ t, k, at: new Date().toLocaleTimeString('pt-BR') }); UI.log = UI.log.slice(0, 80); };
 
 function freezeClient(c) {
-  const o = clone({ key: c.key, code: c.code, name: c.name, cnpj: c.cnpj, cnpjRaw: c.cnpjRaw, seg: c.seg, city: c.city, size: c.size, mrr: c.mrr, productsRaw: c.productsRaw, churn: c.churn, nps: c.nps, notes: c.notes, custom: c.custom || [], edits: c.edits || {}, usoConf: c.usoConf || {}, site: c.site || '', fatos: c.fatos || [], sugFatos: c.sugFatos || [], semIA: c.semIA || null, aval: c.aval || {}, valid: c.valid || {}, src: c.src, fichas: c.fichas, docs: c.docs, mgmt: c.mgmt, act: c.act, uf: c.uf, regime: c.regime, release: c.release, lic: c.lic, cloud: c.cloud, rel: c.rel, fis: c.fis, roi: c.roi, exec: c.exec, cdocs: c.cdocs, iid: c.iid, ext: c.ext || {}, cad: c.cad || {}, contratos: c.contratos || [], cadDec: c.cadDec || {}, cadConf: c.cadConf || [], cnpjCad: c.cnpjCad || null, insRef: c.insRef || [], fichaErr: c.fichaErr || [], lastChange: c.lastChange || null, changes: c.changes || [], reviewFlags: c.reviewFlags || [], prevKeys: c.prevKeys || [], oppKeep: c.oppKeep || [] });
+  const o = clone({ key: c.key, code: c.code, name: c.name, cnpj: c.cnpj, cnpjRaw: c.cnpjRaw, seg: c.seg, city: c.city, size: c.size, mrr: c.mrr, productsRaw: c.productsRaw, churn: c.churn, nps: c.nps, notes: c.notes, custom: c.custom || [], edits: c.edits || {}, usoConf: c.usoConf || {}, site: c.site || '', fatos: c.fatos || [], sugFatos: c.sugFatos || [], semIA: c.semIA || null, aval: c.aval || {}, valid: c.valid || {}, src: c.src, fichas: c.fichas, docs: (c.docs || []).filter(d => !d.prv), prFill: c.prFill || {}, prImp: c.prImp || [], mgmt: c.mgmt, act: c.act, uf: c.uf, regime: c.regime, release: c.release, lic: c.lic, cloud: c.cloud, rel: c.rel, fis: c.fis, roi: c.roi, exec: c.exec, cdocs: c.cdocs, iid: c.iid, ext: c.ext || {}, cad: c.cad || {}, contratos: c.contratos || [], cadDec: c.cadDec || {}, cadConf: c.cadConf || [], cnpjCad: c.cnpjCad || null, insRef: c.insRef || [], fichaErr: c.fichaErr || [], lastChange: c.lastChange || null, changes: c.changes || [], reviewFlags: c.reviewFlags || [], prevKeys: c.prevKeys || [], oppKeep: c.oppKeep || [] });
   let n = JSON.stringify(o).length;
   if (n > 235000) { o.docs.forEach(d => d.text = d.text.slice(0, 3000)); (o.cdocs || []).forEach(d => d.text = d.text.slice(0, 3000)); o.docTrunc = true; n = JSON.stringify(o).length; }
   if (n > 235000 && o.lic?.matriz?.rows) { o.lic.matriz.rows = o.lic.matriz.rows.slice(0, 150); o.lic.matriz.trunc = true; n = JSON.stringify(o).length; }
@@ -70,7 +70,7 @@ async function initStore() {
 }
 function runAnalysis(c, reason) {
   c.fichas ||= []; c.docs ||= []; c.mgmt ||= {}; c.act ||= {}; c.fichaErr ||= []; c.changes ||= []; c.reviewFlags ||= []; c.iid ||= 'cli_' + uid(); c.ext ||= {};
-  const before = reason && c.opps ? snapOf(c) : null; analyzeClient(c, S);
+  if (typeof prSyncDocs === 'function') prSyncDocs(c); const before = reason && c.opps ? snapOf(c) : null; analyzeClient(c, S);
   if (before) { const items = diffSnap(before, snapOf(c)); if (items.length) { c.lastChange = { at: new Date().toISOString(), reason, items }; c.changes = [c.lastChange, ...c.changes].slice(0, 8); } }
 }
 function reanalyzeAll(stamp = true, reason = '') { Object.values(S.clients).forEach(c => { runAnalysis(c, reason); if (reason) touchC(c.key); }); if (stamp) { S.meta.lastAnalysis = new Date().toISOString(); touchMeta(); } }

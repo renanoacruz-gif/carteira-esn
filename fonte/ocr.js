@@ -124,7 +124,7 @@ function ocrCard(rec) {
   return h + '</div>';
 }
 function ocrPanel() {
-  const list = S.ocr;
+  const list = S.ocr.filter(o => o.origem !== 'print');
   return `<div class="card"><h3>Leitura por OCR <span class="muted sm">(imagens e PDFs escaneados)</span></h3>
   <label class="drop" data-drop="f-ocr"><b>Prints, imagens e documentos escaneados</b><br><span class="muted sm">PNG, JPG, WEBP ou PDF escaneado, até 3 MB cada. O texto é lido por OCR no backend — <b>só depois da sua autorização</b>.</span><input type="file" id="f-ocr" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" hidden></label>
   <p class="sm muted">O cliente é identificado por CNPJ válido ou código TOTVS no texto; se houver dúvida, você escolhe. Documentos com texto (PDF com texto, DOCX, XLSX, TXT) seguem pelo cartão 3 e não usam OCR. O backup JSON não inclui as imagens nem as leituras de OCR (ficam na base da sua conta).</p>

@@ -240,7 +240,7 @@ function identifiedProducts(c) {
   const map = new Map(); const add = p => { const e = map.get(p.id) || { id: p.id, nome: p.nome, ev: [] }; e.ev.push(p); map.set(p.id, e); };
   if (c.productsRaw) findProducts(c.productsRaw, { src: 'Planilha', loc: `linha ${c.src?.row || '?'} (Produtos)` }).forEach(add);
   fichasOk(c).forEach(f => { if (f.items?.length) f.items.forEach(it => findProducts(it.desc, { src: f.file, loc: it.loc }).forEach(add)); else (f.products || []).forEach(p => add({ ...p, src: f.file })); });
-  (c.docs || []).forEach(d => findProducts(d.text, { src: d.name, loc: 'documento complementar', texto: true }).forEach(add));
+  (c.docs || []).filter(d => !d.prPrint).forEach(d => findProducts(d.text, { src: d.name, loc: 'documento complementar', texto: true }).forEach(add));
   /* decisão humana por cliente prevalece sobre o reconhecimento automático */
   const dec = c.prodDec || {};
   const out = [...map.values()].filter(e => dec[e.id]?.st !== 'rejeitado').map(e => ({ ...e, nivel: e.ev.some(x => !x.texto) ? 'estruturado' : 'texto', conf: dec[e.id]?.st === 'confirmado' }));

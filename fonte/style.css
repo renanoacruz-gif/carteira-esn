@@ -253,3 +253,7 @@ button.kpi.rt{cursor:pointer;text-align:left;font:inherit;width:100%;border:1px 
 .opc .opp{margin-top:8px}.jd input[type=text]{min-width:160px}
 @media(max-width:640px){.ab dl.chain2{grid-template-columns:1fr}.ab dl.chain2 dd{margin-bottom:6px}}
 #radar .grid>*{min-width:0}#radar td,#radar th{overflow-wrap:anywhere}
+.mdl-box #mdb{margin:0 0 var(--s5);color:var(--txt2);line-height:1.55}
+.pr-it{margin:8px 0;padding:10px}.pr-th{width:72px;height:72px;object-fit:cover;border:1px solid var(--bd);border-radius:6px;cursor:zoom-in;background:#f4f7f9;flex:none}
+.pr-it textarea{max-width:100%}.pr-it .alert{margin:6px 0}
+.pr-it td.or{min-width:230px}.pr-it td input{min-width:110px}
