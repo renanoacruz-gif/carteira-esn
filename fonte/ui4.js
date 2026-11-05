@@ -3,7 +3,7 @@ const CTABS = [['raiox', 'Raio-X'], ['resumo', 'Resumo'], ['cadastro', 'Cadastro
 const kk = c => esc(c.key);
 const stPill = st => pill({ confirmado: 'confirmado', candidato: 'a revisar', descartado: 'descartado', substituido: 'substituído' }[st] || st, { confirmado: 'ok', candidato: 'warn', descartado: 'off', substituido: 'off' }[st] || 'off');
 const clsSel = (attrs, cur, list = CLS5) => `<select ${attrs}>${list.map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
-const srcLink = f => f?.u ? `<a href="${esc(f.u)}" target="_blank" rel="noopener noreferrer">${esc(f.t || f.ref || hostOf(f.u))}</a>` : esc(f?.t || f?.ref || '—');
+const srcLink = f => f?.u ? `<a href="${esc(safeUrl(f.u))}" target="_blank" rel="noopener noreferrer">${esc(f.t || f.ref || hostOf(f.u))}</a>` : esc(f?.t || f?.ref || '—');
 const histDet = h => h?.length ? `<details><summary class="sm muted">Histórico (${h.length})</summary><ul class="sm">${h.map(x => `<li>${esc(fmtDate(x.at))} — ${esc(x.acao)}${x.campo ? ` <b>${esc(x.campo)}</b>` : ''}${x.de !== undefined && x.de !== null ? `: "${esc(String(x.de))}" → "${esc(String(x.para ?? ''))}"` : ''}${x.motivo ? ` <span class="muted">(${esc(x.motivo)})</span>` : ''}${x.por ? ` <span class="muted">por ${esc(x.por)}</span>` : ''}</li>`).join('')}</ul></details>` : '';
 
 /* ---------- Componente: lista de evidências ---------- */
@@ -12,7 +12,7 @@ function evList(c, path, arr, o = {}) {
   const pk = path.replace(/\W/g, '_');
   const rows = vis.map(e => `<div class="evr ${e.st}"><div class="row">${chip(e.cls)} <b>${esc(e.v)}</b>${o.extra ? o.extra(e) : ''} ${stPill(e.st)}<span class="sp"></span>
     ${e.st === 'candidato' ? `<button class="btn sm" data-a="evSt" data-k="${kk(c)}" data-p="${path}" data-id="${e.id}" data-st="confirmado">Confirmar</button><button class="btn ghost sm" data-a="evSt" data-k="${kk(c)}" data-p="${path}" data-id="${e.id}" data-st="descartado">Descartar</button>` : `<button class="btn ghost sm" data-a="evSt" data-k="${kk(c)}" data-p="${path}" data-id="${e.id}" data-st="${e.st === 'confirmado' ? 'descartado' : 'candidato'}">${e.st === 'confirmado' ? 'Revogar' : 'Reabrir'}</button>`}</div>
-    <div class="sm muted">Fonte: ${e.fonte.u ? `<a href="${esc(e.fonte.u)}" target="_blank" rel="noopener noreferrer">${esc(e.fonte.ref)}</a>` : esc(fonteTxt(e.fonte))} • registrado ${esc(fmtDate(e.at))}${e.conf ? ` • confirmado ${esc(fmtDate(e.conf))}` : ''}</div>${e.trecho ? `<div class="sm trecho">“${esc(e.trecho)}”</div>` : ''}${histDet(e.hist)}</div>`).join('');
+    <div class="sm muted">Fonte: ${e.fonte.u ? `<a href="${esc(safeUrl(e.fonte.u))}" target="_blank" rel="noopener noreferrer">${esc(e.fonte.ref)}</a>` : esc(fonteTxt(e.fonte))} • registrado ${esc(fmtDate(e.at))}${e.conf ? ` • confirmado ${esc(fmtDate(e.conf))}` : ''}</div>${e.trecho ? `<div class="sm trecho">“${esc(e.trecho)}”</div>` : ''}${histDet(e.hist)}</div>`).join('');
   const add = o.noAdd ? '' : `<div class="row addr"><input type="text" id="v_${pk}" placeholder="${esc(o.ph || 'Valor')}" style="min-width:220px">${o.addExtra || ''}${clsSel(`id="c_${pk}"`, 'FATO')}<input type="text" id="r_${pk}" placeholder="Fonte (documento, reunião, link)" style="min-width:220px"><button class="btn ghost sm" data-a="evAdd" data-k="${kk(c)}" data-p="${path}" data-x="${pk}">Registrar</button></div>`;
   return (rows || `<p class="muted sm">${esc(o.empty || 'Nada identificado nos documentos.')}</p>`) + add;
 }

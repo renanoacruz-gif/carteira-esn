@@ -8,6 +8,7 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const fmtBRL = n => n == null || isNaN(n) ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = iso => iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
+function safeUrl(u) { const t = String(u == null ? '' : u).trim(); return /^https?:\/\/[^\s<>"']+$/i.test(t) ? t : 'about:blank'; }
 function parseNum(v) {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return isFinite(v) ? v : null;
@@ -29,7 +30,23 @@ const normName = s => norm(s).replace(/\b(ltda|s\/?a|sa|eireli|me|epp|cia|compan
 const safeKey = s => String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_').slice(0, 120) || 'x';
 
 /* ---------- Leitura de arquivos ---------- */
-async function readBuf(file) { return await file.arrayBuffer(); }
+/* Leitura com validação: limite de tamanho, bloqueio de executáveis e conferência da assinatura real (não só a extensão). Erro por arquivo; o lote continua. */
+const ARQ_MAX = 80 * 1024 * 1024, ARQ_EXEC = /\.(exe|dll|bat|cmd|com|scr|msi|ps1|vbs|jar|sh|lnk|apk|app|js|jse|wsf|hta|iso)$/i;
+function arqAssinatura(name, buf) {
+  const u = new Uint8Array(buf, 0, Math.min(buf.byteLength, 1024)), ext = String(name).split('.').pop().toLowerCase(), at = (i, t) => t.every((x, k) => u[i + k] === x), asc = s => [...s].map(c => c.charCodeAt(0));
+  if (ARQ_EXEC.test(name) || at(0, [0x4d, 0x5a]) || at(0, [0x7f, 0x45, 0x4c, 0x46]) || at(0, [0xcf, 0xfa, 0xed, 0xfe]) || at(0, [0xce, 0xfa, 0xed, 0xfe]) || at(0, [0xfe, 0xed, 0xfa, 0xce]) || at(0, [0xfe, 0xed, 0xfa, 0xcf]) || at(0, [0xca, 0xfe, 0xba, 0xbe])) return 'Arquivo executável/programa não é aceito. Anexe PDF, DOCX, PPTX, XLSX, CSV, TXT, HTML, JSON ou imagem.';
+  if (ext === 'pdf' && !String.fromCharCode(...u).includes('%PDF')) return 'O arquivo não é um PDF válido (assinatura ausente). Reexporte o PDF.';
+  if (['xlsx', 'docx', 'pptx'].includes(ext) && !at(0, [0x50, 0x4b])) return 'O arquivo não é um .' + ext + ' válido (assinatura ausente).';
+  if (ext === 'png' && !at(0, [0x89, 0x50, 0x4e, 0x47])) return 'O arquivo não é um PNG válido.';
+  if ((ext === 'jpg' || ext === 'jpeg') && !at(0, [0xff, 0xd8, 0xff])) return 'O arquivo não é um JPEG válido.';
+  if (ext === 'webp' && !(at(0, asc('RIFF')) && at(8, asc('WEBP')))) return 'O arquivo não é um WEBP válido.';
+  return '';
+}
+async function readBuf(file) {
+  if (file.size > ARQ_MAX) throw new Error('"' + file.name + '" tem mais de 80 MB: divida ou reduza o arquivo e tente de novo.');
+  const buf = await file.arrayBuffer(), m = arqAssinatura(file.name, buf); if (m) throw new Error('"' + file.name + '": ' + m);
+  return buf;
+}
 async function sha(buf) { try { const h = await crypto.subtle.digest('SHA-256', buf); return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24); } catch { let h = 0; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 7) h = (h * 31 + u[i]) | 0; return 'w' + (h >>> 0).toString(16) + u.length; } }
 function decodeText(buf) { let t = new TextDecoder('utf-8').decode(buf); if (t.includes(String.fromCharCode(0xFFFD))) t = new TextDecoder('windows-1252').decode(buf); return t.replace(/^﻿/, ''); }
 function parseCSV(text) {
@@ -47,18 +64,21 @@ function parseCSV(text) {
   return rows;
 }
 /* Retorna {sheets:[{name, rows:[[...]]}]} para XLSX/CSV */
+const OP0 = new Set(Object.getOwnPropertyNames(Object.prototype));
 async function readTable(file, buf) {
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'csv' || ext === 'txt' && /[;,\t]/.test(decodeText(buf).slice(0, 500))) return { sheets: [{ name: 'CSV', rows: parseCSV(decodeText(buf)) }] };
   if (!window.XLSX) throw new Error('Biblioteca XLSX indisponível neste ambiente (CDN bloqueado?).');
+  const p0 = Object.getOwnPropertyNames(Object.prototype).length; /* defesa em profundidade: CVE-2023-30533 (poluição de protótipo no SheetJS < 0.19.3) */
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  if (Object.getOwnPropertyNames(Object.prototype).length !== p0) { for (const k of Object.getOwnPropertyNames(Object.prototype)) if (!OP0.has(k)) delete Object.prototype[k]; throw new Error('Planilha rejeitada: tentativa de alterar objetos internos do navegador.'); }
   return { sheets: wb.SheetNames.map(n => ({ name: n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '', blankrows: true }) })) };
 }
 /* PDF: devolve linhas {p, text} reconstruídas por coordenadas. PDFs escaneados (sem camada de texto) NÃO são lidos (sem OCR). */
 async function readPdf(buf) {
   if (!window.pdfjsLib) throw new Error('Biblioteca PDF indisponível neste ambiente (CDN bloqueado?).');
   let pdf, last;
-  for (const src of [PDF_WORKER, PDF_WORKER_DIRECT]) { try { pdfjsLib.GlobalWorkerOptions.workerSrc = src; pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise; break; } catch (e) { last = e; } }
+  for (const src of [PDF_WORKER, PDF_WORKER_DIRECT]) { try { pdfjsLib.GlobalWorkerOptions.workerSrc = src; pdf = await pdfjsLib.getDocument({ data: buf.slice(0), isEvalSupported: false }).promise; break; } catch (e) { last = e; } }
   if (!pdf) throw last || new Error('Falha ao abrir o PDF.');
   const lines = [];
   for (let p = 1; p <= pdf.numPages; p++) {

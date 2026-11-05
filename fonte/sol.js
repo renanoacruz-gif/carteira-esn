@@ -114,10 +114,13 @@ function extractTable(sh, file) {
 }
 /* DOCX: percorre o corpo em ordem. Parágrafo = uma linha; lista = "• "; tabela = uma linha por linha da tabela, colunas separadas por 2 espaços
    (como as colunas de PDF); tab/quebra viram espaço; texto de "Fallback" (duplicado) e exclusões rastreadas são ignorados; cabeçalho/rodapé não são lidos. */
+/* Proteção contra "zip bomb": limita nº de entradas e o tamanho descompactado de cada entrada lida. */
+function zipGuard(z) { if (Object.keys(z.files).length > 20000) throw new Error('Arquivo compactado com entradas demais (possível arquivo malicioso); não foi lido.'); }
+async function zipTxt(f) { const n = f && f._data && f._data.uncompressedSize; if (n > 60e6) throw new Error('Conteúdo descompactado acima de 60 MB (possível arquivo malicioso); não foi lido.'); return f.async('string'); }
 async function readDocx(buf) {
   if (!window.JSZip) throw new Error('Biblioteca DOCX (JSZip) indisponível neste ambiente.');
-  const z = await JSZip.loadAsync(buf); const f = z.file('word/document.xml'); if (!f) throw new Error('DOCX inválido: word/document.xml ausente.');
-  const doc = new DOMParser().parseFromString(await f.async('string'), 'application/xml'); if (doc.querySelector('parsererror')) throw new Error('DOCX inválido: XML do documento ilegível.');
+  const z = await JSZip.loadAsync(buf); zipGuard(z); const f = z.file('word/document.xml'); if (!f) throw new Error('DOCX inválido: word/document.xml ausente.');
+  const doc = new DOMParser().parseFromString(await zipTxt(f), 'application/xml'); if (doc.querySelector('parsererror')) throw new Error('DOCX inválido: XML do documento ilegível.');
   const body = [...doc.getElementsByTagName('*')].find(n => n.localName === 'body'); if (!body) throw new Error('DOCX inválido: corpo ausente.');
   const kids = (n, ln) => [...n.children].filter(c => c.localName === ln);
   const txt = n => { let t = ''; const walk = x => { for (const c of x.children) { const l = c.localName; if (l === 't') t += c.textContent; else if (l === 'tab') t += '  '; else if (l === 'br' || l === 'cr') t += ' '; else if (l === 'noBreakHyphen') t += '-'; else if (['pPr', 'rPr', 'instrText', 'del', 'Fallback', 'tblPr', 'trPr', 'tcPr'].includes(l)) continue; else walk(c); } }; walk(n); return t.replace(/[ \t]+$/g, '').replace(/^\s+/, ''); };
@@ -134,8 +137,8 @@ async function readDocx(buf) {
 
 async function readPptx(buf) {
   if (!window.JSZip) throw new Error('Biblioteca (JSZip) indisponível neste ambiente.');
-  const z = await JSZip.loadAsync(buf); const names = Object.keys(z.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => +a.match(/(\d+)\.xml/)[1] - +b.match(/(\d+)\.xml/)[1]); const out = [];
-  for (const n of names) { const xml = await z.file(n).async('string'); const sl = +n.match(/(\d+)\.xml/)[1];
+  const z = await JSZip.loadAsync(buf); zipGuard(z); const names = Object.keys(z.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => +a.match(/(\d+)\.xml/)[1] - +b.match(/(\d+)\.xml/)[1]); const out = [];
+  for (const n of names) { const xml = await zipTxt(z.file(n)); const sl = +n.match(/(\d+)\.xml/)[1];
     xml.split(/<\/a:p>/).forEach(p => { const t = (p.match(/<a:t[^>]*>[^<]*<\/a:t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join('').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim(); if (t) out.push({ text: t, loc: 'slide ' + sl }); }); }
   return out;
 }

@@ -374,7 +374,9 @@ function planRows() {
 }
 
 /* ---------- Exportações ---------- */
-function toCSV(head, rows) { const q = v => { v = String(v ?? ''); return /[";\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }; return '﻿' + [head, ...rows].map(r => r.map(q).join(';')).join('\r\n'); }
+/* Anti "CSV injection": célula de texto iniciada por = + - @ (ou TAB/CR) ganha apóstrofo; números e datas legítimos (ex.: -12,5; +55 11...) ficam intactos. */
+const csvSafe = v => { v = String(v ?? ''); return /^[=+\-@\t\r]/.test(v) && !/^([+-]?\d+([.,]\d+)*(%|\s?[A-Za-z$]{0,3})?|-)$/.test(v.trim()) ? "'" + v : v; };
+function toCSV(head, rows) { const q = v => { v = csvSafe(v); return /[";\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }; return '﻿' + [head, ...rows].map(r => r.map(q).join(';')).join('\r\n'); }
 async function offer(name, data) {
   if (!DL) { UI.fb = { name, data: typeof data === 'string' ? data : null }; render(); toast(typeof data === 'string' ? 'Download indisponível: copie o conteúdo abaixo.' : 'Download indisponível neste ambiente.'); return; }
   try { await DL.save({ filename: name, data }); toast('Arquivo oferecido: ' + name); }

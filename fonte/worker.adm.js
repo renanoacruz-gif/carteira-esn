@@ -36,7 +36,8 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS eventos (id TEXT PRIMARY KEY, ts TEXT NOT NULL, usuario TEXT NOT NULL, func TEXT NOT NULL, fase TEXT NOT NULL, resultado TEXT, corr TEXT, dur_ms INTEGER, origem TEXT NOT NULL, meta TEXT)',
   'CREATE INDEX IF NOT EXISTS eventos_ts ON eventos(ts)', 'CREATE INDEX IF NOT EXISTS eventos_usr ON eventos(usuario, ts)',
   'CREATE TABLE IF NOT EXISTS adm_cfg (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)',
-  'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)'
+  'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)',
+  'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)'
 ];
 const admDb = env => env && env.DB && typeof env.DB.prepare === 'function' ? env.DB : null;
 async function admInit(env) {
@@ -113,6 +114,24 @@ async function admPurgar(env, forcar) {
   return { eventos: a.meta?.changes ?? 0, tentativas: b.meta?.changes ?? 0 };
 }
 /* POST /api/ev  {eventos:[{id,func,fase,resultado,corr,dur,ts,meta}]}  — qualquer executivo autenticado; só grava eventos próprios */
+/* Observação de CSP (Report-Only): só contadores por diretiva+origem do recurso; sem URL completa, sem conteúdo, sem usuário. */
+async function admCsp(req, env, au) {
+  if (!au.user || req.method !== 'POST') return new Response(null, { status: 204 });
+  const db = admDb(env); if (!db) return new Response(null, { status: 204 });
+  const now = Date.now(), rr = ADM_MEM.rate.get('csp:' + au.user) || { t: now, n: 0 }; if (now - rr.t > 60000) { rr.t = now; rr.n = 0; } rr.n++; ADM_MEM.rate.set('csp:' + au.user, rr);
+  if (rr.n > 30) return new Response(null, { status: 204 });
+  try {
+    const raw = await req.text(); if (raw.length > 4096) return new Response(null, { status: 204 });
+    const j = JSON.parse(raw), r = j['csp-report'] || (Array.isArray(j) ? (j[0] || {}).body : j.body) || {};
+    const dir = String(r['violated-directive'] || r.effectiveDirective || r['effective-directive'] || '').split(' ')[0].replace(/[^a-z-]/gi, '').slice(0, 40);
+    let alvo = String(r['blocked-uri'] || r.blockedURL || r.blockedUri || '').slice(0, 300); try { const u = new URL(alvo); alvo = u.protocol === 'http:' || u.protocol === 'https:' ? u.origin : u.protocol; } catch { alvo = alvo.replace(/[^a-z:\-]/gi, '').slice(0, 30) || 'inline'; }
+    if (!dir) return new Response(null, { status: 204 });
+    await admInit(env);
+    const n = (await db.prepare('SELECT COUNT(*) c FROM csp_obs').first())?.c || 0; if (n >= 200 && !(await db.prepare('SELECT 1 x FROM csp_obs WHERE chave=?').bind(dir + '|' + alvo).first())) return new Response(null, { status: 204 });
+    await db.prepare('INSERT INTO csp_obs(chave,diretiva,alvo,n,ultimo) VALUES(?,?,?,1,?) ON CONFLICT(chave) DO UPDATE SET n=n+1, ultimo=excluded.ultimo').bind(dir + '|' + alvo, dir, alvo, new Date().toISOString()).run();
+  } catch { /* observação é melhor esforço */ }
+  return new Response(null, { status: 204 });
+}
 async function admIngestar(req, env, au) {
   if (!au.user) return J({ ok: false, erro: { codigo: 'nao_autorizado', mensagem: 'Eventos exigem identidade.' } }, 401);
   if (req.method !== 'POST') return J({ ok: false, erro: { codigo: 'metodo', mensagem: 'Use POST.' } }, 405);
@@ -211,6 +230,7 @@ async function admResumo(env, url) {
   out.roster = roster; out.config = cfg; out.funcs = Object.fromEntries(Object.entries(ADM_FUNCS).map(([k, v]) => [k, { rot: v.rot, util: !!v.util, org: v.org }]));
   try { out.limites_backend = await (await handleLimites(env)).json(); } catch { out.limites_backend = null; }
   out.tentativas_negadas = { ultimas_24h: (await db.prepare('SELECT COUNT(*) c FROM adm_tentativas WHERE ts>?').bind(new Date(Date.now() - 864e5).toISOString()).first())?.c || 0, ultimas: ((await db.prepare('SELECT ts,usuario,motivo,rota FROM adm_tentativas ORDER BY id DESC LIMIT 10').all()).results || []) };
+  try { out.csp = ((await db.prepare('SELECT diretiva,alvo,n,ultimo FROM csp_obs ORDER BY n DESC LIMIT 30').all()).results || []); } catch { out.csp = []; }
   out.geradoEm = agora; return out;
 }
 async function admRoster(req, env, au) {
