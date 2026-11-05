@@ -1,0 +1,22 @@
+name = "carteira-esn"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+
+# App (public/) + API (Worker) no mesmo endereço. Só /api/* e /backend passam pelo código do Worker.
+[assets]
+directory = "./public"
+run_worker_first = ["/api/*", "/backend"]
+
+# Banco compartilhado (catálogo) + carteira de cada executivo. O id é gerado por: wrangler d1 create carteira-esn
+[[d1_databases]]
+binding = "DB"
+database_name = "carteira-esn"
+database_id = "COLE_O_ID_AQUI"
+
+[vars]
+ALLOWED_DOMAIN = "totvs.com.br"          # só e-mails deste domínio entram (o Cloudflare Access também restringe)
+ADMIN_EMAILS = "seu.nome@totvs.com.br"   # quem pode excluir registros do catálogo criados por outros (separe por vírgula)
+
+# Segredos (NÃO coloque valores aqui). Chaves de IA ficam com cada executivo, no navegador dele.
+#   wrangler secret put APP_TOKEN        # opcional: só para a página manual /backend
+# NUNCA defina ALLOW_TEST_USER em produção (existe só para testes locais).

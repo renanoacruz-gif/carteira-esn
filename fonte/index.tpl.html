@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestão de Carteira TOTVS ESN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style id="appcss">{{CSS}}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head><body>
+<a class="skip" href="#app">Ir para o conteúdo</a>
+<div class="shell" id="shell">
+<aside class="sb" id="sb" aria-label="Navegação principal">
+<div class="sb-top"><img class="sb-logo" src="{{LOGO_W}}" alt="TOTVS"><img class="sb-sym" src="{{LOGO_S}}" alt="TOTVS" width="26" height="30"><button class="sb-tg" type="button" id="sbtg" data-a="sbToggle" aria-label="Recolher menu lateral" aria-expanded="true"></button></div>
+<nav class="sb-nav" id="nav" aria-label="Seções"></nav>
+<div class="sb-foot" id="sbfoot"></div>
+</aside>
+<div class="scrim" id="scrim" data-a="sbClose"></div>
+<div class="main-col">
+<header class="top" id="top"></header>
+<main id="main"><div id="app" tabindex="-1"><div class="skeleton" aria-busy="true" aria-label="Carregando"><i class="sk w40"></i><div class="grid g4"><i class="sk h70"></i><i class="sk h70"></i><i class="sk h70"></i><i class="sk h70"></i></div><i class="sk h160"></i></div></div></main>
+</div>
+</div>
+<div id="modal"></div>
+<div id="tip" role="tooltip" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+const LOGO_W="{{LOGO_W}}";
+const PDF_WORKER_DIRECT='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDF_WORKER=URL.createObjectURL(new Blob(['importScripts("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js");'],{type:'text/javascript'}));
+{{JS}}
+</script></body></html>

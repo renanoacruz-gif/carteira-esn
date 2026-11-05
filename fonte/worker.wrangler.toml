@@ -1,0 +1,14 @@
+name = "gemini-carteira-backend"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Segredos (NÃO coloque valores aqui):
+#   wrangler secret put GEMINI_API_KEY
+#   wrangler secret put APP_TOKEN
+
+# Opcional — contadores (por minuto/dia) e cache persistentes entre instâncias via Workers KV:
+#   wrangler kv namespace create LIMITES      (copie o id retornado)
+# [[kv_namespaces]]
+# binding = "LIMITES"
+# id = "COLE_O_ID_AQUI"
+# Variáveis opcionais: LIMITE_POR_MIN (padrão 12), LIMITE_POR_DIA (padrão 300), TDN_COOKIE / TDN_AUTH_HEADER (segredos, só para importação do TDN).
