@@ -16,6 +16,8 @@ database_id = "34fc3064-d8fe-4d5a-91e4-7e02c6fce2bc"
 [vars]
 ALLOWED_DOMAIN = "totvs.com.br"          # só e-mails deste domínio entram (o Cloudflare Access também restringe)
 ADMIN_EMAILS = "renan.oscar@totvs.com.br"   # quem pode excluir registros do catálogo criados por outros (separe por vírgula)
+ACCESS_TEAM = "billowing-paper-7b4d.cloudflareaccess.com"   # domínio do time Zero Trust (não é segredo)
+ACCESS_AUD = ""   # AUD tag do aplicativo Access (Workers & Pages → carteira-esn → Access → AUD tag → copiar)
 
 # Segredos (NÃO coloque valores aqui). Chaves de IA ficam com cada executivo, no navegador dele.
 #   wrangler secret put APP_TOKEN        # opcional: só para a página manual /backend

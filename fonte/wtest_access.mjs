@@ -1,0 +1,25 @@
+import w from './worker.mjs';
+import { webcrypto as C } from 'node:crypto';
+const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const TEAM = 'time-teste.cloudflareaccess.com', AUD = 'aud-teste-123';
+const kp = await C.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+const jwk = { ...(await C.subtle.exportKey('jwk', kp.publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
+const kp2 = await C.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+const b64 = o => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
+async function jwt(pl, key = kp.privateKey, kid = 'k1') { const h = b64({ alg: 'RS256', kid, typ: 'JWT' }), p = b64(pl), s = Buffer.from(await C.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(h + '.' + p))).toString('base64url'); return h + '.' + p + '.' + s; }
+let fetches = 0; globalThis.fetch = async u => { if (String(u) === 'https://' + TEAM + '/cdn-cgi/access/certs') { fetches++; return new Response(JSON.stringify({ keys: [jwk] }), { headers: { 'content-type': 'application/json' } }); } return new Response('x', { status: 404 }); };
+const env = { ACCESS_TEAM: TEAM, ACCESS_AUD: AUD, ALLOWED_DOMAIN: 'totvs.com.br', ADMIN_EMAILS: 'adm@totvs.com.br' };
+const now = Math.floor(Date.now() / 1000), base = { iss: 'https://' + TEAM, aud: [AUD], exp: now + 600, email: 'Renan.Oscar@totvs.com.br' };
+const me = async t => (await (await w.fetch(new Request('https://x.example/api/me', { headers: t ? { 'cf-access-jwt-assertion': t } : {} }), env, {})).json());
+let j = await me(await jwt(base)); ok(j.ok && j.id === 'renan.oscar@totvs.com.br' && j.hospedado, 'token válido do Access identifica o e-mail (minúsculo)');
+ok(fetches === 1, 'chaves do time buscadas uma vez e reaproveitadas'); await me(await jwt(base)); ok(fetches === 1, 'segunda chamada usa cache');
+j = await me(await jwt({ ...base, email: 'adm@totvs.com.br' })); ok(j.admin === true, 'admin reconhecido por ADMIN_EMAILS');
+j = await me(await jwt({ ...base, aud: ['outro'] })); ok(!j.ok && j.erro.codigo === 'nao_autorizado', 'AUD diferente é recusado');
+j = await me(await jwt({ ...base, iss: 'https://outro.cloudflareaccess.com' })); ok(!j.ok, 'emissor diferente é recusado');
+j = await me(await jwt({ ...base, exp: now - 5 })); ok(!j.ok, 'token expirado é recusado');
+j = await me(await jwt(base, kp2.privateKey)); ok(!j.ok, 'assinatura de outra chave é recusada');
+j = await me(await jwt({ ...base, email: 'x@gmail.com' })); ok(!j.ok && j.erro.codigo === 'dominio_nao_permitido', 'domínio fora de totvs.com.br é recusado');
+j = await me(await jwt(base, kp.privateKey, 'kx')); ok(!j.ok, 'kid desconhecido é recusado');
+j = await me('lixo.lixo.lixo'); ok(!j.ok, 'token malformado é recusado');
+j = await me(null); ok(!j.ok && j.erro.codigo === 'nao_autorizado', 'sem token: nega');
+const e2 = { ...env, ACCESS_AUD: '' }; j = await (await w.fetch(new Request('https://x.example/api/me', { headers: { 'cf-access-jwt-assertion': await jwt(base) } }), e2, {})).json(); ok(!j.ok, 'sem ACCESS_AUD configurado o token é ignorado');

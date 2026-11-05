@@ -521,9 +521,27 @@ async function handleStatus(env) {
    Chave do provedor: cada executivo envia a sua em x-provider-key (junto de x-provider). Ela vive só na memória da requisição: não é gravada, devolvida nem registrada. */
 const DOMAIN_OK = (env) => String(env.ALLOWED_DOMAIN || 'totvs.com.br').toLowerCase().replace(/^@/, '');
 const EMAIL_RE = /^[a-z0-9._+\-]+@[a-z0-9.\-]+$/;
+/* Validação do token do Access (Cf-Access-Jwt-Assertion): assinatura RS256 contra as chaves do time, emissor, AUD e validade. Só roda com ACCESS_TEAM e ACCESS_AUD definidos. */
+const _jwks = { team: '', at: 0, tent: 0, keys: [] };
+const b64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(s).length / 4) * 4, '=')), c => c.charCodeAt(0));
+async function accessJwtEmail(req, env) {
+  const tok = req.headers.get('cf-access-jwt-assertion'); if (!tok || !env.ACCESS_TEAM || !env.ACCESS_AUD) return '';
+  try {
+    const [h, p, s] = tok.split('.'), hd = JSON.parse(new TextDecoder().decode(b64u(h))), pl = JSON.parse(new TextDecoder().decode(b64u(p)));
+    const team = String(env.ACCESS_TEAM).replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+    if (hd.alg !== 'RS256' || pl.iss !== 'https://' + team || !(pl.exp > Date.now() / 1000) || ![].concat(pl.aud || []).includes(env.ACCESS_AUD)) return '';
+    if (_jwks.team !== team || !_jwks.keys.some(k => k.kid === hd.kid)) {
+      if (_jwks.team !== team || Date.now() - _jwks.tent > 60000) { _jwks.tent = Date.now(); const r = await fetch('https://' + team + '/cdn-cgi/access/certs'); if (r.ok) { const j = await r.json(); _jwks.team = team; _jwks.at = Date.now(); _jwks.keys = j.keys || []; } }
+    }
+    const jwk = _jwks.keys.find(k => k.kid === hd.kid); if (!jwk) return '';
+    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    return (await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(s), new TextEncoder().encode(h + '.' + p))) ? String(pl.email || '').toLowerCase() : '';
+  } catch { return ''; }
+}
 async function authn(req, env, ctx) {
   let email = '';
   try { if (ctx?.access?.getIdentity) { const id = await ctx.access.getIdentity(); email = String(id?.email || '').toLowerCase(); } } catch { email = ''; }
+  if (!email) email = await accessJwtEmail(req, env);
   if (!email && env.ALLOW_TEST_USER === '1') email = String(req.headers.get('x-test-user') || '').toLowerCase(); /* SOMENTE testes locais; nunca defina em produção */
   if (email) { if (!EMAIL_RE.test(email) || !email.endsWith('@' + DOMAIN_OK(env))) return { ok: false, erro: { codigo: 'dominio_nao_permitido', mensagem: `Acesso restrito a e-mails @${DOMAIN_OK(env)}.` }, status: 403 }; return { ok: true, user: email, admin: String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).includes(email) }; }
   if (authorized(req, env)) return { ok: true, user: null, admin: false };
