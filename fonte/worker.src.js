@@ -524,26 +524,27 @@ const EMAIL_RE = /^[a-z0-9._+\-]+@[a-z0-9.\-]+$/;
 /* Validação do token do Access (Cf-Access-Jwt-Assertion): assinatura RS256 contra as chaves do time, emissor, AUD e validade. Só roda com ACCESS_TEAM e ACCESS_AUD definidos. */
 const _jwks = { team: '', at: 0, tent: 0, keys: [] };
 const b64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(s).length / 4) * 4, '=')), c => c.charCodeAt(0));
-async function accessJwtEmail(req, env) {
-  const tok = req.headers.get('cf-access-jwt-assertion'); if (!tok || !env.ACCESS_TEAM || !env.ACCESS_AUD) return '';
+async function accessJwtEmail(req, env) { const r = await accessJwtId(req, env); return r.email; }
+async function accessJwtId(req, env) {
+  const NO = { email: '', sub: '' }; const tok = req.headers.get('cf-access-jwt-assertion'); if (!tok || !env.ACCESS_TEAM || !env.ACCESS_AUD) return NO;
   try {
     const [h, p, s] = tok.split('.'), hd = JSON.parse(new TextDecoder().decode(b64u(h))), pl = JSON.parse(new TextDecoder().decode(b64u(p)));
     const team = String(env.ACCESS_TEAM).replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
-    if (hd.alg !== 'RS256' || pl.iss !== 'https://' + team || !(pl.exp > Date.now() / 1000) || ![].concat(pl.aud || []).includes(env.ACCESS_AUD)) return '';
+    if (hd.alg !== 'RS256' || pl.iss !== 'https://' + team || !(pl.exp > Date.now() / 1000) || ![].concat(pl.aud || []).includes(env.ACCESS_AUD)) return NO;
     if (_jwks.team !== team || !_jwks.keys.some(k => k.kid === hd.kid)) {
       if (_jwks.team !== team || Date.now() - _jwks.tent > 60000) { _jwks.tent = Date.now(); const r = await fetch('https://' + team + '/cdn-cgi/access/certs'); if (r.ok) { const j = await r.json(); _jwks.team = team; _jwks.at = Date.now(); _jwks.keys = j.keys || []; } }
     }
-    const jwk = _jwks.keys.find(k => k.kid === hd.kid); if (!jwk) return '';
+    const jwk = _jwks.keys.find(k => k.kid === hd.kid); if (!jwk) return NO;
     const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    return (await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(s), new TextEncoder().encode(h + '.' + p))) ? String(pl.email || '').toLowerCase() : '';
-  } catch { return ''; }
+    return (await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(s), new TextEncoder().encode(h + '.' + p))) ? { email: String(pl.email || '').toLowerCase(), sub: String(pl.sub || '') } : NO;
+  } catch { return { email: '', sub: '' }; }
 }
 async function authn(req, env, ctx) {
-  let email = '';
-  try { if (ctx?.access?.getIdentity) { const id = await ctx.access.getIdentity(); email = String(id?.email || '').toLowerCase(); } } catch { email = ''; }
-  if (!email) email = await accessJwtEmail(req, env);
-  if (!email && env.ALLOW_TEST_USER === '1') email = String(req.headers.get('x-test-user') || '').toLowerCase(); /* SOMENTE testes locais; nunca defina em produção */
-  if (email) { if (!EMAIL_RE.test(email) || !email.endsWith('@' + DOMAIN_OK(env))) return { ok: false, erro: { codigo: 'dominio_nao_permitido', mensagem: `Acesso restrito a e-mails @${DOMAIN_OK(env)}.` }, status: 403 }; return { ok: true, user: email, admin: String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).includes(email) }; }
+  let email = '', sub = '', verif = false;
+  try { if (ctx?.access?.getIdentity) { const id = await ctx.access.getIdentity(); email = String(id?.email || '').toLowerCase(); sub = String(id?.user_uuid || id?.sub || id?.id || ''); verif = !!(email && sub); } } catch { email = ''; sub = ''; verif = false; }
+  if (!email) { const j = await accessJwtId(req, env); email = j.email; sub = j.sub; verif = !!(email && sub); }
+  if (!email && env.ALLOW_TEST_USER === '1') { email = String(req.headers.get('x-test-user') || '').toLowerCase(); sub = String(req.headers.get('x-test-sub') || ''); verif = !!sub; } /* SOMENTE testes locais; nunca defina em produção */
+  if (email) { if (!EMAIL_RE.test(email) || !email.endsWith('@' + DOMAIN_OK(env))) return { ok: false, erro: { codigo: 'dominio_nao_permitido', mensagem: `Acesso restrito a e-mails @${DOMAIN_OK(env)}.` }, status: 403 }; return { ok: true, user: email, sub, verif, admin: String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).includes(email) }; }
   if (authorized(req, env)) return { ok: true, user: null, admin: false };
   return { ok: false, erro: { codigo: 'nao_autorizado', mensagem: 'Entre pelo Cloudflare Access (e-mail corporativo) ou informe o APP_TOKEN.' }, status: 401 };
 }
@@ -620,7 +621,13 @@ async function handleInner(req, env0, ctx) {
   if (!url.pathname.startsWith('/api/')) return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota inexistente.' } }, 404);
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
-  if (url.pathname === '/api/me') return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, hospedado: !!au.user });
+  if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
+  if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
+  if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
+  if (ADM_ROTAS[url.pathname] && au.user) { const t0 = Date.now(), rc = url.pathname === '/api/ia' ? req.clone() : req, resp = await rotasApi(req, env, au, url); await admMedir(env0, ctx, au, url.pathname, rc, t0, resp); return resp; }
+  return rotasApi(req, env, au, url);
+}
+async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/db') return handleDb(req, env, au);
   if (url.pathname === '/api/limites' && req.method === 'GET') return handleLimites(env);
   if (url.pathname === '/api/importar') return handleImportar(req, env);
@@ -663,6 +670,7 @@ async function processar(q, env, base, t0) {
   return J({ ...base, ok: true, usouBuscaWeb: p.usouBusca, fallbackSemBusca: !!r.fallbackSemBusca, daCache: false, consultas: p.consultas.slice(0, 10), fontes: p.citacoes.slice(0, 40).map(c => ({ ...c, oficial: OFFICIAL.test(hostOf(c.u)) || OFFICIAL.test(String(c.t).toLowerCase()) })), sugestoesBuscaHtml: p.sugestoesHtml.slice(0, 3), resumo: str(parsed.resumo, 600), itens, semResultados, avisos, latenciaMs: Date.now() - t0 });
 }
 
+/*__ADM__*/
 export default { fetch: (req, env, ctx) => handle(req, env, ctx) };
 
 /* Página mínima servida em "/": cola o pedido (JSON baixado do aplicativo), envia, baixa a resposta. A senha (APP_TOKEN) fica só na memória da página. */

@@ -35,7 +35,7 @@ function stats() {
 const VIEWS = [['importar', 'Importar'], ['geral', 'Visão geral'], ['clientes', 'Clientes'], ['cliente', 'Cliente'], ['segmentos', 'Segmentos'], ['plano', 'Plano de ação'], ['criterios', 'Critérios'], ['solucoes', 'Base de Soluções'], ['refs', 'Releases e regulatório'], ['consol', 'Consolidação'], ['ia', 'Configurações de IA'], ['base', 'Base TOTVS e limites']];
 function render() {
   paintShell();
-  const V = { importar: vImport, oport: vOport, geral: vGeral, clientes: vClientes, cliente: vCliente, diag: vDiag, segmentos: vSeg, plano: vPlano, criterios: vCrit, base: vBase, solucoes: vSolucoes, ia: vIA, refs: vRefs, consol: vConsol, conta: vConta, dados: vDados, integra: vIntegra, cnpj: vCnpj, mercado: vMercado, pend: vPend }[UI.view];
+  const V = { importar: vImport, oport: vOport, geral: vGeral, clientes: vClientes, cliente: vCliente, diag: vDiag, segmentos: vSeg, plano: vPlano, criterios: vCrit, base: vBase, solucoes: vSolucoes, ia: vIA, refs: vRefs, consol: vConsol, conta: vConta, dados: vDados, integra: vIntegra, cnpj: vCnpj, mercado: vMercado, pend: vPend, adm: vAdm }[UI.view];
   $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + (window.__HOSTED__ ? hkBanner() : '') + V();
   paintModal();
 }

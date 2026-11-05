@@ -23,7 +23,7 @@ if (HOST && !window.claude) {
     if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual });
     return j;
   };
-  let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); return j; }).catch(e => { _me = null; throw e; }));
+  let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
   const lastGet = {};
   const col = path => ({
     path,

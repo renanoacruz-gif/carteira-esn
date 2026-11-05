@@ -182,6 +182,8 @@ details.lf{border-bottom:1px solid var(--bd);padding:6px 0}details.lf>summary{co
 .seg2 button{border:0;background:#fff;padding:6px 14px;cursor:pointer;font-family:var(--fh);transition:.15s}.seg2 button.on{background:var(--pet);color:#fff}
 tr.arq{opacity:.55}
 table.chain td{vertical-align:top}
+.tbl-wrap{overflow-x:auto;max-width:100%}
+@media(max-width:760px){.opp{overflow-x:auto}}
 .card.roi table input{padding:4px 6px;border:1px solid var(--bd);border-radius:5px}
 .a4wrap{display:flex;flex-direction:column;gap:16px;align-items:center;background:#e9eef1;padding:18px;border-radius:12px}
 .a4{width:100%;max-width:640px;aspect-ratio:210/297;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:0 0 26px;position:relative;overflow:hidden;font-size:10.5px;line-height:1.4}

@@ -77,7 +77,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT);
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;
@@ -94,12 +94,13 @@ document.addEventListener('change', async e => {
   if (id === 'f-sol' && files?.length) { await solImportFiles(files); t.value = ''; return; }
   if (id === 'f-lk' && files?.length) { await aiImportFile(files[0]); t.value = ''; return; }
   if ((id === 'f-ai' || id === 'f-ai2') && files?.length) { await aiImportFile(files[0]); t.value = ''; return; }
+  if (id === 'adm-roster-f' && files?.length) { await admRosterFile(files[0]); t.value = ''; return; }
   if (id === 'f-bak' && files?.length) { await importBackup(files[0]); t.value = ''; return; }
   if (!c) return; const v = t.value;
   if (c === 'prtxt') { prTexto(t.dataset.id, v); return; }
   if (c === 'lkopt') { LK_OPT()[t.dataset.f] = Math.max(0, +v || 0); return; }
   if (c === 'valOrig' && files?.length) { valOrig(t.dataset.k, t.dataset.id, files[0]); t.value = ''; return; }
-  if (iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
+  if (admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
   switch (c) {
     case 'attach': await ingest(files, t.dataset.t, t.dataset.k); t.value = ''; break;
     case 'wsheet': { const w = UI.wiz; w.si = +v; w.h = detectHeader(w.sheets[w.si].rows); w.map = autoMap((w.sheets[w.si].rows[w.h] || []).map(String)); render(); break; }
