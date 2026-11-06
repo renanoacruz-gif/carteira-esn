@@ -2243,6 +2243,27 @@ const ME = { id: '', nome: '', ok: false }; /* conta ativa (identidade da plataf
 const GCOL = { marcos: { arr: () => S.marcos, ref: null, d: new Set(), x: new Set() }, regulatorio: { arr: () => S.regs, ref: null, d: new Set(), x: new Set() }, integlog: { arr: () => S.intlog, ref: null, d: new Set(), x: new Set() }, cnpj: { arr: () => S.cnpj, ref: null, d: new Set(), x: new Set() }, insights: { arr: () => S.insights, ref: null, d: new Set(), x: new Set() }, ocr: { arr: () => S.ocr, ref: null, d: new Set(), x: new Set() }, ocrimg: { arr: () => S.ocrimg, ref: null, d: new Set(), x: new Set() } };
 function touchG(col, id) { GCOL[col].d.add(id); GCOL[col].x.delete(id); sched(); }
 function dropG(col, id) { GCOL[col].d.delete(id); GCOL[col].x.add(id); sched(); }
+/* Item 24: as imagens do OCR/prints (coleção ocrimg, em partes) NÃO são lidas na abertura; cada imagem é lida só quando alguém a usa (ver original, ampliar, enviar ao OCR), por partes `${rec.id}_${i}` (rec.n). */
+const OCI = { p: new Map(), falha: new Set() };
+const ocrimgOk = rec => { if (!rec || !rec.n) return true; let k = 0; for (const x of S.ocrimg) if (x.ocrId === rec.id) k++; return k >= rec.n; };
+function ocrimgEnsure(rec) {
+  if (ocrimgOk(rec)) return Promise.resolve(true);
+  if (OCI.p.has(rec.id)) return OCI.p.get(rec.id);
+  const ep = DM.epoch, ref = GCOL.ocrimg.ref, have = new Set(S.ocrimg.map(x => x.id)), ids = [];
+  for (let i = 0; i < rec.n; i++) { const id = `${rec.id}_${i}`; if (!have.has(id) && !GCOL.ocrimg.x.has(id)) ids.push(id); }
+  OCI.falha.delete(rec.id);
+  const p = (async () => {
+    try {
+      const got = await poolRun(ids.map(id => () => wto(ref.doc(id).get(), 20000)), 5);
+      if (ep !== DM.epoch) return false;
+      const ja = new Set(S.ocrimg.map(x => x.id));
+      got.forEach(d => { if (d && d.exists) { const v = clone(d.data()); if (v && !ja.has(v.id)) { ja.add(v.id); S.ocrimg.push(v); } } });
+      const ok = ocrimgOk(rec); if (!ok) OCI.falha.add(rec.id); return ok;
+    } catch (e) { OCI.falha.add(rec.id); throw e; } finally { OCI.p.delete(rec.id); }
+  })();
+  OCI.p.set(rec.id, p); return p;
+}
+const ocrimgDrop = rec => { for (let i = 0; i < (rec.n || 0); i++) dropG('ocrimg', `${rec.id}_${i}`); S.ocrimg.filter(x => x.ocrId === rec.id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== rec.id); };
 const dirtyC = new Set(), delC = new Set(), dirtyI = new Set(), delI = new Set(), dirtyS = new Set(), delS = new Set(), dirtyP = new Set(), delP = new Set(); let dirtyMeta = false, saving = false, timer = null;
 const wto = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('tempo esgotado')), ms))]);
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -2307,16 +2328,16 @@ async function initStore() {
       META = db.doc('data/users/' + id + '/carteira'); CL = META.collection('clientes'); INB = META.collection('inbox'); SOL = META.collection('solucoes'); PES = META.collection('pesquisas'); GCOL.marcos.ref = META.collection('marcos'); GCOL.regulatorio.ref = META.collection('regulatorio'); GCOL.consol.ref = META.collection('consolidacoes'); GCOL.consolsnap.ref = META.collection('consolidacoes_snap'); SNOTE = META.collection('solnotas'); GCOL.integlog.ref = META.collection('integ_log'); GCOL.cnpj.ref = META.collection('cnpj'); GCOL.insights.ref = META.collection('insights'); GCOL.ocr.ref = META.collection('ocr'); GCOL.ocrimg.ref = META.collection('ocrimg'); SCONT = window.__HOSTED__ ? db.collection('catalogo_conteudo') : META.collection('solconteudo');
       /* leituras em paralelo (máx. 5 em voo); tudo é aplicado só depois que todas concluem, na ordem original — falha em qualquer uma mantém o comportamento anterior (modo memória) */
       const T = 10000, G = k => () => wto(GCOL[k].ref.get(), T), byAt = (a, b) => (b.at || '').localeCompare(a.at || ''), docs = q => q.docs.map(d => clone(d.data()));
-      const [m, cl, inb, cat, priv, notes, pes, marcos, regs, merges, msnap, intlog, cnpj, insights, ocr, ocrimg] = await poolRun([
+      const [m, cl, inb, cat, priv, notes, pes, marcos, regs, merges, msnap, intlog, cnpj, insights, ocr] = await poolRun([
         () => wto(META.get(), T), () => wto(CL.get(), T), () => wto(INB.get(), T), () => wto(SOLC.get(), T), () => wto(SOL.get(), T), () => wto(SNOTE.get(), T).catch(() => null), () => wto(PES.get(), T),
-        G('marcos'), G('regulatorio'), G('consol'), G('consolsnap'), G('integlog'), G('cnpj'), G('insights'), G('ocr'), () => wto(GCOL.ocrimg.ref.get(), 20000)
+        G('marcos'), G('regulatorio'), G('consol'), G('consolsnap'), G('integlog'), G('cnpj'), G('insights'), G('ocr')
       ], 5);
       if (m.exists) { const d = clone(m.data()); Object.assign(S.meta, d.meta || {}); S.meta.weights = { ...DEF_WEIGHTS, ...(S.meta.weights || {}) }; S.meta.files ||= []; S.meta.segOv ||= {}; S.meta.act ||= {}; S.kbExtra = d.kbExtra || { solutions: [] }; }
       cl.docs.forEach(d => { const c = clone(d.data()); S.clients[c.key] = c; });
       S.inbox = docs(inb);
       loadSolutions(catalogBuild(cat, priv, notes));
       S.pesq = docs(pes).sort(byAt);
-      S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = docs(ocrimg); ensureIids();
+      S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = []; /* imagens: sob demanda (ocrimgEnsure) */ ensureIids();
       UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
       catalogWatch(); reanalyzeAll(false); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
       if (Object.keys(S.clients).length) UI.view = 'geral';
@@ -5015,6 +5036,7 @@ function ocrPedirAut(ids) {
 async function ocrEnviar(rec) {
   const ep = DM.epoch; rec.estado = 'lendo'; rec.erro = null; rec.autorizadoEm = nowISO(); rec.pedidoId = 'ocrc_' + uid(); touchG('ocr', rec.id); render();
   try {
+    if (!(await ocrimgEnsure(rec))) throw new Error('Imagem original indisponível; reenvie o arquivo.'); if (ep !== DM.epoch) return;
     const pedido = { versao: 1, pedidoId: rec.pedidoId, ...(aiTarefa('ocr').prov === 'pagina' ? { provedor: 'pagina' } : {}), tipo: 'ocr_material', finalidade: 'cliente', autorizacaoUsuario: true, confirmaEnvioProvedor: true, arquivo: { nome: rec.nome, mime: rec.mime, base64: ocImgB64(rec.id) } };
     const r = await bkChamar('ocr', pedido, `pedido-ocr-${rec.id}.json`); if (ep !== DM.epoch) return;
     if (r.via === 'direto') await ocrClienteResposta(r.resp);
@@ -5065,7 +5087,7 @@ function ocrIncorporar(id) {
 }
 function ocrExcluir(id) {
   const rec = S.ocr.find(o => o.id === id); if (!rec) return; ocrRemoverDoCliente(rec);
-  S.ocrimg.filter(x => x.ocrId === id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== id); S.ocr = S.ocr.filter(o => o.id !== id); dropG('ocr', id); if (UI.oc.ver === id) UI.oc.ver = null; render();
+  ocrimgDrop(rec); S.ocr = S.ocr.filter(o => o.id !== id); dropG('ocr', id); if (UI.oc.ver === id) UI.oc.ver = null; render();
 }
 function ocrTexto(id, v) {
   const rec = S.ocr.find(o => o.id === id); if (!rec) return; v = String(v).slice(0, OC_TXT);
@@ -5097,7 +5119,7 @@ function ocrCard(rec) {
     <div class="row sm">${cl ? `<button class="btn pri sm" data-a="ocInc" data-id="${esc(rec.id)}">${rec.incorporado ? 'Atualizar no cliente' : 'Incorporar ao cliente (como indício)'}</button><button class="btn ghost sm" data-a="open" data-k="${esc(cl.key)}">Abrir cliente</button>` : ''}</div>`;
   }
   h += `<div class="row sm"><button class="btn ghost sm" data-a="ocVer" data-id="${esc(rec.id)}">${UI.oc.ver === rec.id ? 'Ocultar original' : 'Ver original'}</button><button class="btn ghost sm" data-a="ocDel" data-id="${esc(rec.id)}">Excluir</button></div>`;
-  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : `<img loading="lazy" decoding="async" alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">`;
+  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : (ocrimgOk(rec) ? `<img loading="lazy" decoding="async" alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">` : `<p class="sm muted">${OCI.falha.has(rec.id) ? 'Não foi possível carregar a imagem original. Feche e abra de novo.' : 'Carregando imagem original…'}</p>`);
   return h + '</div>';
 }
 function ocrPanel() {
@@ -5113,7 +5135,7 @@ const OC_ACT = {
   ocPedir: t => { UI.oc.fila = [t.dataset.id]; ocrPedirAut([t.dataset.id]); },
   ocAssoc: t => { const k = $(`select[data-id="ocs_${t.dataset.id}"]`)?.value; ocrAssociar(t.dataset.id, k); },
   ocDesassoc: t => ocrDesassociar(t.dataset.id), ocInc: t => ocrIncorporar(t.dataset.id), ocDel: t => ocrExcluir(t.dataset.id),
-  ocVer: t => { UI.oc.ver = UI.oc.ver === t.dataset.id ? null : t.dataset.id; render(); }
+  ocVer: t => { UI.oc.ver = UI.oc.ver === t.dataset.id ? null : t.dataset.id; render(); const rec = S.ocr.find(x => x.id === UI.oc.ver); if (rec && !ocrimgOk(rec)) ocrimgEnsure(rec).then(() => render(), () => render()); }
 };
 function ocChange(t, c, v) { if (c !== 'oc') return false; ocrTexto(t.dataset.id, v); return true; }
 
@@ -7062,7 +7084,6 @@ const PR_CRIT = ['cnpj', 'code'];
 const PR_EVT = { contato: 'Contato', produto: 'Produto/módulo citado', contrato: 'Contratual/operacional', quantidade: 'Quantidade/indicador', data: 'Data exibida', valor: 'Valor exibido', dor: 'Dor/observação/histórico', tabela: 'Tabela', campo: 'Outra informação', outra_empresa: 'Outra empresa citada' };
 UI.pr = { pg: 0, f: '', run: 0, auto: {}, inf: new Set(), at: {}, del: null, big: null, msg: '' };
 const prRecs = c => S.ocr.filter(o => o.origem === 'print' && o.cli === c.key);
-const prImgs = id => S.ocrimg.filter(x => x.ocrId === id);
 const prTxt = rec => rec.textoCorrigido ?? rec.texto ?? '';
 const prNorm = v => norm(String(v ?? '')).replace(/\s+/g, ' ').trim();
 const prImp = (c, id) => (c.prImp || []).find(i => i.id === id);
@@ -7336,7 +7357,7 @@ function prExcluir(recId, reverter) {
   const d = prDeps(c, rec); let r = { rev: 0, mant: 0 };
   if (reverter) r = prReverterDe(c, rec); else d.campos.forEach(s => { const p = c.prFill?.[s.campo]; if (p && p.sug === s.id) { p.origemExcluida = true; p.excluidaEm = nowISO(); } });
   const imp = prImp(c, rec.imp); if (imp) { imp.recs = imp.recs.filter(x => x !== rec.id); }
-  prImgs(rec.id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== rec.id); S.ocr = S.ocr.filter(o => o.id !== rec.id); dropG('ocr', rec.id);
+  ocrimgDrop(rec); S.ocr = S.ocr.filter(o => o.id !== rec.id); dropG('ocr', rec.id);
   touchC(c.key); runAnalysis(c, `Print excluído: ${rec.nome}`); touchC(c.key); render();
   toast(`Imagem excluída. ${reverter ? `${r.rev} campo(s) revertido(s)${r.mant ? `, ${r.mant} mantido(s) por edição posterior` : ''}.` : d.campos.length ? `${d.campos.length} campo(s) mantido(s) com a origem registrada.` : ''}${d.opps.length ? ' Diagnósticos reavaliados.' : ''}`);
 }
@@ -7420,7 +7441,7 @@ const PR_ACT = {
   prAutPend: t => { const c = S.clients[t.dataset.k]; if (c) prSolicitar(prRecs(c).filter(r => r.estado === 'autorizar').map(r => r.id), c.key); },
   prProc: () => { prKick(); render(); }, prFalhas: t => prRepetirFalhas(t.dataset.k),
   prFiltro: t => { UI.pr.f = t.dataset.e; UI.pr.pg = 0; render(); }, prPag: t => { UI.pr.pg = Math.max(0, UI.pr.pg + +t.dataset.d); render(); },
-  prBig: t => { const rec = S.ocr.find(o => o.id === t.dataset.id); if (!rec) return; MODALS.prbig = { t: esc(rec.nome), b: `<div style="max-height:68vh;overflow:auto;border:1px solid var(--bd);border-radius:6px"><img id="prbigimg" alt="Imagem ampliada: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%"></div><p class="sm muted">${(rec.tam / 1024).toFixed(0)} KB • ${esc(dtBR(rec.at))}</p><button class="btn ghost sm" data-a="prZoom">Tamanho real / ajustar à janela</button>`, ok: ['prBigX', 'Fechar', 'pri'], cancel: 'prBigX', wide: true }; UI.confirm = 'prbig'; render(); },
+  prBig: t => { const rec = S.ocr.find(o => o.id === t.dataset.id); if (!rec) return; if (!ocrimgOk(rec)) { toast('Carregando imagem…'); ocrimgEnsure(rec).then(ok => { if (ok) PR_ACT.prBig(t); else toast('Não foi possível carregar a imagem original.'); }, () => toast('Não foi possível carregar a imagem original.')); return; } MODALS.prbig = { t: esc(rec.nome), b: `<div style="max-height:68vh;overflow:auto;border:1px solid var(--bd);border-radius:6px"><img id="prbigimg" alt="Imagem ampliada: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%"></div><p class="sm muted">${(rec.tam / 1024).toFixed(0)} KB • ${esc(dtBR(rec.at))}</p><button class="btn ghost sm" data-a="prZoom">Tamanho real / ajustar à janela</button>`, ok: ['prBigX', 'Fechar', 'pri'], cancel: 'prBigX', wide: true }; UI.confirm = 'prbig'; render(); },
   prBigX: () => { UI.confirm = null; render(); }, prZoom: () => { const i = $('#prbigimg'); if (i) i.style.maxWidth = i.style.maxWidth === 'none' ? '100%' : 'none'; },
   prReproc: t => prReproc(t.dataset.id), prDel: t => prExcluirPrep(t.dataset.id), prDelRev: () => prExcluir(UI.pr.del, true), prDelKeep: () => prExcluir(UI.pr.del, false), prDelNo: () => { UI.confirm = null; UI.pr.del = null; render(); },
   prAceitar: t => { const tr = t.closest('tr'); prSugAcao(t.dataset.id, t.dataset.s, 'aceitar', tr?.querySelector('[data-f=prval]')?.value); }, prRejeitar: t => prSugAcao(t.dataset.id, t.dataset.s, 'rejeitar'),

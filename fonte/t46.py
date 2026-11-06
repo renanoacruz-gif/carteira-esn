@@ -137,7 +137,7 @@ opps=c("(c.opps||[]).filter(o=>(o.evInd||[]).some(e=>String(e.src||'').startsWit
 # ---- (7) persistência
 ev(A,"flush && 0"); wt(A,1500)
 B,eb=open_page(b,srv,'u1'); wt(B,1500)
-nb=ev(B,"S.ocr.filter(o=>o.origem==='print').length"); ck('persistência: imagens, texto e estados sobrevivem ao recarregar', nb==6 and ev(B,"S.ocrimg.length")>=6 and ev(B,"S.clients['%s'].uf"%K1)=='PR' and ev(B,"Object.keys(S.clients['%s'].prFill).length"%K1)>=4, nb)
+nb=ev(B,"S.ocr.filter(o=>o.origem==='print').length"); ck('persistência: imagens, texto e estados sobrevivem ao recarregar', nb==6 and ev(B,"S.ocrimg.length")==0 and ev(B,"Promise.all(S.ocr.filter(o=>o.origem==='print').map(ocrimgEnsure)).then(r=>r.length==6&&r.every(Boolean))") and ev(B,"S.clients['%s'].uf"%K1)=='PR' and ev(B,"Object.keys(S.clients['%s'].prFill).length"%K1)>=4, nb)
 ck('após recarregar: texto completo e origem preservados', ev(B,"S.ocr.find(o=>o.nome==='p_tabela.png').texto.length")==len(T['tabela']) and ev(B,"S.ocr.find(o=>o.nome==='p_tabela.png').ev.length")>5)
 ck('após recarregar: docs virtuais recriados na análise', ev(B,"(()=>{const c=S.clients['%s'];runAnalysis(c,'x');return c.docs.filter(d=>d.prv).length})()"%K1)>=3)
 B.close()

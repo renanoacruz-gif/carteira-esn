@@ -38,6 +38,7 @@ function ocrPedirAut(ids) {
 async function ocrEnviar(rec) {
   const ep = DM.epoch; rec.estado = 'lendo'; rec.erro = null; rec.autorizadoEm = nowISO(); rec.pedidoId = 'ocrc_' + uid(); touchG('ocr', rec.id); render();
   try {
+    if (!(await ocrimgEnsure(rec))) throw new Error('Imagem original indisponível; reenvie o arquivo.'); if (ep !== DM.epoch) return;
     const pedido = { versao: 1, pedidoId: rec.pedidoId, ...(aiTarefa('ocr').prov === 'pagina' ? { provedor: 'pagina' } : {}), tipo: 'ocr_material', finalidade: 'cliente', autorizacaoUsuario: true, confirmaEnvioProvedor: true, arquivo: { nome: rec.nome, mime: rec.mime, base64: ocImgB64(rec.id) } };
     const r = await bkChamar('ocr', pedido, `pedido-ocr-${rec.id}.json`); if (ep !== DM.epoch) return;
     if (r.via === 'direto') await ocrClienteResposta(r.resp);
@@ -88,7 +89,7 @@ function ocrIncorporar(id) {
 }
 function ocrExcluir(id) {
   const rec = S.ocr.find(o => o.id === id); if (!rec) return; ocrRemoverDoCliente(rec);
-  S.ocrimg.filter(x => x.ocrId === id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== id); S.ocr = S.ocr.filter(o => o.id !== id); dropG('ocr', id); if (UI.oc.ver === id) UI.oc.ver = null; render();
+  ocrimgDrop(rec); S.ocr = S.ocr.filter(o => o.id !== id); dropG('ocr', id); if (UI.oc.ver === id) UI.oc.ver = null; render();
 }
 function ocrTexto(id, v) {
   const rec = S.ocr.find(o => o.id === id); if (!rec) return; v = String(v).slice(0, OC_TXT);
@@ -120,7 +121,7 @@ function ocrCard(rec) {
     <div class="row sm">${cl ? `<button class="btn pri sm" data-a="ocInc" data-id="${esc(rec.id)}">${rec.incorporado ? 'Atualizar no cliente' : 'Incorporar ao cliente (como indício)'}</button><button class="btn ghost sm" data-a="open" data-k="${esc(cl.key)}">Abrir cliente</button>` : ''}</div>`;
   }
   h += `<div class="row sm"><button class="btn ghost sm" data-a="ocVer" data-id="${esc(rec.id)}">${UI.oc.ver === rec.id ? 'Ocultar original' : 'Ver original'}</button><button class="btn ghost sm" data-a="ocDel" data-id="${esc(rec.id)}">Excluir</button></div>`;
-  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : `<img loading="lazy" decoding="async" alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">`;
+  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : (ocrimgOk(rec) ? `<img loading="lazy" decoding="async" alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">` : `<p class="sm muted">${OCI.falha.has(rec.id) ? 'Não foi possível carregar a imagem original. Feche e abra de novo.' : 'Carregando imagem original…'}</p>`);
   return h + '</div>';
 }
 function ocrPanel() {
@@ -136,6 +137,6 @@ const OC_ACT = {
   ocPedir: t => { UI.oc.fila = [t.dataset.id]; ocrPedirAut([t.dataset.id]); },
   ocAssoc: t => { const k = $(`select[data-id="ocs_${t.dataset.id}"]`)?.value; ocrAssociar(t.dataset.id, k); },
   ocDesassoc: t => ocrDesassociar(t.dataset.id), ocInc: t => ocrIncorporar(t.dataset.id), ocDel: t => ocrExcluir(t.dataset.id),
-  ocVer: t => { UI.oc.ver = UI.oc.ver === t.dataset.id ? null : t.dataset.id; render(); }
+  ocVer: t => { UI.oc.ver = UI.oc.ver === t.dataset.id ? null : t.dataset.id; render(); const rec = S.ocr.find(x => x.id === UI.oc.ver); if (rec && !ocrimgOk(rec)) ocrimgEnsure(rec).then(() => render(), () => render()); }
 };
 function ocChange(t, c, v) { if (c !== 'oc') return false; ocrTexto(t.dataset.id, v); return true; }

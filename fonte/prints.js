@@ -14,7 +14,6 @@ const PR_CRIT = ['cnpj', 'code'];
 const PR_EVT = { contato: 'Contato', produto: 'Produto/módulo citado', contrato: 'Contratual/operacional', quantidade: 'Quantidade/indicador', data: 'Data exibida', valor: 'Valor exibido', dor: 'Dor/observação/histórico', tabela: 'Tabela', campo: 'Outra informação', outra_empresa: 'Outra empresa citada' };
 UI.pr = { pg: 0, f: '', run: 0, auto: {}, inf: new Set(), at: {}, del: null, big: null, msg: '' };
 const prRecs = c => S.ocr.filter(o => o.origem === 'print' && o.cli === c.key);
-const prImgs = id => S.ocrimg.filter(x => x.ocrId === id);
 const prTxt = rec => rec.textoCorrigido ?? rec.texto ?? '';
 const prNorm = v => norm(String(v ?? '')).replace(/\s+/g, ' ').trim();
 const prImp = (c, id) => (c.prImp || []).find(i => i.id === id);
@@ -288,7 +287,7 @@ function prExcluir(recId, reverter) {
   const d = prDeps(c, rec); let r = { rev: 0, mant: 0 };
   if (reverter) r = prReverterDe(c, rec); else d.campos.forEach(s => { const p = c.prFill?.[s.campo]; if (p && p.sug === s.id) { p.origemExcluida = true; p.excluidaEm = nowISO(); } });
   const imp = prImp(c, rec.imp); if (imp) { imp.recs = imp.recs.filter(x => x !== rec.id); }
-  prImgs(rec.id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== rec.id); S.ocr = S.ocr.filter(o => o.id !== rec.id); dropG('ocr', rec.id);
+  ocrimgDrop(rec); S.ocr = S.ocr.filter(o => o.id !== rec.id); dropG('ocr', rec.id);
   touchC(c.key); runAnalysis(c, `Print excluído: ${rec.nome}`); touchC(c.key); render();
   toast(`Imagem excluída. ${reverter ? `${r.rev} campo(s) revertido(s)${r.mant ? `, ${r.mant} mantido(s) por edição posterior` : ''}.` : d.campos.length ? `${d.campos.length} campo(s) mantido(s) com a origem registrada.` : ''}${d.opps.length ? ' Diagnósticos reavaliados.' : ''}`);
 }
@@ -372,7 +371,7 @@ const PR_ACT = {
   prAutPend: t => { const c = S.clients[t.dataset.k]; if (c) prSolicitar(prRecs(c).filter(r => r.estado === 'autorizar').map(r => r.id), c.key); },
   prProc: () => { prKick(); render(); }, prFalhas: t => prRepetirFalhas(t.dataset.k),
   prFiltro: t => { UI.pr.f = t.dataset.e; UI.pr.pg = 0; render(); }, prPag: t => { UI.pr.pg = Math.max(0, UI.pr.pg + +t.dataset.d); render(); },
-  prBig: t => { const rec = S.ocr.find(o => o.id === t.dataset.id); if (!rec) return; MODALS.prbig = { t: esc(rec.nome), b: `<div style="max-height:68vh;overflow:auto;border:1px solid var(--bd);border-radius:6px"><img id="prbigimg" alt="Imagem ampliada: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%"></div><p class="sm muted">${(rec.tam / 1024).toFixed(0)} KB • ${esc(dtBR(rec.at))}</p><button class="btn ghost sm" data-a="prZoom">Tamanho real / ajustar à janela</button>`, ok: ['prBigX', 'Fechar', 'pri'], cancel: 'prBigX', wide: true }; UI.confirm = 'prbig'; render(); },
+  prBig: t => { const rec = S.ocr.find(o => o.id === t.dataset.id); if (!rec) return; if (!ocrimgOk(rec)) { toast('Carregando imagem…'); ocrimgEnsure(rec).then(ok => { if (ok) PR_ACT.prBig(t); else toast('Não foi possível carregar a imagem original.'); }, () => toast('Não foi possível carregar a imagem original.')); return; } MODALS.prbig = { t: esc(rec.nome), b: `<div style="max-height:68vh;overflow:auto;border:1px solid var(--bd);border-radius:6px"><img id="prbigimg" alt="Imagem ampliada: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%"></div><p class="sm muted">${(rec.tam / 1024).toFixed(0)} KB • ${esc(dtBR(rec.at))}</p><button class="btn ghost sm" data-a="prZoom">Tamanho real / ajustar à janela</button>`, ok: ['prBigX', 'Fechar', 'pri'], cancel: 'prBigX', wide: true }; UI.confirm = 'prbig'; render(); },
   prBigX: () => { UI.confirm = null; render(); }, prZoom: () => { const i = $('#prbigimg'); if (i) i.style.maxWidth = i.style.maxWidth === 'none' ? '100%' : 'none'; },
   prReproc: t => prReproc(t.dataset.id), prDel: t => prExcluirPrep(t.dataset.id), prDelRev: () => prExcluir(UI.pr.del, true), prDelKeep: () => prExcluir(UI.pr.del, false), prDelNo: () => { UI.confirm = null; UI.pr.del = null; render(); },
   prAceitar: t => { const tr = t.closest('tr'); prSugAcao(t.dataset.id, t.dataset.s, 'aceitar', tr?.querySelector('[data-f=prval]')?.value); }, prRejeitar: t => prSugAcao(t.dataset.id, t.dataset.s, 'rejeitar'),

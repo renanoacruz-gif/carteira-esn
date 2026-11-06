@@ -6,6 +6,27 @@ const ME = { id: '', nome: '', ok: false }; /* conta ativa (identidade da plataf
 const GCOL = { marcos: { arr: () => S.marcos, ref: null, d: new Set(), x: new Set() }, regulatorio: { arr: () => S.regs, ref: null, d: new Set(), x: new Set() }, integlog: { arr: () => S.intlog, ref: null, d: new Set(), x: new Set() }, cnpj: { arr: () => S.cnpj, ref: null, d: new Set(), x: new Set() }, insights: { arr: () => S.insights, ref: null, d: new Set(), x: new Set() }, ocr: { arr: () => S.ocr, ref: null, d: new Set(), x: new Set() }, ocrimg: { arr: () => S.ocrimg, ref: null, d: new Set(), x: new Set() } };
 function touchG(col, id) { GCOL[col].d.add(id); GCOL[col].x.delete(id); sched(); }
 function dropG(col, id) { GCOL[col].d.delete(id); GCOL[col].x.add(id); sched(); }
+/* Item 24: as imagens do OCR/prints (coleção ocrimg, em partes) NÃO são lidas na abertura; cada imagem é lida só quando alguém a usa (ver original, ampliar, enviar ao OCR), por partes `${rec.id}_${i}` (rec.n). */
+const OCI = { p: new Map(), falha: new Set() };
+const ocrimgOk = rec => { if (!rec || !rec.n) return true; let k = 0; for (const x of S.ocrimg) if (x.ocrId === rec.id) k++; return k >= rec.n; };
+function ocrimgEnsure(rec) {
+  if (ocrimgOk(rec)) return Promise.resolve(true);
+  if (OCI.p.has(rec.id)) return OCI.p.get(rec.id);
+  const ep = DM.epoch, ref = GCOL.ocrimg.ref, have = new Set(S.ocrimg.map(x => x.id)), ids = [];
+  for (let i = 0; i < rec.n; i++) { const id = `${rec.id}_${i}`; if (!have.has(id) && !GCOL.ocrimg.x.has(id)) ids.push(id); }
+  OCI.falha.delete(rec.id);
+  const p = (async () => {
+    try {
+      const got = await poolRun(ids.map(id => () => wto(ref.doc(id).get(), 20000)), 5);
+      if (ep !== DM.epoch) return false;
+      const ja = new Set(S.ocrimg.map(x => x.id));
+      got.forEach(d => { if (d && d.exists) { const v = clone(d.data()); if (v && !ja.has(v.id)) { ja.add(v.id); S.ocrimg.push(v); } } });
+      const ok = ocrimgOk(rec); if (!ok) OCI.falha.add(rec.id); return ok;
+    } catch (e) { OCI.falha.add(rec.id); throw e; } finally { OCI.p.delete(rec.id); }
+  })();
+  OCI.p.set(rec.id, p); return p;
+}
+const ocrimgDrop = rec => { for (let i = 0; i < (rec.n || 0); i++) dropG('ocrimg', `${rec.id}_${i}`); S.ocrimg.filter(x => x.ocrId === rec.id).forEach(x => dropG('ocrimg', x.id)); S.ocrimg = S.ocrimg.filter(x => x.ocrId !== rec.id); };
 const dirtyC = new Set(), delC = new Set(), dirtyI = new Set(), delI = new Set(), dirtyS = new Set(), delS = new Set(), dirtyP = new Set(), delP = new Set(); let dirtyMeta = false, saving = false, timer = null;
 const wto = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('tempo esgotado')), ms))]);
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -70,16 +91,16 @@ async function initStore() {
       META = db.doc('data/users/' + id + '/carteira'); CL = META.collection('clientes'); INB = META.collection('inbox'); SOL = META.collection('solucoes'); PES = META.collection('pesquisas'); GCOL.marcos.ref = META.collection('marcos'); GCOL.regulatorio.ref = META.collection('regulatorio'); GCOL.consol.ref = META.collection('consolidacoes'); GCOL.consolsnap.ref = META.collection('consolidacoes_snap'); SNOTE = META.collection('solnotas'); GCOL.integlog.ref = META.collection('integ_log'); GCOL.cnpj.ref = META.collection('cnpj'); GCOL.insights.ref = META.collection('insights'); GCOL.ocr.ref = META.collection('ocr'); GCOL.ocrimg.ref = META.collection('ocrimg'); SCONT = window.__HOSTED__ ? db.collection('catalogo_conteudo') : META.collection('solconteudo');
       /* leituras em paralelo (máx. 5 em voo); tudo é aplicado só depois que todas concluem, na ordem original — falha em qualquer uma mantém o comportamento anterior (modo memória) */
       const T = 10000, G = k => () => wto(GCOL[k].ref.get(), T), byAt = (a, b) => (b.at || '').localeCompare(a.at || ''), docs = q => q.docs.map(d => clone(d.data()));
-      const [m, cl, inb, cat, priv, notes, pes, marcos, regs, merges, msnap, intlog, cnpj, insights, ocr, ocrimg] = await poolRun([
+      const [m, cl, inb, cat, priv, notes, pes, marcos, regs, merges, msnap, intlog, cnpj, insights, ocr] = await poolRun([
         () => wto(META.get(), T), () => wto(CL.get(), T), () => wto(INB.get(), T), () => wto(SOLC.get(), T), () => wto(SOL.get(), T), () => wto(SNOTE.get(), T).catch(() => null), () => wto(PES.get(), T),
-        G('marcos'), G('regulatorio'), G('consol'), G('consolsnap'), G('integlog'), G('cnpj'), G('insights'), G('ocr'), () => wto(GCOL.ocrimg.ref.get(), 20000)
+        G('marcos'), G('regulatorio'), G('consol'), G('consolsnap'), G('integlog'), G('cnpj'), G('insights'), G('ocr')
       ], 5);
       if (m.exists) { const d = clone(m.data()); Object.assign(S.meta, d.meta || {}); S.meta.weights = { ...DEF_WEIGHTS, ...(S.meta.weights || {}) }; S.meta.files ||= []; S.meta.segOv ||= {}; S.meta.act ||= {}; S.kbExtra = d.kbExtra || { solutions: [] }; }
       cl.docs.forEach(d => { const c = clone(d.data()); S.clients[c.key] = c; });
       S.inbox = docs(inb);
       loadSolutions(catalogBuild(cat, priv, notes));
       S.pesq = docs(pes).sort(byAt);
-      S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = docs(ocrimg); ensureIids();
+      S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = []; /* imagens: sob demanda (ocrimgEnsure) */ ensureIids();
       UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
       catalogWatch(); reanalyzeAll(false); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
       if (Object.keys(S.clients).length) UI.view = 'geral';

@@ -27,7 +27,7 @@ pg.wait_for_timeout(1500)
 ev(pg,"flush()") if ev(pg,"typeof flush")=='function' else None
 pg.wait_for_timeout(1500)
 pg.reload(); pg.wait_for_timeout(3500)
-ck('hospedado: persiste no servidor e sobrevive ao recarregar', ev(pg,"S.ocr.filter(o=>o.origem==='print'&&o.estado==='lido').length")==1 and ev(pg,"S.ocrimg.length")>=1 and ev(pg,"S.clients['c_T00001'].prFill.uf.imagem")=='h1.png', ev(pg,"[S.ocr.length,S.ocrimg.length,Object.keys(S.clients).length]"))
+ck('hospedado: persiste no servidor e sobrevive ao recarregar', ev(pg,"S.ocr.filter(o=>o.origem==='print'&&o.estado==='lido').length")==1 and ev(pg,"S.ocrimg.length")==0 and ev(pg,"Promise.all(S.ocr.filter(o=>o.origem==='print').map(ocrimgEnsure)).then(r=>r.length>=1&&r.every(Boolean))") and ev(pg,"S.clients['c_T00001'].prFill.uf.imagem")=='h1.png', ev(pg,"[S.ocr.length,S.ocrimg.length,Object.keys(S.clients).length]"))
 ev(pg,"UI.sel='c_T00001';UI.view='cliente';UI.ctab='raiox';render();0"); pg.wait_for_timeout(500)
 ck('raio-X após recarregar mostra origem do print', 'Extraído de print por OCR' in ev(pg,"document.getElementById('app').innerText"))
 ck('chave do provedor não vai para o registro gravado', 'AIza-teste' not in json.dumps(ev(pg,"[freezeClient(S.clients['c_T00001']),S.ocr]")))
