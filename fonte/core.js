@@ -49,8 +49,8 @@ async function readBuf(file) {
 }
 async function sha(buf) { try { const h = await crypto.subtle.digest('SHA-256', buf); return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24); } catch { let h = 0; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 7) h = (h * 31 + u[i]) | 0; return 'w' + (h >>> 0).toString(16) + u.length; } }
 function decodeText(buf) { let t = new TextDecoder('utf-8').decode(buf); if (t.includes(String.fromCharCode(0xFFFD))) t = new TextDecoder('windows-1252').decode(buf); return t.replace(/^﻿/, ''); }
-function parseCSV(text) {
-  const first = text.split(/\r?\n/, 1)[0] || ''; const sep = [';', '\t', ',', '|'].map(c => [c, first.split(c).length]).sort((a, b) => b[1] - a[1])[0][0];
+function parseCSV(text, forceSep) {
+  const first = text.split(/\r?\n/, 1)[0] || ''; const sep = forceSep || [';', '\t', ',', '|'].map(c => [c, first.split(c).length]).sort((a, b) => b[1] - a[1])[0][0];
   const rows = []; let row = [], cell = '', q = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];

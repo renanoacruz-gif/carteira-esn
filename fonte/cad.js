@@ -219,11 +219,11 @@ function impPlan() {
   out.forEach(P => { if (P.cont) { sum.cont = (sum.cont || 0) + 1; sum.cf += P.cf.length; sum.keep += P.keep; sum.warn += P.warn.length; return; } if (P.act === 'atualizar' && !P.ch.length && !P.cf.length) sum.igual++; else if (sum[P.act] != null) sum[P.act]++; sum.cf += P.cf.length; sum.keep += P.keep; sum.warn += P.warn.length; });
   return { rows: out, sum };
 }
-function impApplyPlan() {
+function impApplyPlan(opt = {}) {
   const w = UI.wiz, sh = w.sheets[w.si], m = w.map, plan = impPlan(); if (plan.sum.pendente) return toast(`${plan.sum.pendente} linha(s) com correspondência ambígua: escolha o cliente, "novo" ou "ignorar" antes de confirmar.`);
-  const get = (r, k) => m[k] == null ? '' : sh.rows[r][m[k]] ?? ''; const used = new Set(Object.keys(S.clients)), created = new Map(); let add = 0, upd = 0, ign = 0, kept = 0, rep = 0;
+  const get = (r, k) => m[k] == null ? '' : sh.rows[r][m[k]] ?? ''; const used = new Set(Object.keys(S.clients)), created = new Map(); let add = 0, upd = 0, ign = 0, kept = 0, rep = 0; const matched = new Set();
   plan.rows.forEach(P => {
-    if (P.act === 'ignorar' || P.act === 'pendente') { ign++; return; }
+    if (P.act === 'ignorar' || P.act === 'pendente') { ign++; (P.cands || []).forEach(x => matched.add(x.key)); return; }
     let c = P.target ? S.clients[P.target] : P.cont ? created.get(P.idk) : null;
     if (!c) { let key = safeKey(P.code ? 'c_' + P.code : P.cnpj.length === 14 ? 'j_' + P.cnpj : 'n_' + normName(P.name).replace(/ /g, '-')); if (used.has(key)) { let n = 2; while (used.has(key + '_' + n)) n++; key += '_' + n; } used.add(key);
       c = S.clients[key] = { key, code: P.code, name: P.name, cnpj: P.cnpj.length === 14 ? P.cnpj : '', cnpjRaw: P.cnpj && P.cnpj.length !== 14 ? String(get(P.i, 'cnpj')) : '', seg: '', city: '', size: '', mrr: null, productsRaw: '', churn: '', nps: '', notes: '', uf: '', regime: '', release: '', fichas: [], docs: [], mgmt: {}, act: {} }; created.set(P.idk, c); add++; } else if (!P.cont) upd++;
@@ -241,12 +241,14 @@ function impApplyPlan() {
       c.cadConf = [{ id: 'cf_' + uid(), campo: x.l, de: String(x.de), para: String(x.para), fonte: `${o.ref} • ${o.loc}`, at: nowISO(), res: d === 'substituir' ? 'substituído pelo usuário na importação' : null }, ...(c.cadConf || [])].slice(0, 30);
       if (d !== 'substituir') { kept++; return; } rep++;
       if (x.k === 'code') c.code = P.code; else if (x.k === 'cnpj') c.cnpj = P.cnpj; else if (CT_IMP.includes(x.k)) ctSetRaw(ctUpsert(c, x.ct), x.k, x.v, o); else if (x.k === 'regime') { c.regime = x.v; c.fis.regime = { ...fld(x.v, 'NECESSITA VALIDAÇÃO', { tipo: 'planilha', ref: o.ref, loc: o.loc }, c.fis.regime), st: 'declarado' }; } else cadSetRaw(c, x.k, x.v, { ...o, motivo: 'substituição escolhida na importação' }); });
-    touchC(c.key);
+    matched.add(c.key); touchC(c.key);
   });
-  S.meta.mapping = m; S.meta.files.push({ id: uid(), name: w.name, kind: 'carteira', at: nowISO(), hash: 'carteira:' + w.name + ':' + sh.rows.length });
+  S.meta.mapping = m; if (!w.fromSheet) S.meta.files.push({ id: uid(), name: w.name, kind: 'carteira', at: nowISO(), hash: 'carteira:' + w.name + ':' + sh.rows.length });
+  const res = { add, upd, ign, kept, rep, keep: plan.sum.keep }; if (w.fromSheet) shAfterApply(w, plan, matched, res);
   reanalyzeAll(); reassocInbox();
-  log(`Carteira importada: ${add} novo(s), ${upd} atualizado(s), ${ign} linha(s) ignorada(s); ${plan.sum.keep} campo(s) preservado(s) por célula vazia; conflitos: ${kept} mantido(s), ${rep} substituído(s).`, 'ok');
-  UI.wiz = null; UI.view = 'geral'; render();
+  log(`Carteira ${w.fromSheet ? 'sincronizada (planilha do Google)' : 'importada'}: ${add} novo(s), ${upd} atualizado(s), ${ign} linha(s) ignorada(s); ${plan.sum.keep} campo(s) preservado(s) por célula vazia; conflitos: ${kept} mantido(s), ${rep} substituído(s).`, 'ok');
+  UI.wiz = null; if (!opt.silent) { UI.view = 'geral'; render(); }
+  return res;
 }
 
 /* ---------- Modelo de importação (XLSX sem dados) ---------- */

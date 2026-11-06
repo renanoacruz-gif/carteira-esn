@@ -516,6 +516,29 @@ async function cnConsultar(prov, cnpj, env) {
   const d = P.norm(j); if (!d.razaoSocial) return { erro: { codigo: 'resposta_invalida', mensagem: `${P.nome}: resposta sem razão social (formato inesperado).`, repetir: true } };
   d.cnpj = cnpj; return { dados: d };
 }
+/* Planilha do Google (link compartilhado): baixa só o CSV de docs.google.com; nenhum outro destino. */
+const PL_HITS = []; const PL_MAX = 6 * 1024 * 1024;
+const PL_HOST = /^(docs\.google\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
+async function handlePlanilha(req) {
+  let q; try { const t = await req.text(); if (t.length > 2048) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Corpo acima de 2 KB.' } }, 413); q = JSON.parse(t); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
+  const m = String(q?.url || '').trim().match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,100})(?:\/[^?#]*)?(?:[?#].*)?$/);
+  if (!m) return J({ ok: false, erro: { codigo: 'link_invalido', mensagem: 'Use o link da planilha (https://docs.google.com/spreadsheets/d/…).' } }, 400);
+  const g = String(q.url).match(/[?&#]gid=(\d{1,12})/), gid = g ? g[1] : '0';
+  const now = Date.now(); while (PL_HITS.length && now - PL_HITS[0] > 60000) PL_HITS.shift(); if (PL_HITS.length >= 20) return J({ ok: false, erro: { codigo: 'limite_local', mensagem: 'Limite do backend: 20 sincronizações/min.' } }, 429); PL_HITS.push(now);
+  let u = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`, r;
+  try {
+    for (let i = 0; i < 5; i++) {
+      r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { accept: 'text/csv,*/*;q=0.5' } });
+      if (r.status >= 300 && r.status < 400) { const loc = r.headers.get('location'); let nx; try { nx = new URL(loc, u); } catch { nx = null; } if (!nx || nx.protocol !== 'https:' || !PL_HOST.test(nx.hostname)) return J({ ok: false, erro: { codigo: 'redirecionamento_bloqueado', mensagem: 'O Google redirecionou para um destino não permitido.' } }, 502); if (/accounts\.google\.com|ServiceLogin/i.test(nx.href)) return J({ ok: false, erro: { codigo: 'planilha_privada', mensagem: 'A planilha não está compartilhada como "Qualquer pessoa com o link → Leitor".' } }, 403); u = nx.href; continue; }
+      break;
+    }
+  } catch { return J({ ok: false, erro: { codigo: 'rede', mensagem: 'Sem resposta do Google (rede ou tempo esgotado).' } }, 502); }
+  if (!r || r.status >= 300) return J({ ok: false, erro: { codigo: r && (r.status === 401 || r.status === 403 || r.status === 404) ? 'planilha_privada' : 'falha_google', mensagem: r && (r.status === 401 || r.status === 403 || r.status === 404) ? 'Planilha inacessível: compartilhe como "Qualquer pessoa com o link → Leitor" e confira o link.' : `Google respondeu HTTP ${r ? r.status : '—'}.` } }, 502);
+  const ct = r.headers.get('content-type') || ''; if (/text\/html/i.test(ct)) return J({ ok: false, erro: { codigo: 'planilha_privada', mensagem: 'O Google devolveu uma página de login: compartilhe como "Qualquer pessoa com o link → Leitor".' } }, 403);
+  const cl = +(r.headers.get('content-length') || 0); if (cl > PL_MAX) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Planilha acima de 6 MB.' } }, 413);
+  const buf = await r.arrayBuffer(); if (buf.byteLength > PL_MAX) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Planilha acima de 6 MB.' } }, 413);
+  return J({ ok: true, csv: new TextDecoder('utf-8').decode(buf), gid, bytes: buf.byteLength, em: new Date().toISOString() });
+}
 async function handleCnpj(req, env) {
   let q; try { const t = await req.text(); if (t.length > 4096) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Corpo acima de 4 KB.' } }, 413); q = JSON.parse(t); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
   const cnpj = String(q?.cnpj || '').replace(/\D/g, ''); const base = { versao: 1, pedidoId: q?.pedidoId || null, tipo: 'cnpj', cnpj, consultadoEm: new Date().toISOString(), aviso: 'Dados cadastrais públicos republicados por provedor terceiro; NÃO é API oficial da Receita Federal. Podem estar defasados.' };
@@ -662,6 +685,7 @@ async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/limites' && req.method === 'GET') return handleLimites(env);
   if (url.pathname === '/api/importar') return handleImportar(req, env);
   if (url.pathname === '/api/status') return handleStatus(env);
+  if (url.pathname === '/api/planilha' && req.method === 'POST') return handlePlanilha(req);
   if (url.pathname === '/api/cnpj' && req.method === 'POST') return handleCnpj(req, env);
   if (url.pathname === '/api/ia' && req.method === 'POST') return handleIa(req, env, false);
   if (url.pathname === '/api/ia/teste' && req.method === 'POST') return handleIa(req, env, true);

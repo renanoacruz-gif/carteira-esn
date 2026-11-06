@@ -44,6 +44,7 @@ const ACT = {
     reanalyze([c.key], `Perfil fiscal atualizado (${ch.map(x => x[0].replace('op:', '')).join(', ')})`); render(); },
   roiAdd: t => roiAdd(t.dataset.k, t.dataset.t), roiRm: t => roiRm(t.dataset.k, t.dataset.id),
   execMode: t => { UI.execMode = t.dataset.v; render(); }, execPdf: t => execExport(t.dataset.k),
+  shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   briefOpen: t => { const c = S.clients[t.dataset.k]; UI.ctab = 'briefing'; if (c && !briefFichas(c).length) toast('Para gerar o briefing é necessário anexar a ficha de faturamento do cliente.'); render(); }, briefPdf: t => briefExport(t.dataset.k),
   refOk: t => refApprove(t.dataset.id), refNo: t => refDiscard(t.dataset.id), refAll: () => refApproveOfficial(), recArq: t => recArchive(t.dataset.col, t.dataset.id),
   mkNew: () => recNew('marcos', { produto: $('#mk_p').value, release: /^12\.1\./.test($('#mk_r').value.trim()) ? $('#mk_r').value.trim() : '12.1.' + $('#mk_r').value.trim(), tipo: $('#mk_t').value, data: $('#mk_d').value, fonteT: $('#mk_ft').value, fonteU: $('#mk_fu').value }),
