@@ -32,6 +32,13 @@ assert gf in hh
 # sem <link rel=preload>: medido em Slow 4G, o preload de 2 fontes (26 KB) disputa banda com o HTML e atrasa o 1º conteúdo em ~125 ms; font-display:swap basta
 hh=hh.replace(gf,'<style>'+ffcss+'</style>\n',1)
 assert 'fonts.googleapis.com/css2' not in hh.split('<body>')[0]
+# Ícone na tela de início (iPhone/Android): ícones e manifesto ficam em /sobre/ (rota pública no Access, pois o manifesto é buscado sem login)
+PWA=('<link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials">'
+ '<link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png">'
+ '<link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png">'
+ '<meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">'
+ '<meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">\n')
+assert 0<=hh.find('</head>')<hh.find('<body>'); hh=hh.replace('</head>',PWA+'</head>',1)  # 1ª ocorrência = o <head> real (o JS contém '</head>' em templates de export)
 # pacote do backend (worker/README/toml) só existe no artefato; no hospedado o servidor já é o backend: não vai no bundle
 hh2=re.sub(r'const WORKER_SRC = ".*";\nconst WORKER_README = ".*";\nconst WORKER_TOML = ".*";\n',"const WORKER_SRC = '', WORKER_README = '', WORKER_TOML = '';\n",hh,count=1); assert hh2!=hh; hh=hh2
 os.makedirs(hd+'public/vendor',exist_ok=True)
