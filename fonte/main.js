@@ -44,6 +44,7 @@ const ACT = {
     reanalyze([c.key], `Perfil fiscal atualizado (${ch.map(x => x[0].replace('op:', '')).join(', ')})`); render(); },
   roiAdd: t => roiAdd(t.dataset.k, t.dataset.t), roiRm: t => roiRm(t.dataset.k, t.dataset.id),
   execMode: t => { UI.execMode = t.dataset.v; render(); }, execPdf: t => execExport(t.dataset.k),
+  briefOpen: t => { const c = S.clients[t.dataset.k]; UI.ctab = 'briefing'; if (c && !briefFichas(c).length) toast('Para gerar o briefing é necessário anexar a ficha de faturamento do cliente.'); render(); }, briefPdf: t => briefExport(t.dataset.k),
   refOk: t => refApprove(t.dataset.id), refNo: t => refDiscard(t.dataset.id), refAll: () => refApproveOfficial(), recArq: t => recArchive(t.dataset.col, t.dataset.id),
   mkNew: () => recNew('marcos', { produto: $('#mk_p').value, release: /^12\.1\./.test($('#mk_r').value.trim()) ? $('#mk_r').value.trim() : '12.1.' + $('#mk_r').value.trim(), tipo: $('#mk_t').value, data: $('#mk_d').value, fonteT: $('#mk_ft').value, fonteU: $('#mk_fu').value }),
   rgNew: () => { const q = s => [...document.querySelectorAll(s + ':checked')].map(x => x.value); recNew('regulatorio', { nome: $('#rg_n').value.trim(), orgao: $('#rg_o').value, fonteT: $('#rg_ft').value, fonteU: $('#rg_fu').value, publicacao: $('#rg_pub').value, vigencia: $('#rg_vig').value, prazo: $('#rg_pz').value, testesIni: $('#rg_ti').value, testesFim: $('#rg_tf').value, regimes: q('.rg_reg'), ops: q('.rg_op'), acoes: q('.rg_ac'), ufs: $('#rg_ufs').value.split(/[,;\s]+/).map(x => x.toUpperCase()).filter(x => UFS.includes(x)), nota: $('#rg_nota').value }); },
@@ -138,6 +139,7 @@ document.addEventListener('change', async e => {
     case 'roiF': roiFl(t.dataset.k, t.dataset.id, t.dataset.f, t.type === 'checkbox' ? t.checked : v); break;
     case 'roiShare': { const s = S.clients[t.dataset.k]?.roi.find(x => x.id === t.dataset.id); if (s) { s.share = t.checked; touchC(t.dataset.k); render(); } break; }
     case 'execOk': execSet(t.dataset.k, 'ok:' + t.dataset.id, t.checked); render(); break;
+    case 'briefComp': UI.briefComp = v; render(); break;
     case 'execV': execSet(t.dataset.k, 'val:' + t.dataset.f, t.checked); render(); break;
     case 'execT': execSet(t.dataset.k, t.dataset.f, v); render(); break;
     case 'execG': { S.meta.exec ||= {}; S.meta.exec[t.dataset.f] = t.type === 'checkbox' ? t.checked : v; touchMeta(); render(); break; }

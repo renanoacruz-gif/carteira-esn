@@ -16,6 +16,7 @@ function freezeClient(c) {
   let n = JSON.stringify(o).length;
   if (n > 235000) { o.docs.forEach(d => d.text = d.text.slice(0, 3000)); (o.cdocs || []).forEach(d => d.text = d.text.slice(0, 3000)); o.docTrunc = true; n = JSON.stringify(o).length; }
   if (n > 235000 && o.lic?.matriz?.rows) { o.lic.matriz.rows = o.lic.matriz.rows.slice(0, 150); o.lic.matriz.trunc = true; n = JSON.stringify(o).length; }
+  if (n > 235000) { o.fichas.forEach(f => { if (f.tab) { f.tab.sheets.forEach(s => { s.rows = s.rows.slice(0, 80); s.trunc = true; }); } }); n = JSON.stringify(o).length; }
   if (n > 235000) { o.fichas.forEach(f => f.items = f.items.slice(0, 60)); o.fichaTrunc = true; }
   return o;
 }
@@ -96,9 +97,21 @@ function normCnpj(raw) { let d = digits(raw); if (d.length === 13 && validCnpj('
 /* ---------- Documentos ---------- */
 const extOf = n => (n.split('.').pop() || '').toLowerCase();
 function tableUnits(sh) {
-  const h = detectHeader(sh.rows), hdr = (sh.rows[h] || []).map(x => norm(x)), mc = hdr.map(x => /valor|pre[cç]o|total|mensal|r\$|desconto|imposto|l[ií]quido|montante/.test(x));
+  const h = detectHeader(sh.rows), hdr = (sh.rows[h] || []).map(x => norm(x)), mc = hdr.map(x => /valor|pre[cç]o|total|mensal|r\$|desconto|imposto|l[ií]quido|montante|\bval\b|val_|vlr|vl_|liqd|unit/.test(x));
   const fmt = (v, ci) => v instanceof Date ? v.toLocaleDateString('pt-BR') : typeof v === 'number' ? ((mc[ci] || !Number.isInteger(v)) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v)) : String(v ?? '').trim();
   return sh.rows.map((r, i) => { const cells = r.map(fmt).filter(x => x !== ''); if (!cells.length) return null; const text = cells.join('   '); return { lines: [{ text, loc: `aba ${sh.name} • linha ${i + 1}` }], text }; }).filter(Boolean);
+}
+/* Instantâneo tabular da ficha (XLSX/CSV): mantém colunas e valores brutos para o briefing pré-reunião. Limites: 300 linhas × 24 colunas por aba. */
+function tabSnap(sheets) {
+  const cell = v => v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === 'number' ? v : String(v ?? '').trim().slice(0, 120);
+  return { sheets: sheets.map(sh => { const h = detectHeader(sh.rows), rows = []; let trunc = false;
+    sh.rows.forEach((r, i) => { const c = r.slice(0, 24).map(cell); if (!c.some(x => x !== '')) return; if (rows.length >= 300) { trunc = true; return; } rows.push({ n: i + 1, c }); });
+    return { name: sh.name, h, rows, trunc }; }).filter(s => s.rows.length > 1) };
+}
+function pickTab(tab, ls) { /* só as linhas que pertencem a esta ficha (arquivo dividido entre clientes) + cabeçalho */
+  if (!tab?.sheets?.length) return null; const want = new Set(ls.map(l => l.loc));
+  const sheets = tab.sheets.map(s => ({ ...s, rows: s.rows.filter(r => r.n === s.h + 1 || want.has(`aba ${s.name} • linha ${r.n}`)) })).filter(s => s.rows.length > 1);
+  return sheets.length ? { sheets } : null;
 }
 async function toUnits(file, buf) {
   const ext = extOf(file.name);
@@ -109,7 +122,7 @@ async function toUnits(file, buf) {
   }
   if (ext === 'docx') { const ls = await readDocx(buf); return ls.map(l => ({ lines: [l], text: l.text })); }
   if (ext === 'txt' || ext === 'md') return decodeText(buf).split(/\r?\n/).map((t, i) => t.trim() ? { lines: [{ text: t.trim(), loc: `linha ${i + 1}` }], text: t.trim() } : null).filter(Boolean);
-  if (['xlsx', 'xls', 'csv'].includes(ext)) { const t = await readTable(file, buf); return t.sheets.flatMap(tableUnits); }
+  if (['xlsx', 'xls', 'csv'].includes(ext)) { const t = await readTable(file, buf); const us = t.sheets.flatMap(tableUnits); us.tab = tabSnap(t.sheets); return us; }
   throw new Error('formato não suportado (PDF, DOCX, XLSX, XLS, CSV, TXT, MD).');
 }
 function groupUnits(units, ix) {
@@ -127,9 +140,10 @@ function groupUnits(units, ix) {
   return gs;
 }
 const locRange = ls => ls.length ? (ls[0].loc === ls[ls.length - 1].loc ? ls[0].loc : `${ls[0].loc} → ${ls[ls.length - 1].loc}`) : '';
-function makeFicha(file, ls, hash, extra = {}) {
+function makeFicha(file, ls, hash, extra = {}, tab = null) {
   const x = extractFicha(ls, { file }); if (x.items.length > 150) { x.itemsTrunc = x.items.length; x.items = x.items.slice(0, 150); }
-  return { id: uid(), file, loc: locRange(ls), hash, at: new Date().toISOString(), matchText: ls.map(l => l.text).join('\n').slice(0, 3000), ...x, ...extra };
+  const tb = pickTab(tab, ls);
+  return { id: uid(), file, loc: locRange(ls), hash, at: new Date().toISOString(), matchText: ls.map(l => l.text).join('\n').slice(0, 3000), ...x, ...(tb ? { tab: tb } : {}), ...extra };
 }
 const TOTVS_ROOT = '53113791';
 function hashOwner(hash) {
@@ -168,7 +182,7 @@ async function ingestOne(file, kind, forceKey, opts, ctx) {
         let rs; if (forceKey) { const vd = validateIdentity({ cnpjs: (text.match(CNPJ_RE) || []).map(digits).filter(x => x.length === 14 && validCnpj(x)) }, text, forceKey, ix); rs = vd.divergencia && vd.divergencia.tipo !== 'ausente' ? { state: 'sugerido', key: forceKey, by: 'anexado no cliente, mas ' + vd.divergencia.msg } : { state: 'confirmado', key: forceKey, by: 'manual (anexado no cliente)' }; } else rs = resolveMatch(matchDoc(text, ix));
         placeDoc(doc, rs, ctx.touched); n = 1;
       } else if (forceKey) {
-        const ls = units.flatMap(u => u.lines), text = units.map(u => u.text).join('\n'); const fi = makeFicha(file.name, ls, hash);
+        const ls = units.flatMap(u => u.lines), text = units.map(u => u.text).join('\n'); const fi = makeFicha(file.name, ls, hash, {}, units.tab);
         const v = validateIdentity(fi, text, forceKey, ix); if (v.divergencia) fi.divergencia = v.divergencia;
         const dupComps = fichaComps(fi).filter(cp => (fc.fichas || []).some(f => f.id !== opts.replaceId && usableF(f) && fichaComps(f).includes(cp))); if (dupComps.length) fi.dupComps = dupComps;
         placeFicha(fi, v, ctx.touched); n = 1;
@@ -177,7 +191,7 @@ async function ingestOne(file, kind, forceKey, opts, ctx) {
         const groups = groupUnits(units, ix);
         for (const g of groups) {
           const ls = g.units.flatMap(u => u.lines); const text = g.units.map(u => u.text).join('\n');
-          const fi = makeFicha(file.name, ls, hash, g.split ? { splitFromBatch: true, inferredLines: g.inferred || 0 } : {});
+          const fi = makeFicha(file.name, ls, hash, g.split ? { splitFromBatch: true, inferredLines: g.inferred || 0 } : {}, units.tab);
           if (!fi.items.length && g.split && !g.key) continue;
           placeFicha(fi, resolveMatch(matchDoc(text, ix)), ctx.touched); n++;
         }
