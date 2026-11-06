@@ -523,17 +523,23 @@ async function handlePlanilha(req) {
   let q; try { const t = await req.text(); if (t.length > 2048) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Corpo acima de 2 KB.' } }, 413); q = JSON.parse(t); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
   const m = String(q?.url || '').trim().match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,100})(?:\/[^?#]*)?(?:[?#].*)?$/);
   if (!m) return J({ ok: false, erro: { codigo: 'link_invalido', mensagem: 'Use o link da planilha (https://docs.google.com/spreadsheets/d/…).' } }, 400);
-  const g = String(q.url).match(/[?&#]gid=(\d{1,12})/), gid = g ? g[1] : '0';
+  const g = String(q.url).match(/[?&#]gid=(\d{1,12})/), gid = g ? g[1] : '';
   const now = Date.now(); while (PL_HITS.length && now - PL_HITS[0] > 60000) PL_HITS.shift(); if (PL_HITS.length >= 20) return J({ ok: false, erro: { codigo: 'limite_local', mensagem: 'Limite do backend: 20 sincronizações/min.' } }, 429); PL_HITS.push(now);
-  let u = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`, r;
-  try {
-    for (let i = 0; i < 5; i++) {
-      r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { accept: 'text/csv,*/*;q=0.5' } });
-      if (r.status >= 300 && r.status < 400) { const loc = r.headers.get('location'); let nx; try { nx = new URL(loc, u); } catch { nx = null; } if (!nx || nx.protocol !== 'https:' || !PL_HOST.test(nx.hostname)) return J({ ok: false, erro: { codigo: 'redirecionamento_bloqueado', mensagem: 'O Google redirecionou para um destino não permitido.' } }, 502); if (/accounts\.google\.com|ServiceLogin/i.test(nx.href)) return J({ ok: false, erro: { codigo: 'planilha_privada', mensagem: 'A planilha não está compartilhada como "Qualquer pessoa com o link → Leitor".' } }, 403); u = nx.href; continue; }
-      break;
-    }
-  } catch { return J({ ok: false, erro: { codigo: 'rede', mensagem: 'Sem resposta do Google (rede ou tempo esgotado).' } }, 502); }
-  if (!r || r.status >= 300) return J({ ok: false, erro: { codigo: r && (r.status === 401 || r.status === 403 || r.status === 404) ? 'planilha_privada' : 'falha_google', mensagem: r && (r.status === 401 || r.status === 403 || r.status === 404) ? 'Planilha inacessível: compartilhe como "Qualquer pessoa com o link → Leitor" e confira o link.' : `Google respondeu HTTP ${r ? r.status : '—'}.` } }, 502);
+  /* sem gid no link: exporta a primeira aba (gid=0 falha com HTTP 400 quando a primeira aba tem outro gid). Se o export falhar com 400, tenta o endpoint gviz. */
+  const tentativas = [`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv${gid ? '&gid=' + gid : ''}`, `https://docs.google.com/spreadsheets/d/${m[1]}/gviz/tq?tqx=out:csv${gid ? '&gid=' + gid : ''}`];
+  let r, ult = 0;
+  for (const u0 of tentativas) {
+    let u = u0;
+    try {
+      for (let i = 0; i < 5; i++) {
+        r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { accept: 'text/csv,*/*;q=0.5' } });
+        if (r.status >= 300 && r.status < 400) { const loc = r.headers.get('location'); let nx; try { nx = new URL(loc, u); } catch { nx = null; } if (!nx || nx.protocol !== 'https:' || !PL_HOST.test(nx.hostname)) return J({ ok: false, erro: { codigo: 'redirecionamento_bloqueado', mensagem: 'O Google redirecionou para um destino não permitido.' } }, 502); if (/accounts\.google\.com|ServiceLogin/i.test(nx.href)) return J({ ok: false, erro: { codigo: 'planilha_privada', mensagem: 'A planilha não está compartilhada como "Qualquer pessoa com o link → Leitor".' } }, 403); u = nx.href; continue; }
+        break;
+      }
+    } catch { return J({ ok: false, erro: { codigo: 'rede', mensagem: 'Sem resposta do Google (rede ou tempo esgotado).' } }, 502); }
+    ult = r ? r.status : 0; if (r && r.status < 300) break; if (r && r.status !== 400) break;
+  }
+  if (!r || r.status >= 300) { const priv = r && [401, 403, 404].includes(r.status); return J({ ok: false, erro: { codigo: priv ? 'planilha_privada' : 'falha_google', mensagem: priv ? 'Planilha inacessível: compartilhe como "Qualquer pessoa com o link → Leitor" e confira o link.' : ult === 400 ? 'O Google recusou o pedido (HTTP 400). Confira: (1) o arquivo é uma Planilha Google nativa (se for um .xlsx guardado no Drive, use Arquivo → Salvar como Planilhas Google); (2) o link é da planilha aberta (e o gid, se houver, existe).' : `Google respondeu HTTP ${r ? r.status : '—'}.` } }, 502); }
   const ct = r.headers.get('content-type') || ''; if (/text\/html/i.test(ct)) return J({ ok: false, erro: { codigo: 'planilha_privada', mensagem: 'O Google devolveu uma página de login: compartilhe como "Qualquer pessoa com o link → Leitor".' } }, 403);
   const cl = +(r.headers.get('content-length') || 0); if (cl > PL_MAX) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Planilha acima de 6 MB.' } }, 413);
   const buf = await r.arrayBuffer(); if (buf.byteLength > PL_MAX) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Planilha acima de 6 MB.' } }, 413);
