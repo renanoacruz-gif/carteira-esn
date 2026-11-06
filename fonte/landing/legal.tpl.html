@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#002233">
+<title>{{TITULO}} · Gestão de Carteira TOTVS ESN</title>
+<meta name="description" content="{{RESUMO}}">
+<style>
+{{FONTS}}
+:root{--pet:#002233;--pet2:#012739;--pet3:#0A3A52;--ciano:#00DBFF;--menta:#00FFD3;--lima:#D9FF65;--bg:#F2F5F8;--bd:#DCE3E8;--txt:#002233;--txt2:#4B5E6A;--link:#006C85;--lar:#E67E08}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:96px;-webkit-text-size-adjust:100%}
+body{font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;font-weight:500;color:var(--txt);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-underline-offset:3px}
+a:hover{color:var(--pet)}
+img{display:block;max-width:100%}
+:focus-visible{outline:3px solid var(--ciano);outline-offset:3px;border-radius:6px}
+.w{width:min(1160px,100% - 48px);margin-inline:auto}
+.sk{position:absolute;left:-999px;top:8px;background:var(--lima);color:var(--pet);padding:10px 16px;border-radius:8px;z-index:20;font-weight:700}
+.sk:focus{left:12px}
+.top{background:var(--pet);position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.08)}
+.top .w{display:flex;align-items:center;justify-content:space-between;height:72px}
+.top img{height:28px;width:auto}
+.nav{display:flex;align-items:center;gap:26px}
+.nav a{color:#B7CAD4;text-decoration:none;font-size:15px;transition:color .2s}
+.nav a:hover{color:#fff}
+.btn{display:inline-flex;align-items:center;font:inherit;font-weight:700;font-size:15px;text-decoration:none;padding:10px 20px;border-radius:999px;background:var(--ciano);color:var(--pet)!important;transition:transform .2s,background .2s}
+.btn:hover{background:var(--menta);transform:translateY(-2px)}
+.hero{background:radial-gradient(760px 380px at 85% 0,rgba(0,219,255,.18),transparent 62%),linear-gradient(180deg,var(--pet),var(--pet2));color:#fff;padding:72px 0 64px}
+.eb{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lima)}
+.eb::before{content:"";width:28px;height:2px;background:var(--lima);border-radius:2px}
+h1{font-size:clamp(34px,4.6vw,54px);line-height:1.08;letter-spacing:-.028em;font-weight:700;margin:18px 0 14px}
+.lead{font-size:19px;color:#C3D4DD;max-width:680px}
+.meta{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px}
+.meta span{font-size:13.5px;font-weight:700;color:var(--pet);background:var(--lima);border-radius:999px;padding:6px 14px}
+.meta span.o{background:rgba(255,255,255,.1);color:#E8F1F5}
+.rev{margin:36px 0 0;display:flex;gap:12px;align-items:flex-start;background:#FFF6E8;border:1px solid #F3D6A8;color:#6B4308;border-radius:16px;padding:16px 20px;font-size:15px}
+.rev svg{flex:none;width:22px;height:22px;margin-top:2px;color:var(--lar)}
+.body{padding:48px 0 96px}
+.cols{display:grid;grid-template-columns:260px 1fr;gap:56px;align-items:start}
+.cols>*{min-width:0}
+.toc{position:sticky;top:96px;background:#fff;border:1px solid var(--bd);border-radius:20px;padding:22px}
+.toc h2{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--link);margin-bottom:12px}
+.toc ol{list-style:none;display:grid;gap:2px;counter-reset:t}
+.toc a{display:block;text-decoration:none;color:var(--txt2);font-size:14.5px;padding:7px 10px;border-radius:10px;transition:background .2s,color .2s}
+.toc a:hover{background:var(--bg);color:var(--pet)}
+.doc{background:#fff;border:1px solid var(--bd);border-radius:28px;padding:48px 52px}
+.doc section+section{margin-top:44px;padding-top:40px;border-top:1px solid var(--bd)}
+.doc h2{font-size:25px;line-height:1.2;letter-spacing:-.018em;font-weight:700;margin-bottom:16px;display:flex;gap:14px;align-items:baseline}
+.doc h2 i{font-style:normal;flex:none;font-size:14px;font-weight:700;color:var(--pet);background:var(--lima);border-radius:999px;min-width:32px;height:32px;display:inline-grid;place-items:center;transform:translateY(-3px)}
+.doc p{font-size:16.5px;color:var(--txt2)}
+.doc p+p,.doc p+ul,.doc ul+p,.doc .tw+p{margin-top:14px}
+.doc ul{padding-left:22px;display:grid;gap:8px;font-size:16.5px;color:var(--txt2)}
+.doc li::marker{color:var(--ciano)}
+.doc b{color:var(--pet)}
+.tw{overflow-x:auto;border:1px solid var(--bd);border-radius:16px}
+table{border-collapse:collapse;width:100%;font-size:15px;min-width:480px}
+th{background:var(--pet);color:#fff;text-align:left;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;padding:12px 16px}
+td{padding:14px 16px;border-top:1px solid var(--bd);vertical-align:top;color:var(--txt2)}
+tbody tr:nth-child(even) td{background:#F8FAFB}
+.more{margin-top:56px}
+.more h2{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--link);margin-bottom:16px}
+.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.mc{display:block;text-decoration:none;background:#fff;border:1px solid var(--bd);border-radius:20px;padding:22px;transition:transform .25s,border-color .25s,box-shadow .25s}
+.mc:hover{transform:translateY(-5px);border-color:var(--ciano);box-shadow:0 22px 40px -26px rgba(0,34,51,.4)}
+.mc b{display:block;font-size:18px;color:var(--pet);margin-bottom:4px}
+.mc span{font-size:14.5px;color:var(--txt2)}
+footer{background:var(--pet);color:#8FA8B6;padding:40px 0;font-size:14px}
+footer .w{display:flex;flex-wrap:wrap;gap:18px 36px;justify-content:space-between;align-items:center}
+footer img{height:24px;width:auto}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 24px}
+footer a{color:var(--ciano);text-decoration:none}
+footer a:hover{text-decoration:underline}
+@media (max-width:980px){
+  .cols{grid-template-columns:1fr;gap:28px}
+  .toc{position:static}
+  .doc{padding:34px 28px}
+  .mg{grid-template-columns:1fr}
+  .nav a:not(.btn){display:none}
+}
+@media (max-width:600px){
+  .w{width:calc(100% - 32px)}
+  .doc{padding:26px 20px;border-radius:22px}
+  .doc h2{font-size:22px}
+  .hero{padding:52px 0 48px}
+}
+@media print{
+  .top,.toc,.more,footer,.sk{display:none}
+  body{background:#fff}.hero{background:#fff;color:#000;padding:0}.lead{color:#333}h1{color:#000}
+  .doc{border:0;padding:0}.cols{display:block}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
+</head>
+<body>
+<a class="sk" href="#doc">Ir para o conteúdo</a>
+<header class="top"><div class="w">
+ <a href="/sobre/" aria-label="Voltar ao início"><img src="{{LOGO_W}}" alt="TOTVS" width="98" height="28"></a>
+ <nav class="nav" aria-label="Principal"><a href="/sobre/">Início</a>{{NAVLINKS}}<a class="btn" href="/">Entrar</a></nav>
+</div></header>
+<main>
+<div class="hero"><div class="w">
+ <span class="eb">Gestão de Carteira TOTVS ESN</span>
+ <h1>{{TITULO}}</h1>
+ <p class="lead">{{RESUMO}}</p>
+ <div class="meta"><span>Versão {{VERSAO}}</span><span class="o">Atualizado em {{DATA}}</span><span class="o">Uso interno · @totvs.com.br</span></div>
+ <p class="rev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>Texto elaborado a partir do funcionamento técnico do sistema. Ainda pendente de validação do Jurídico e do Encarregado (DPO) da TOTVS.</span></p>
+</div></div>
+<div class="body"><div class="w cols">
+ <aside class="toc" aria-label="Neste documento"><h2>Neste documento</h2><ol>{{TOC}}</ol></aside>
+ <article class="doc" id="doc">{{SECOES}}</article>
+</div>
+<div class="w more"><h2>Outros documentos</h2><div class="mg">{{OUTROS}}</div></div>
+</div>
+</main>
+<footer><div class="w">
+ <img src="{{LOGO_W}}" alt="TOTVS" width="86" height="24">
+ <nav aria-label="Documentos">{{NAVLINKS}}</nav>
+ <a href="/">Entrar no sistema</a>
+</div></footer>
+</body>
+</html>

@@ -14,3 +14,21 @@ h = open(f'{here}/index.tpl.html').read().replace('{{FONTS}}', ff).replace('{{LO
 os.makedirs(f'{root}/public/sobre', exist_ok=True)
 open(f'{root}/public/sobre/index.html', 'w').write(h)
 print(len(h))
+
+
+# ---- páginas legais (/sobre/<slug>/) ----
+import sys; sys.path.insert(0, here)
+from legal_content import PAGES, ORDEM, DATA, VERSAO
+lt = open(f'{here}/legal.tpl.html').read()
+navl = ''.join(f'<a href="/sobre/{k}/">{PAGES[k]["curto"]}</a>' for k in ORDEM)
+for k in ORDEM:
+    pg = PAGES[k]
+    toc = ''.join(f'<li><a href="#s{i}">{t}</a></li>' for i, (t, _) in enumerate(pg['secoes'], 1))
+    sec = ''.join(f'<section id="s{i}"><h2><i>{i}</i>{t}</h2>{b}</section>' for i, (t, b) in enumerate(pg['secoes'], 1))
+    out = ''.join(f'<a class="mc" href="/sobre/{o}/"><b>{PAGES[o]["titulo"]}</b><span>{PAGES[o]["resumo"]}</span></a>' for o in ORDEM if o != k)
+    h = (lt.replace('{{FONTS}}', ff).replace('{{LOGO_W}}', logo).replace('{{TITULO}}', pg['titulo']).replace('{{RESUMO}}', pg['resumo'])
+         .replace('{{VERSAO}}', VERSAO).replace('{{DATA}}', DATA).replace('{{TOC}}', toc).replace('{{SECOES}}', sec)
+         .replace('{{OUTROS}}', out).replace('{{NAVLINKS}}', navl))
+    os.makedirs(f'{root}/public/sobre/{k}', exist_ok=True)
+    open(f'{root}/public/sobre/{k}/index.html', 'w').write(h)
+    print(k, len(h))

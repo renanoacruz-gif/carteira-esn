@@ -132,6 +132,7 @@ details a{color:var(--link);font-weight:700}
 footer{background:var(--pet);color:#8FA8B6;padding:44px 0;font-size:14px}
 footer .w{display:flex;flex-wrap:wrap;gap:20px 40px;justify-content:space-between;align-items:center}
 footer img{height:26px;width:auto}
+footer .fl{display:flex;flex-wrap:wrap;gap:8px 22px}
 footer a{color:var(--ciano);text-decoration:none}
 footer a:hover{text-decoration:underline}
 
@@ -271,7 +272,7 @@ footer a:hover{text-decoration:underline}
    <div class="df"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9m-3 3 3 3"/></svg><div><h3>Chave de IA é sua</h3><p>Fica no seu navegador e não é gravada pelo servidor. Conteúdo só vai ao provedor de IA quando você autoriza o envio.</p></div></div>
    <div class="df"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><div><h3>Backup por executivo</h3><p>Exporte a sua carteira em arquivo quando quiser.</p></div></div>
   </div>
-  <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>O sistema roda no Cloudflare (Workers e banco D1), com entrada protegida pelo Cloudflare Access. Quem administra a conta do Cloudflare tem acesso técnico ao banco.</p>
+  <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>O sistema roda no Cloudflare (Workers e banco D1), com entrada protegida pelo Cloudflare Access. Quem administra a conta do Cloudflare tem acesso técnico ao banco. Leia os <a href="/sobre/termos-de-uso/" style="color:var(--ciano)">Termos de Uso</a>, a <a href="/sobre/privacidade/" style="color:var(--ciano)">Política de Privacidade</a> e a página de <a href="/sobre/lgpd/" style="color:var(--ciano)">LGPD</a>.</p>
  </div>
 </section>
 
@@ -312,6 +313,7 @@ footer a:hover{text-decoration:underline}
  <div class="w">
   <img src="{{LOGO_W}}" alt="TOTVS" width="92" height="26">
   <span>Gestão de Carteira TOTVS ESN · uso interno, acesso restrito a e-mails @totvs.com.br</span>
+  <nav class="fl" aria-label="Documentos"><a href="/sobre/termos-de-uso/">Termos de Uso</a><a href="/sobre/politica-de-uso/">Política de Uso</a><a href="/sobre/privacidade/">Privacidade</a><a href="/sobre/lgpd/">LGPD</a></nav>
   <a href="/">Entrar no sistema</a>
  </div>
 </footer>
