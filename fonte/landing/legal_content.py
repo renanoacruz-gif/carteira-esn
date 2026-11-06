@@ -1,7 +1,7 @@
 # Conteúdo das páginas legais. Fatos técnicos conferidos no código (worker.js, adm.js, schema, wrangler.toml, README).
 CONTATO = 'renan.oscar@totvs.com.br'
 DATA = '06/11/2026'
-VERSAO = '1.0'
+VERSAO = '1.1'
 
 def tb(head, rows):
     h = ''.join(f'<th>{c}</th>' for c in head)
@@ -76,11 +76,13 @@ PAGES['privacidade'] = dict(
     ['<b>Registro de uso</b>: recurso usado, data e hora, resultado, tempo de processamento, e-mail do usuário e medidas de desempenho da abertura (tempos do navegador e quantidade de clientes)','Acompanhar adoção e funcionamento, e medir desempenho','Nunca grava conteúdo de fichas, prints, pesquisas, contratos ou respostas de IA, nem nomes de clientes, CNPJs ou valores'],
     ['<b>Tentativas de acesso negadas</b>: data, e-mail informado, motivo e rota','Segurança','Guardadas por 90 dias'],
     ['<b>Observações de segurança do navegador</b>: regra de segurança acionada e destino bloqueado, com contagem','Segurança e correção de falhas','Sem identificação de usuário'],
+    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro e contagem de falhas de envio','Avisar às 8h30 dos dias úteis, só se você ainda não abriu o sistema no dia','Só existe se você ativar. Não leva dados da carteira. Pode desativar a qualquer momento em Conta'],
     ['<b>Preferências locais</b>: chave de IA, avisos já vistos e configurações, no armazenamento do seu navegador','Funcionamento do sistema','Ficam no seu navegador; a chave de IA não é gravada pelo servidor'],
   ])+'''<p>As páginas públicas (landing e documentos) não usam cookies de rastreamento nem ferramentas de análise de audiência.</p>'''),
   ('Base legal', '''<p>O tratamento tem como base, em regra, o <b>legítimo interesse</b> da TOTVS na gestão da sua operação comercial e na segurança do ambiente (LGPD, art. 7º, IX) e, quando aplicável, a execução das atividades decorrentes da relação de trabalho e de contratos com clientes (art. 7º, V). As bases são definidas e validadas pelo controlador e pelo Encarregado.</p>'''),
   ('Com quem os dados são compartilhados', '''<ul><li><b>Cloudflare:</b> hospeda o aplicativo e o banco, e controla o acesso. Quem administra a conta do Cloudflare tem acesso técnico ao banco.</li>
 <li><b>Provedores de IA</b> (Google Gemini, OpenAI, Anthropic, Groq): só quando você aciona um recurso de IA ou OCR com a sua chave e autoriza o envio. Vai apenas o conteúdo necessário àquela tarefa.</li>
+<li><b>Serviços de notificação do navegador</b> (Google, Apple, Mozilla, Microsoft): se você ativar o lembrete, recebem o endereço de notificação do seu aparelho e um aviso vazio, sem conteúdo, para entregá-lo. O texto da notificação é fixo e fica no próprio aplicativo.</li>
 <li><b>Fontes externas consultadas por você</b> (por exemplo, consultas públicas de CNPJ, TDN e Planilhas Google): vai só o necessário para a consulta, como o identificador ou o link informado.</li>
 <li>Os dados não são vendidos nem usados para publicidade.</li></ul>'''),
   ('Transferência internacional', '''<p>O banco de dados fica na região <b>ENAM</b> do Cloudflare D1 (leste da América do Norte), e a rede do Cloudflare e os provedores de IA podem processar dados fora do Brasil. Essas transferências ocorrem com os mecanismos previstos no art. 33 da LGPD, conforme os contratos de cada fornecedor.</p>'''),
@@ -88,6 +90,7 @@ PAGES['privacidade'] = dict(
     ['Carteira (clientes, fichas, imagens)','Até você apagar, usando as funções de gerenciamento de dados, ou até o encerramento do seu acesso, conforme as regras internas da TOTVS'],
     ['Registro de uso','180 dias, prazo que o administrador pode ajustar entre 30 e 730 dias. Eventos mais antigos são apagados automaticamente'],
     ['Tentativas de acesso negadas','90 dias'],
+    ['Lembrete diário','Até você desativar, ou até o serviço de notificação informar que o aparelho não existe mais, ou após 5 falhas seguidas de envio'],
     ['Backups exportados por você','Ficam com você, fora do sistema. Proteja-os e apague quando não forem mais necessários'],
   ])),
   ('Como protegemos os dados', '''<ul><li>Acesso protegido pelo Cloudflare Access (código por e-mail), com conferência do domínio @totvs.com.br a cada requisição.</li>
@@ -131,9 +134,9 @@ PAGES['lgpd'] = dict(
     ['Não discriminação','Leituras e oportunidades são apoio à decisão; a decisão final é sempre humana'],
     ['Responsabilização','Autoria registrada no catálogo e registro de uso com retenção definida'],
   ])),
-  ('Compartilhamento e transferência internacional', '''<p>Detalhados na <a href="/sobre/privacidade/">Política de Privacidade</a>: Cloudflare como infraestrutura (banco na região ENAM), provedores de IA somente quando você aciona o recurso, e consultas externas iniciadas por você. As transferências internacionais seguem o art. 33 da LGPD, conforme os contratos de cada fornecedor.</p>'''),
+  ('Compartilhamento e transferência internacional', '''<p>Detalhados na <a href="/sobre/privacidade/">Política de Privacidade</a>: Cloudflare como infraestrutura (banco na região ENAM), provedores de IA somente quando você aciona o recurso, consultas externas iniciadas por você e serviços de notificação do navegador, se você ativar o lembrete diário. As transferências internacionais seguem o art. 33 da LGPD, conforme os contratos de cada fornecedor.</p>'''),
   ('Incidentes de segurança', f'''<p>Comunique qualquer suspeita de incidente a <a href="mailto:{CONTATO}">{CONTATO}</a>. Incidentes que possam acarretar risco ou dano relevante aos titulares são avaliados pelo controlador e, quando cabível, comunicados à ANPD e aos titulares no prazo regulamentado.</p>'''),
-  ('Retenção e eliminação', '''<p>A carteira fica até você apagá-la ou até o encerramento do acesso, conforme as regras internas da TOTVS. O registro de uso é apagado automaticamente após o prazo de retenção (hoje 180 dias) e as tentativas negadas após 90 dias.</p>'''),
+  ('Retenção e eliminação', '''<p>A carteira fica até você apagá-la ou até o encerramento do acesso, conforme as regras internas da TOTVS. O registro de uso é apagado automaticamente após o prazo de retenção (hoje 180 dias) e as tentativas negadas após 90 dias. O cadastro do lembrete diário é apagado quando você o desativa.</p>'''),
   ('Vigência', f'''<p>Versão {VERSAO}, de {DATA}.</p>'''),
   ])
 

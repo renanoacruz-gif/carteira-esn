@@ -19,6 +19,12 @@ ADMIN_EMAILS = "renan.oscar@totvs.com.br"   # quem pode excluir registros do cat
 ACCESS_TEAM = "billowing-paper-7b4d.cloudflareaccess.com"   # domínio do time Zero Trust (não é segredo)
 ACCESS_AUD = "6adb058f7cefc1043743382577cf95aa70a156b6d6ed7d9455ba8b8856eadcb2"   # AUD tag do aplicativo Access (Workers & Pages → carteira-esn → Access → AUD tag → copiar)
 
+# Lembrete diário 08:30 de Brasília (UTC-3, sem horário de verão), seg-sex. Só envia se VAPID_PUBLIC e VAPID_PRIVATE estiverem definidos.
+[triggers]
+crons = ["30 11 * * MON-FRI"]
+
 # Segredos (NÃO coloque valores aqui). Chaves de IA ficam com cada executivo, no navegador dele.
+#   wrangler secret put VAPID_PUBLIC     # lembrete diário: gerar o par com `node fonte/gerar_vapid.mjs`
+#   wrangler secret put VAPID_PRIVATE
 #   wrangler secret put APP_TOKEN        # opcional: só para a página manual /backend
 # NUNCA defina ALLOW_TEST_USER em produção (existe só para testes locais).
