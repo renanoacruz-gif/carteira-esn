@@ -69,8 +69,12 @@ async function pushSol(r, retry = 1) {
   namesResolve(solAuthors(r));
 }
 async function catalogLoad() {
-  const cat = (await wto(SOLC.get(), 10000)).docs.map(d => clone(d.data())), priv = (await wto(SOL.get(), 10000)).docs.map(d => clone(d.data()));
-  const notes = {}; try { (await wto(SNOTE.get(), 10000)).docs.forEach(d => { const x = d.data(); notes[x.id] = { n: clone(x.notasInt || []), m: clone(x.materiais || []) }; }); } catch { /* sem notas */ }
+  const [c, p] = [await wto(SOLC.get(), 10000), await wto(SOL.get(), 10000)]; let n = null; try { n = await wto(SNOTE.get(), 10000); } catch { /* sem notas */ }
+  return catalogBuild(c, p, n);
+}
+function catalogBuild(catSnap, privSnap, notesSnap) { /* monta o catálogo a partir das leituras já feitas (initStore lê em paralelo) */
+  const cat = catSnap.docs.map(d => clone(d.data())), priv = privSnap.docs.map(d => clone(d.data()));
+  const notes = {}; if (notesSnap) notesSnap.docs.forEach(d => { const x = d.data(); notes[x.id] = { n: clone(x.notasInt || []), m: clone(x.materiais || []) }; });
   const cid = new Set(cat.map(r => r.id)); cat.forEach(r => { SOLBASE.set(r.id, clone(r)); if (notes[r.id]) { if (notes[r.id].n.length) r.notasInt = notes[r.id].n; if (notes[r.id].m.length) r.materiais = notes[r.id].m; r._notasSalvas = true; } });
   S.privDup = priv.filter(r => cid.has(r.id)).length; /* cópias privadas antigas já presentes no catálogo (o catálogo prevalece) */
   const legacy = priv.filter(r => !cid.has(r.id)).map(r => ({ ...r, _priv: true }));

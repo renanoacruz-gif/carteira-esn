@@ -86,6 +86,6 @@ function execPDF(M) {
 }
 async function execExport(key) {
   const c = S.clients[key]; if (!c) return; const mode = UI.execMode || 'interno';
-  try { const M = execModel(c, mode); const blob = execPDF(M); await offer(`diagnostico-${mode}-${safeKey(c.code || c.name).slice(0, 40)}.pdf`, blob); c.exec.lastPdf = { at: nowISO(), mode, paginas: M.anexo ? '1 + anexo' : '1' }; touchC(key); }
+  try { await vend('jspdf'); const M = execModel(c, mode); const blob = execPDF(M); await offer(`diagnostico-${mode}-${safeKey(c.code || c.name).slice(0, 40)}.pdf`, blob); c.exec.lastPdf = { at: nowISO(), mode, paginas: M.anexo ? '1 + anexo' : '1' }; touchC(key); }
   catch (e) { toast('Falha ao gerar PDF: ' + e.message); }
 }

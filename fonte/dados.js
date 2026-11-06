@@ -6,7 +6,7 @@
    - o catálogo compartilhado nunca é apagado em "Limpar carteira"; em "Zerar" só os registros criados exclusivamente por esta conta. */
 const DM = { epoch: 0, locked: false, plan: null, res: null, selCli: '', selDoc: '' };
 const META_DADOS = ['files', 'act', 'segOv', 'segSec', 'lastAnalysis', 'mapping', 'consolIgnore', 'refDec', 'lotes'];
-const META_CFG = ['weights', 'segMap', 'prodReg', 'mrrPrec', 'mrrPlanComp', 'mrrComp', 'compCrit', 'renovDays', 'regimes', 'alertDays', 'staleDays', 'segUnit', 'mrrTol', 'exec', 'refComp', 'intMap', 'ai', 'apiKey', 'key', 'intEst', 'cnpjCfg'];
+const META_CFG = ['weights', 'segMap', 'prodReg', 'mrrPrec', 'mrrPlanComp', 'mrrComp', 'compCrit', 'renovDays', 'regimes', 'alertDays', 'staleDays', 'segUnit', 'mrrTol', 'exec', 'refComp', 'intMap', 'ai', 'apiKey', 'key', 'intEst', 'cnpjCfg', 'tickets'];
 const anyDirty = () => dirtyC.size || delC.size || dirtyI.size || delI.size || dirtyS.size || delS.size || dirtyP.size || delP.size || dirtyMeta || Object.values(GCOL).some(g => g.d.size || g.x.size);
 const dmClearQueues = () => { clearTimeout(timer); [dirtyC, delC, dirtyI, delI, dirtyS, delS, dirtyP, delP].forEach(s => s.clear()); dirtyMeta = false; Object.values(GCOL).forEach(g => { g.d.clear(); g.x.clear(); }); };
 async function flushNow() { // grava tudo o que está pendente e só retorna quando a fila esvaziou (ou falhou)

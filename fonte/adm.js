@@ -93,6 +93,21 @@ function telActWire() {
   if (!TEL.on) return;
   const o = ACT.rxRefresh; if (typeof o === 'function' && !o.__tel) { const w = function (...a) { const t0 = Date.now(); let r; try { r = o.apply(this, a); tel('raiox_gerar', 'concluida', 'ok', { dur: Date.now() - t0, meta: { modo: 'manual' } }); return r; } catch (e) { tel('raiox_gerar', 'erro', 'erro', { dur: Date.now() - t0, meta: { codigo: 'excecao' } }); throw e; } }; w.__tel = 1; ACT.rxRefresh = w; }
 }
+/* Desempenho da abertura (item 30): 1 evento por abertura, só tempos em ms do navegador (sem URL, conteúdo ou nome). dur = fase de dados (initStore). */
+const TEL_PERF = { lcp: 0, cls: 0 };
+try {
+  if (TEL.on) {
+    try { new PerformanceObserver(l => { for (const e of l.getEntries()) TEL_PERF.lcp = e.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch { /* sem suporte */ }
+    try { new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput) TEL_PERF.cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch { /* sem suporte */ }
+  }
+} catch { /* sem DOM */ }
+function telAbertura(t0) {
+  try {
+    if (!TEL.on || telAbertura.feito) return; telAbertura.feito = 1;
+    const fcp = (performance.getEntriesByName('first-contentful-paint')[0] || {}).startTime || 0, falha = /^(ERRO|mem[óo]ria)/.test(String(UI.persist || ''));
+    tel('desempenho_abertura', falha ? 'erro' : 'concluida', falha ? 'erro' : 'ok', { dur: Date.now() - t0, meta: { fcp_ms: fcp, lcp_ms: TEL_PERF.lcp, pronto_ms: performance.now(), cls_m: TEL_PERF.cls * 1000, clientes: telClN(), ...(falha ? { codigo: 'modo_memoria' } : {}) } });
+  } catch { /* coleta nunca interrompe o uso */ }
+}
 /* aviso simples de que eventos de uso são registrados */
 const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e o funcionamento da ferramenta: recurso utilizado, data/hora, resultado e tempo de processamento. Nunca são gravados o conteúdo de fichas, prints, pesquisas, contratos ou respostas da IA, nem nomes de clientes, CNPJs ou valores. Os eventos são guardados por prazo limitado e acessados apenas pelo administrador da plataforma.';
 {

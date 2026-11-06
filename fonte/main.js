@@ -19,7 +19,7 @@ const ACT = {
   delF1: t => { UI.confirm = 'del:' + t.dataset.id; render(); }, delF0: () => { UI.confirm = null; render(); }, delF: t => { UI.confirm = null; deleteFicha(t.dataset.k, t.dataset.id); },
   dismErr: t => dismissFichaErr(t.dataset.k, t.dataset.id), markRev: t => markReviewed(t.dataset.k, t.dataset.id),
   refAuto: () => setRefComp(''), filtSem: () => { UI.f = { ...UI.f, fs: 'nao_carregada' }; UI.view = 'clientes'; render(); window.scrollTo(0, 0); },
-  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...COV_ACT, ...VAL_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
+  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...COV_ACT, ...VAL_ACT, ...REL_ACT, ...TK_ACT, ...UT_ACT, ...RD_ACT, ...DOR_ACT, ...DT_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
   solView: t => { UI.solSel = t.dataset.id; UI.solEdit = null; render(); window.scrollTo(0, 0); }, solEdit: t => solEditOpen(t.dataset.id),
   solForce: () => { UI.solEdit.d.ackDup = true; solSave(); }, solMerge: t => solMergeInto(t.dataset.id),
   solArq: t => solArchive(t.dataset.id, !!t.dataset.on), solSeed: solRestoreSeed, pendOk: t => solResolvePend(t.dataset.id, +t.dataset.i, !!t.dataset.adopt),
@@ -180,20 +180,24 @@ document.addEventListener('change', async e => {
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
   }
 });
+/* Item 04: renders caros disparados por digitação são agrupados (140 ms); o estado (UI.*) é atualizado a cada tecla e só o render é adiado. deb.flush(k) executa já. */
+const deb = (k, fn, ms = 140) => { clearTimeout(deb.t[k]); deb.f[k] = fn; deb.t[k] = setTimeout(() => { delete deb.f[k]; fn(); }, ms); };
+deb.t = {}; deb.f = {}; deb.flush = k => { if (deb.f[k]) { clearTimeout(deb.t[k]); const fn = deb.f[k]; delete deb.f[k]; fn(); } };
+const reRender = sel => { const n = $(sel), p = n && document.activeElement === n ? n.selectionStart : null; render(); if (p !== null) { const m = $(sel); if (m) { m.focus(); m.setSelectionRange(p, p); } } };
 document.addEventListener('input', e => {
   const t = e.target; if (t.dataset.i === 'dmword' && DM.plan) { DM.plan.word = t.value; const b = $('[data-a=dmGo]'); if (b) b.disabled = t.value.trim().toUpperCase() !== DM_NEEDWORD[DM.plan.t]; return; }
   if (t.dataset.i === 'bktoken') { BK.token = t.value.trim(); BK.direto = null; return; }
-  if (t.dataset.i === 'tdq') { TD_VIEW.q = t.value; const p = t.selectionStart; render(); const n = $('[data-i=tdq]'); n?.focus(); n?.setSelectionRange(p, p); return; }
+  if (t.dataset.i === 'tdq') { TD_VIEW.q = t.value; deb('tdq', () => reRender('[data-i=tdq]')); return; }
   if (t.dataset.i === 'cnq') { UI.cn.q = t.value; return; }
-  if (t.dataset.i === 'fq') { UI.f.q = t.value; UI.lim = 200; retbl(); }
+  if (t.dataset.i === 'fq') { UI.f.q = t.value; UI.lim = 200; deb('fq', retbl); }
   if (t.dataset.i === 'pbulk') { UI.planBulk = t.value; return; }
   if (t.dataset.i === 'lkurls') { UI.lkUrls = t.value; return; }
-  if (t.dataset.i === 'prodq') { UI.prodQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=prodq]'); n.focus(); n.setSelectionRange(p, p); }
-  if (t.dataset.i === 'solq') { UI.solQ = t.value; const p = t.selectionStart; render(); const n = $('[data-i=solq]'); n.focus(); n.setSelectionRange(p, p); }
-  if (t.dataset.i === 'pq') { UI.plan.q = t.value; const p = t.selectionStart; render(); const n = $('[data-i=pq]'); n.focus(); n.setSelectionRange(p, p); }
+  if (t.dataset.i === 'prodq') { UI.prodQ = t.value; deb('prodq', () => reRender('[data-i=prodq]')); }
+  if (t.dataset.i === 'solq') { UI.solQ = t.value; deb('solq', () => reRender('[data-i=solq]')); }
+  if (t.dataset.i === 'pq') { UI.plan.q = t.value; deb('pq', () => reRender('[data-i=pq]')); }
 });
 ['dragover', 'dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => {
   const d = e.target.closest?.('[data-drop]'); if (!d) return; e.preventDefault(); d.classList.toggle('ov', ev === 'dragover');
   if (ev === 'drop' && e.dataTransfer?.files?.length) { const inp = $('#' + d.dataset.drop); const dt = new DataTransfer(); [...e.dataTransfer.files].forEach(f => dt.items.add(f)); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); }
 }));
-render(); initStore();
+render(); { const t0 = Date.now(); initStore().finally(() => telAbertura(t0)); }

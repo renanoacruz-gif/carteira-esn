@@ -119,18 +119,22 @@ function briefRaw(c) {
   return { rows, docTot, meta, files: [...new Set(files)], tabular, hasCol };
 }
 
+/* Classificação de uma linha de ficha (compartilhada pelo Briefing e pelo motor de oportunidades — sem extratores paralelos).
+   st: Ativo | Cancelado | Excedente; nat: recorrente | avulso | excedente | desconto | outro. */
+function brClassRow(r) {
+  const nd = norm(r.desc + ' ' + r.statusRaw), neg = r.total != null && r.total < 0;
+  const cancel = /cancel|descontinu|legado|baixad|encerrad|desativ|inativ|rescind|obsolet/.test(nd);
+  const exc = r.kind === 'excedente' || /excedent|acima do contrat|overage|uso adicional|consumo adicional/.test(nd) || (r.contr != null && r.util != null && r.util > r.contr);
+  const sub = /subscri|assinatura|saas|cloud|nuvem|mensalidade/.test(nd), nat = neg || r.kind === 'desconto' ? 'desconto' : exc ? 'excedente' : (r.kind === 'outro' && sub ? 'recorrente' : r.kind);
+  return { ...r, nat, dept: brDept(r), plat: brPlat(r.desc), st: cancel ? 'Cancelado' : exc ? 'Excedente' : 'Ativo', sub, pac: /pacote|consumo|franquia|bolsa|\bpool\b|credito|volumetria|transac|tokens/.test(nd) };
+}
+
 function briefModel(c, compSel) {
   consInit(c); const raw = briefRaw(c);
   const comps = [...new Set(raw.rows.map(r => r.comp).filter(Boolean))].sort(), comp = comps.includes(compSel) ? compSel : (comps[comps.length - 1] || null);
   const inComp = r => !comps.length || !r.comp || r.comp === comp;
   const all = raw.rows.filter(inComp), docTot = raw.docTot.filter(inComp);
-  const imp = all.filter(r => r.kind === 'imposto'), rows = all.filter(r => r.kind !== 'imposto').map(r => {
-    const nd = norm(r.desc + ' ' + r.statusRaw), neg = r.total != null && r.total < 0;
-    const cancel = /cancel|descontinu|legado|baixad|encerrad|desativ|inativ|rescind|obsolet/.test(nd);
-    const exc = r.kind === 'excedente' || /excedent|acima do contrat|overage|uso adicional|consumo adicional/.test(nd) || (r.contr != null && r.util != null && r.util > r.contr);
-    const sub = /subscri|assinatura|saas|cloud|nuvem|mensalidade/.test(nd), nat = neg || r.kind === 'desconto' ? 'desconto' : exc ? 'excedente' : (r.kind === 'outro' && sub ? 'recorrente' : r.kind);
-    return { ...r, nat, dept: brDept(r), plat: brPlat(r.desc), st: cancel ? 'Cancelado' : exc ? 'Excedente' : 'Ativo', sub, pac: /pacote|consumo|franquia|bolsa|\bpool\b|credito|volumetria|transac|tokens/.test(nd) };
-  });
+  const imp = all.filter(r => r.kind === 'imposto'), rows = all.filter(r => r.kind !== 'imposto').map(brClassRow);
   const sum = (a, k) => a.reduce((s, r) => s + (r[k] || 0), 0), cnt = (a, k) => a.filter(r => r[k] != null).length;
   const bruto = cnt(rows, 'total') ? sum(rows, 'total') : null, liq = cnt(rows, 'liq') ? sum(rows, 'liq') : null;
   const pos = rows.filter(r => (r.total || 0) > 0), posSum = sum(pos, 'total');
@@ -325,7 +329,7 @@ function briefPDF(M) {
 async function briefExport(key) {
   const c = S.clients[key]; if (!c) return;
   if (!briefFichas(c).length) { UI.ctab = 'briefing'; render(); return toast('Anexe a ficha de faturamento do cliente para gerar o briefing.'); }
-  try { const M = briefModel(c, UI.briefComp), blob = briefPDF(M); await offer(`briefing-${safeKey(c.code || c.name).slice(0, 40)}-${M.comp || 'sem-competencia'}.pdf`, blob); (c.exec ||= {}).lastBrief = { at: nowISO(), comp: M.comp, itens: M.n }; touchC(key); }
+  try { await vend('jspdf'); const M = briefModel(c, UI.briefComp), blob = briefPDF(M); await offer(`briefing-${safeKey(c.code || c.name).slice(0, 40)}-${M.comp || 'sem-competencia'}.pdf`, blob); (c.exec ||= {}).lastBrief = { at: nowISO(), comp: M.comp, itens: M.n }; touchC(key); }
   catch (e) { toast('Falha ao gerar briefing: ' + e.message); }
 }
 

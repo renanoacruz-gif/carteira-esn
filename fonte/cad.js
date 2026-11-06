@@ -259,7 +259,7 @@ const TPL = [['Código TOTVS', 'Identificador da conta. Usado para atualizar o c
   ['Contrato', 'Identificador do contrato. Vários contratos: uma linha por contrato com o mesmo código TOTVS.', 'texto'], ['Última renovação', 'Data ligada ao contrato informado.', 'DD/MM/AAAA'], ['Próxima renovação', 'Não é calculada: informe a data.', 'DD/MM/AAAA'], ['Índice de reajuste', 'Ex.: IPCA, IGP-M (não presumido).', 'texto'], ['Data-base do reajuste', 'Pode ser diferente da renovação.', 'DD/MM/AAAA'],
   ['Churn / risco', '', 'texto'], ['NPS', '', 'texto'], ['Observações', '', 'texto']];
 async function downloadTemplate() {
-  if (!window.XLSX) return toast('Biblioteca XLSX indisponível neste ambiente.');
+  if (!(await vend('xlsx'))) return toast('Biblioteca XLSX indisponível neste ambiente.');
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([TPL.map(x => x[0])]), 'Carteira');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Coluna', 'Instrução', 'Formato'], ...TPL, [], ['Regras gerais', 'Células vazias preservam o valor existente (a menos que a opção "limpar" seja marcada na prévia). Valores importados entram como DECLARADOS. Informações confirmadas não são substituídas sem sua escolha. Colunas podem ter outros nomes e ficar em qualquer ordem: o mapeamento é conferido na prévia. Planilhas antigas (sem as novas colunas) continuam aceitas.', '']]), 'Instruções');
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }); offer('modelo-carteira-totvs.xlsx', new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));

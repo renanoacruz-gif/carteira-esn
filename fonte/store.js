@@ -12,7 +12,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const log = (t, k = '') => { UI.log.unshift({ t, k, at: new Date().toLocaleTimeString('pt-BR') }); UI.log = UI.log.slice(0, 80); };
 
 function freezeClient(c) {
-  const o = clone({ foraPlanilha: c.foraPlanilha || null, key: c.key, code: c.code, name: c.name, cnpj: c.cnpj, cnpjRaw: c.cnpjRaw, seg: c.seg, city: c.city, size: c.size, mrr: c.mrr, productsRaw: c.productsRaw, churn: c.churn, nps: c.nps, notes: c.notes, custom: c.custom || [], edits: c.edits || {}, usoConf: c.usoConf || {}, site: c.site || '', fatos: c.fatos || [], sugFatos: c.sugFatos || [], semIA: c.semIA || null, aval: c.aval || {}, valid: c.valid || {}, src: c.src, fichas: c.fichas, docs: (c.docs || []).filter(d => !d.prv), prFill: c.prFill || {}, prImp: c.prImp || [], mgmt: c.mgmt, act: c.act, uf: c.uf, regime: c.regime, release: c.release, lic: c.lic, cloud: c.cloud, rel: c.rel, fis: c.fis, roi: c.roi, exec: c.exec, cdocs: c.cdocs, iid: c.iid, ext: c.ext || {}, cad: c.cad || {}, contratos: c.contratos || [], cadDec: c.cadDec || {}, cadConf: c.cadConf || [], cnpjCad: c.cnpjCad || null, insRef: c.insRef || [], fichaErr: c.fichaErr || [], lastChange: c.lastChange || null, changes: c.changes || [], reviewFlags: c.reviewFlags || [], prevKeys: c.prevKeys || [], oppKeep: c.oppKeep || [] });
+  const o = clone({ foraPlanilha: c.foraPlanilha || null, key: c.key, code: c.code, name: c.name, cnpj: c.cnpj, cnpjRaw: c.cnpjRaw, seg: c.seg, city: c.city, size: c.size, mrr: c.mrr, productsRaw: c.productsRaw, churn: c.churn, nps: c.nps, notes: c.notes, custom: c.custom || [], edits: c.edits || {}, usoConf: c.usoConf || {}, site: c.site || '', fatos: c.fatos || [], sugFatos: c.sugFatos || [], semIA: c.semIA || null, aval: c.aval || {}, valid: c.valid || {}, dorHip: c.dorHip || [], dtConf: c.dtConf || {}, src: c.src, fichas: c.fichas, docs: (c.docs || []).filter(d => !d.prv), prFill: c.prFill || {}, prImp: c.prImp || [], mgmt: c.mgmt, act: c.act, uf: c.uf, regime: c.regime, release: c.release, lic: c.lic, cloud: c.cloud, rel: c.rel, fis: c.fis, roi: c.roi, exec: c.exec, cdocs: c.cdocs, iid: c.iid, ext: c.ext || {}, cad: c.cad || {}, contratos: c.contratos || [], cadDec: c.cadDec || {}, cadConf: c.cadConf || [], cnpjCad: c.cnpjCad || null, insRef: c.insRef || [], fichaErr: c.fichaErr || [], lastChange: c.lastChange || null, changes: c.changes || [], reviewFlags: c.reviewFlags || [], prevKeys: c.prevKeys || [], oppKeep: c.oppKeep || [] });
   let n = JSON.stringify(o).length;
   if (n > 235000) { o.docs.forEach(d => d.text = d.text.slice(0, 3000)); (o.cdocs || []).forEach(d => d.text = d.text.slice(0, 3000)); o.docTrunc = true; n = JSON.stringify(o).length; }
   if (n > 235000 && o.lic?.matriz?.rows) { o.lic.matriz.rows = o.lic.matriz.rows.slice(0, 150); o.lic.matriz.trunc = true; n = JSON.stringify(o).length; }
@@ -29,21 +29,34 @@ function sched() { clearTimeout(timer); timer = setTimeout(flush, DM_DELAY); }
 const DM_DELAY = 300; /* atraso curto de gravação; além disso grava ao ocultar/fechar a página */
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && META) { clearTimeout(timer); flush(); } });
 addEventListener('pagehide', () => { if (META) { clearTimeout(timer); flush(); } });
+/* Concorrência limitada (D1/Worker): processa fns com até `conc` em voo; após o 1º erro não inicia novas, aguarda as em voo e propaga o 1º erro (sem rejeição solta). */
+async function poolRun(fns, conc = 5) {
+  const out = new Array(fns.length); let i = 0, err = null, bad = false;
+  await Promise.all(Array.from({ length: Math.min(conc, fns.length) }, async () => { while (!bad && i < fns.length) { const j = i++; try { out[j] = await fns[j](); } catch (e) { if (!bad) { bad = true; err = e; } } } }));
+  if (bad) throw err; return out;
+}
 async function flush() {
   if (!META) return; if (saving) { sched(); return; } saving = true;
   try {
-    for (const k of [...dirtyC]) { dirtyC.delete(k); if (S.clients[k]) { try { await CL.doc(k).set(freezeClient(S.clients[k])); } catch (e) { dirtyC.add(k); throw e; } } }
-    for (const k of [...delC]) { delC.delete(k); try { await CL.doc(k).delete(); } catch (e) { delC.add(k); throw e; } }
+    let left = dirtyC.size + delC.size + Object.values(GCOL).reduce((n, g) => n + (g.ref ? g.d.size + g.x.size : 0), 0);
+    const tick = () => { if (--left >= 0 && total > 5) { UI.persist = `salvando ${left}…`; paintStatus(); } }, total = left; if (total > 5) { UI.persist = `salvando ${total}…`; paintStatus(); }
+    await poolRun([
+      ...[...dirtyC].map(k => async () => { dirtyC.delete(k); if (S.clients[k]) { try { await CL.doc(k).set(freezeClient(S.clients[k])); } catch (e) { dirtyC.add(k); throw e; } } tick(); }),
+      ...[...delC].map(k => async () => { delC.delete(k); try { await CL.doc(k).delete(); } catch (e) { delC.add(k); throw e; } tick(); })
+    ]);
     for (const id of [...dirtyI]) { dirtyI.delete(id); const it = S.inbox.find(x => x.id === id); if (it) await INB.doc(id).set(clone(it)); }
     for (const id of [...delI]) { delI.delete(id); try { await INB.doc(id).delete(); } catch (e) { delI.add(id); throw e; } }
     for (const id of [...dirtyS]) { dirtyS.delete(id); const r = S.solutions.find(x => x.id === id); if (r) { try { await pushSol(r); } catch (e) { dirtyS.add(id); throw e; } } }
     for (const id of [...delS]) { delS.delete(id); if (SOL) await SOL.doc(id).delete(); } /* só o espaço privado: o catálogo compartilhado nunca é apagado por esta rotina */
     for (const id of [...dirtyP]) { dirtyP.delete(id); const r = S.pesq.find(x => x.id === id); if (r && PES) await PES.doc(id).set(clone(r)); }
     for (const id of [...delP]) { delP.delete(id); try { if (PES) await PES.doc(id).delete(); } catch (e) { delP.add(id); throw e; } }
-    for (const [, g] of Object.entries(GCOL)) { if (!g.ref) continue; for (const id of [...g.d]) { g.d.delete(id); const r = g.arr().find(x => x.id === id); if (r) await g.ref.doc(id).set(clone(r)); } for (const id of [...g.x]) { g.x.delete(id); await g.ref.doc(id).delete(); } }
+    await poolRun(Object.values(GCOL).filter(g => g.ref).flatMap(g => [
+      ...[...g.d].map(id => async () => { g.d.delete(id); const r = g.arr().find(x => x.id === id); if (r) { try { await g.ref.doc(id).set(clone(r)); } catch (e) { g.d.add(id); throw e; } } tick(); }),
+      ...[...g.x].map(id => async () => { g.x.delete(id); try { await g.ref.doc(id).delete(); } catch (e) { g.x.add(id); throw e; } tick(); })
+    ]));
     if (dirtyMeta) { dirtyMeta = false; await META.set(clone({ meta: { ...S.meta, files: S.meta.files.slice(-400) }, kbExtra: S.kbExtra })); }
     UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
-  } catch (e) { UI.persist = 'ERRO ao salvar: ' + (e.code || e.message); toast('Falha ao salvar: ' + (e.message || e.code)); }
+  } catch (e) { UI.persist = 'ERRO ao salvar: ' + (e.code === 'tempo_esgotado' ? e.message : (e.code || e.message)); toast('Falha ao salvar: ' + (e.message || e.code)); }
   saving = false; paintStatus();
 }
 async function initStore() {
@@ -55,19 +68,24 @@ async function initStore() {
     if (db && id) {
       ME.id = id; ME.ok = true; await meLoad(user); SOLC = db.collection('catalogo');
       META = db.doc('data/users/' + id + '/carteira'); CL = META.collection('clientes'); INB = META.collection('inbox'); SOL = META.collection('solucoes'); PES = META.collection('pesquisas'); GCOL.marcos.ref = META.collection('marcos'); GCOL.regulatorio.ref = META.collection('regulatorio'); GCOL.consol.ref = META.collection('consolidacoes'); GCOL.consolsnap.ref = META.collection('consolidacoes_snap'); SNOTE = META.collection('solnotas'); GCOL.integlog.ref = META.collection('integ_log'); GCOL.cnpj.ref = META.collection('cnpj'); GCOL.insights.ref = META.collection('insights'); GCOL.ocr.ref = META.collection('ocr'); GCOL.ocrimg.ref = META.collection('ocrimg'); SCONT = window.__HOSTED__ ? db.collection('catalogo_conteudo') : META.collection('solconteudo');
-      const m = await wto(META.get(), 10000);
+      /* leituras em paralelo (máx. 5 em voo); tudo é aplicado só depois que todas concluem, na ordem original — falha em qualquer uma mantém o comportamento anterior (modo memória) */
+      const T = 10000, G = k => () => wto(GCOL[k].ref.get(), T), byAt = (a, b) => (b.at || '').localeCompare(a.at || ''), docs = q => q.docs.map(d => clone(d.data()));
+      const [m, cl, inb, cat, priv, notes, pes, marcos, regs, merges, msnap, intlog, cnpj, insights, ocr, ocrimg] = await poolRun([
+        () => wto(META.get(), T), () => wto(CL.get(), T), () => wto(INB.get(), T), () => wto(SOLC.get(), T), () => wto(SOL.get(), T), () => wto(SNOTE.get(), T).catch(() => null), () => wto(PES.get(), T),
+        G('marcos'), G('regulatorio'), G('consol'), G('consolsnap'), G('integlog'), G('cnpj'), G('insights'), G('ocr'), () => wto(GCOL.ocrimg.ref.get(), 20000)
+      ], 5);
       if (m.exists) { const d = clone(m.data()); Object.assign(S.meta, d.meta || {}); S.meta.weights = { ...DEF_WEIGHTS, ...(S.meta.weights || {}) }; S.meta.files ||= []; S.meta.segOv ||= {}; S.meta.act ||= {}; S.kbExtra = d.kbExtra || { solutions: [] }; }
-      (await wto(CL.get(), 10000)).docs.forEach(d => { const c = clone(d.data()); S.clients[c.key] = c; });
-      S.inbox = (await wto(INB.get(), 10000)).docs.map(d => clone(d.data()));
-      loadSolutions(await catalogLoad());
-      S.pesq = (await wto(PES.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
-      S.marcos = (await wto(GCOL.marcos.ref.get(), 10000)).docs.map(d => clone(d.data())); S.regs = (await wto(GCOL.regulatorio.ref.get(), 10000)).docs.map(d => clone(d.data())); S.merges = (await wto(GCOL.consol.ref.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || '')); S.msnap = (await wto(GCOL.consolsnap.ref.get(), 10000)).docs.map(d => clone(d.data())); S.intlog = (await wto(GCOL.integlog.ref.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || '')); S.cnpj = (await wto(GCOL.cnpj.ref.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || '')); S.insights = (await wto(GCOL.insights.ref.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || '')); S.ocr = (await wto(GCOL.ocr.ref.get(), 10000)).docs.map(d => clone(d.data())).sort((a, b) => (b.at || '').localeCompare(a.at || '')); S.ocrimg = (await wto(GCOL.ocrimg.ref.get(), 20000)).docs.map(d => clone(d.data())); ensureIids();
+      cl.docs.forEach(d => { const c = clone(d.data()); S.clients[c.key] = c; });
+      S.inbox = docs(inb);
+      loadSolutions(catalogBuild(cat, priv, notes));
+      S.pesq = docs(pes).sort(byAt);
+      S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = docs(ocrimg); ensureIids();
       UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
-      catalogWatch(); reanalyzeAll(false);
+      catalogWatch(); reanalyzeAll(false); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
       if (Object.keys(S.clients).length) UI.view = 'geral';
     } else { UI.persist = 'memória (db indisponível: use Backup JSON)'; loadSolutions([]); }
   } catch (e) { META = null; SOL = PES = null; loadSolutions([]); UI.persist = 'memória (db indisponível: ' + e.message + ') — use Backup JSON'; }
-  render();
+  render(); setTimeout(() => vendPrefetch('xlsx'), 3000);
 }
 function runAnalysis(c, reason) {
   c.fichas ||= []; c.docs ||= []; c.mgmt ||= {}; c.act ||= {}; c.fichaErr ||= []; c.changes ||= []; c.reviewFlags ||= []; c.iid ||= 'cli_' + uid(); c.ext ||= {};
@@ -399,8 +417,8 @@ async function offer(name, data) {
 const planHead = ['Prioridade', 'Score', 'Confiança da análise', 'Tipo', 'Cliente', 'Evidência', 'Ação', 'Responsável', 'Prazo', 'Validação / Situação'];
 function planArr() { return planRows().map(r => { const a = actOf(r.id, r.key); return [r.prio, r.score >= 0 ? r.score : '', r.conf, r.tipo, r.cliente, r.evid, r.acao, a.resp || '', a.prazo || '', r.dec ? `${VALID_L[r.dec.valid]} / ${SIT_L[r.dec.sit]}` : a.status || 'Pendente']; }); }
 function exportCSV() { offer('plano-de-acao.csv', toCSV(planHead, planArr())); }
-function exportXLSX() {
-  if (!window.XLSX) return toast('Biblioteca XLSX indisponível.');
+async function exportXLSX() {
+  if (!(await vend('xlsx'))) return toast('Biblioteca XLSX indisponível.');
   const wb = XLSX.utils.book_new(); const add = (n, h, r) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([h, ...r]), n);
   add('Plano de ação', planHead, planArr());
   const cs = Object.values(S.clients);

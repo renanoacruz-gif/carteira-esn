@@ -72,7 +72,7 @@ function opFilter(rows, f) {
   const q = norm(f.q);
   return rows.filter(x => (f.cl ? x.cl === f.cl : (x.cl !== 'nao' || (f.dec && f.dec !== 'sem'))) && (!f.cli || x.c.key === f.cli) && (!f.seg || opSeg(x.c) === f.seg) && (!f.fam || oppFam(x.o) === f.fam) && (!f.proc || oppProc(x.o) === f.proc)
     && (!f.dec || (f.dec === 'sem' ? !jdCur(x.c, x.o) : jdCur(x.c, x.o) === f.dec)) && (!f.ev || fundOf(x.o).documental) && (!f.uso || opUso(x.o)) && (!f.mkt || opMkt(x.c)) && (!q || norm(`${x.c.name} ${x.o.nome} ${oppProc(x.o)} ${oppFam(x.o)}`).includes(q)))
-    .sort((a, b) => (a.cl === 'identificada' ? 0 : 1) - (b.cl === 'identificada' ? 0 : 1) || b.o.score - a.o.score || a.c.name.localeCompare(b.c.name));
+    .sort((a, b) => (a.cl === 'identificada' ? 0 : 1) - (b.cl === 'identificada' ? 0 : 1) || b.o.score - a.o.score || tkRank(b.c, b.o) - tkRank(a.c, a.o) || a.c.name.localeCompare(b.c.name));
 }
 function opChips(f) {
   const L = []; if (f.cl) L.push(['cl', 'Classificação: ' + (OP_CL[f.cl] || [f.cl])[0]]); if (f.dec && f.dec !== 'sem') L.push(['dec', 'Leitura: ' + JD[f.dec]]); if (f.ev) L.push(['ev', 'Com evidência em documentos']); if (f.uso) L.push(['uso', 'Melhor aproveitamento do que já contratou']); if (f.mkt) L.push(['mkt', 'Cliente com acontecimento de mercado']);
@@ -89,6 +89,7 @@ function vOport() {
   const uniq = fn => [...new Set(act.map(fn))].sort((a, b) => String(a).localeCompare(String(b))), sel = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
   const nI = rows.filter(x => x.cl === 'identificada').length, nH = rows.filter(x => x.cl === 'hipotese').length;
   return `<div class="alert i sm"><b>Como ler.</b> ${pill('Oportunidade identificada', 'ok')} tem dado objetivo do cliente ou o mesmo indício em 2+ fontes; ${pill('Hipótese de investigação', 'warn')} é plausível, mas ainda sem confirmação — <b>não é oportunidade comercial confirmada</b>. Ausência na ficha não prova ausência de contratação. Sua leitura (Faz sentido, Investigar, Já atendida, Descartar) ajusta as próximas análises e evita repetir recomendações.</div>
+  ${utilHtml()}
   <div class="filters"><input type="text" data-c="opf" data-f="q" value="${esc(f.q)}" placeholder="Buscar cliente, oportunidade, processo…" aria-label="Buscar oportunidades" style="min-width:220px">
   <select data-c="opf" data-f="cl" aria-label="Classificação">${sel('', 'Identificadas e hipóteses', f.cl)}${sel('identificada', 'Só identificadas', f.cl)}${sel('hipotese', 'Só hipóteses', f.cl)}${sel('nao', 'Não priorizadas', f.cl)}</select>
   <select data-c="opf" data-f="seg" aria-label="Segmento">${sel('', 'Todos os segmentos', f.seg)}${uniq(x => opSeg(x.c)).map(s => sel(s, opSegL(s), f.seg)).join('')}</select>

@@ -65,6 +65,9 @@ function ctxLacunas(c) {
   if (!activeSols().length) L.push({ falta: 'Base de Soluções vazia', importa: 'Sem ela as recomendações vêm só das regras internas e não cobrem o portfólio TOTVS pertinente.', decisao: 'Quais soluções do portfólio oficial podem ser apresentadas.', acao: ['nav', 'solucoes', 'Abrir Base de Soluções'] });
   else if (sg.some(x => ['manual', 'dificuldade'].includes(x.tipo)) && !(c.opps || []).some(o => o.modo === 'evidencia')) L.push({ falta: 'Solução da Base para a dor citada nos textos', importa: 'O cliente cita rotina manual ou dificuldade, mas nenhuma solução cadastrada correspondeu.', decisao: 'Se existe solução oficial a investigar para essa dor.', acao: ['nav', 'solucoes', 'Enriquecer Base de Soluções'] });
   if (!(c.fatos || []).length && !(c.sugFatos || []).length) L.push({ falta: 'Pesquisa da empresa e do mercado', importa: 'Sem fatos recentes com fonte, o momento da empresa fica desconhecido.', decisao: 'O gancho e o timing da abordagem.', acao: ['emPrep', c.key, 'Pesquisar empresa (IA)'] });
+  if (typeof fsPendencias === 'function') L.push(...fsPendencias(c));
+  if (typeof dtPendencia === 'function') L.push(...dtPendencia(c));
+  if (typeof cmpPendencia === 'function') L.push(...cmpPendencia(c));
   return L;
 }
 

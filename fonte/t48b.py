@@ -99,7 +99,7 @@ ck('arquivo: CSV legítimo aceito (um inválido não derruba os demais)',res[4]=
 big=ev(A,"readBuf({name:'enorme.pdf',size:90*1024*1024,arrayBuffer:async()=>new ArrayBuffer(1)}).then(()=>'ok',e=>e.message)")
 ck('arquivo >80MB recusado com mensagem clara','80 MB' in big,big)
 # --- zip bomb / entradas demais
-zb=ev(A,"""(async()=>{ const z=new JSZip(); z.file('word/document.xml','<w:document xmlns:w="x"><w:body/></w:document>'); const b=await z.generateAsync({type:'arraybuffer'}); try{ await readDocx(b); return 'sem-erro-esperado'; }catch(e){ return e.message; } })()""")
+zb=ev(A,"""(async()=>{ await vend('jszip'); const z=new JSZip(); z.file('word/document.xml','<w:document xmlns:w="x"><w:body/></w:document>'); const b=await z.generateAsync({type:'arraybuffer'}); try{ await readDocx(b); return 'sem-erro-esperado'; }catch(e){ return e.message; } })()""")
 print('docx mínimo:',zb)
 zg=ev(A,"""(()=>{ const f={ _data:{uncompressedSize:61e6}, async:async()=>'x' }; return zipTxt(f).then(()=>'ok',e=>e.message); })()""")
 ck('zipTxt recusa entrada >60MB descompactada','60 MB' in zg,zg)

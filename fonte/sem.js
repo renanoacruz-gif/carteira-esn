@@ -2,8 +2,28 @@
    Camada local (sempre disponível, sem IA): sinônimos/paráfrases por necessidade, negação, menção histórica, problema resolvido, recuperação de trechos da Base de Soluções.
    Camada de IA (opcional, via "Claude desta página" ou backend): lê os trechos, devolve hipóteses estruturadas que só chegam a "Investigar" e só depois de aceitas pelo executivo.
    Regra: similaridade textual ou semântica NUNCA prova necessidade. */
-const SEM_RES = /\b(resolvid[oa]s?|solucionad[oa]s?|corrigid[oa]s?|j[aá] (?:implant|migr|resolv|substitu)\w*|implantamos|migramos|passou a usar|deixou de ser (?:um )?problema|n[aã]o [eé] mais (?:um )?problema|substitu[ií]d[oa]s?)/i;
-const SEM_HIST = /\b(antes|antigamente|no passado|na [eé]poca|anos atr[aá]s|j[aá] foi|at[eé] 20\d\d|em 20(?:0\d|1\d|2[0-3])\b|h[aá] \d+ (?:anos|meses))/i;
+const SEM_RES = /\b(resolvid[oa]s?|solucionad[oa]s?|corrigid[oa]s?|conclu[ií]d[oa]s?|j[aá] (?:implant|migr|resolv|substitu)\w*|j[aá] (?:foi|foram|est[aá]|est[aã]o) (?:implantad|migrad|resolvid|substitu[ií]d|conclu[ií]d)\w*|implantamos|migramos|passou a usar|deixou de ser (?:um )?problema|n[aã]o [eé] mais (?:um )?problema|substitu[ií]d[oa]s?)/i;
+const SEM_HIST0 = /\b(antes|antigamente|no passado|na [eé]poca|anos atr[aá]s|j[aá] foi)/i;
+/* Rodada 18 §C: ano só é "passado" se já passou (ex.: "até 2027" é prazo futuro); "há N anos" depois de "sem/faz/desde" descreve situação que PERSISTE ("sem atualização há 3 anos") */
+function semHist(sent) {
+  if (SEM_HIST0.test(sent)) return true;
+  const Y = new Date().getFullYear(); let m; const ry = /(?:at[eé]|em|desde)\s+(20\d\d)\b/gi; while ((m = ry.exec(sent))) if (+m[1] < Y) return true;
+  return /h[aá] \d+ (?:anos|meses)/i.test(sent) && !/(?:\bsem\b|\bfaz(?:em)?\b|\bdesde\b|\bn[aã]o\b)[^.;]{0,60}h[aá] \d+ (?:anos|meses)/i.test(sent);
+}
+/* Rodada 18 §C: termos GENÉRICOS (aparecem em qualquer cliente sem indicar necessidade) só viram necessidade atual com indício de dificuldade ou processo manual na MESMA frase. Termos fortes (reforma tributária, IBS/CBS, NR-1, OEE, PCP, workflow, retrabalho…) e paráfrases (SEM_CONC) não são gateados. */
+const SEM_GEN = {
+  fiscal: /^(tribut|fiscal|nf-?e|nfs-?e|nota fiscal|icms|sped|cfop|ncm|classifica)/i, sst: /^(absente|afastament|esocial|banco de horas|hora extra|jornada|ponto)/i,
+  financeiro: /^(cobran|boleto|concilia|antecip|prazo de pagamento|receb|fluxo de caixa|pix|contas a)/i, processos: /^(aprova|papel|documento|assinatura|planilha|protocolo|solicita)/i,
+  producao: /^(produ|capacidade|programa|perda|manuten|apontamento|parada)/i, analytics: /^(relat|indicador|funil|pipeline|forecast|comiss)/i,
+  logistica: /^(entrega|rota|frota|expedi|armaz|cd$|estoque|separa|agendamento|transporte|frete)/i, sustentacao: /^(chamado|upgrade|release|vers|atualiza|banco de dados|backup|homologa|infra)/i,
+  treinamento: /^(treinamento|capacita|ado|uso do sistema|parametriza|customiza)/i, nfse: /^(nfs|nota de servi|iss|munic)/i, obras: /^(obra|empreendimento|engenharia)/i
+};
+const _L = '(?<![\\wÀ-ÿ])', _R = '(?![\\wÀ-ÿ])';
+const SEM_DIF = new RegExp(_L + '(?:manual\\w*|na m[aã]o|[àa] m[aã]o|demor\\w+|atras\\w+|erros?|errad\\w+|retrabalh\\w+|dificuldad\\w+|problem\\w+|falhas?|lent[ao]s?|lentid[aã]o|trav\\w+|n[aã]o (?:conseguimos|conseguem|consegue|temos|tem|possu\\w+|sabemos|sabem|h[aá]|existe|integr\\w+|control\\w+|usam|usamos)|sem (?:controle|visibilidade|vis[aã]o|indicadores?|integra\\w+|rastre\\w+|padr\\w+|atualiza\\w+|automa\\w+|sistema|apoio)|falta(?:m)?(?: de)?|precis\\w+|necessit\\w+|necessidade|gostar\\w+|gostaria|queremos|quer(?:em)?|deseja\\w*|buscam?|planilha\\w*|e-?mails?|whats\\w*|papel|gargalos?|riscos?|multas?|autua\\w+|perdas?|diverg\\w+|inconsist\\w+|desatualizad\\w+|obsolet\\w+|fora de suporte|descontinuad\\w+|insatisf\\w+|reclam\\w+|duplicidade)' + _R, 'i');
+function semGenerico(need, termo, frase) {
+  const g = SEM_GEN[need]; if (!g || !g.test(String(termo).trim())) return false;
+  return !SEM_DIF.test(String(frase || '').replace(termo, ' '));
+}
 const SEM_NEG_S = /\b(?:n[aã]o|nunca|jamais)\s+(?:h[aá]|temos|tem|existe\w*|enfrent\w+|possu\w+|precis\w+|necessit\w+|apresent\w+|vemos|consideramos)\b|\bsem\s+(?:problemas?|dificuldades?|necessidade)|\bn[aã]o\s+[eé]\s+(?:um\s+)?(?:problema|necessidade|prioridade)/i;
 const SEM_NEG_T = /\b(?:n[aã]o|nunca|jamais)\s+(?:[\wçãõáéíóúâêô]+\s+){0,2}$/i;
 const SEM_CONTRA = /\b(mas|por[eé]m|contudo|ainda|todavia|continua|segue)\b/i;
@@ -29,7 +49,7 @@ function semEstado(t, idx, len) {
   const [a, b] = semBounds(t, idx, len), sent = t.slice(a, b), before = t.slice(a, idx);
   if (SEM_NEG_T.test(before) || SEM_NEG_S.test(sent)) return { st: 'negada', motivo: 'a frase nega a necessidade ou o uso', frase: sent.trim() };
   if (SEM_RES.test(sent) && !SEM_CONTRA.test(sent)) return { st: 'resolvida', motivo: 'a frase indica problema já resolvido ou solução já implantada', frase: sent.trim() };
-  if (SEM_HIST.test(sent) && !/\b(?:hoje(?!,?\s*n[aã]o)|atualmente(?!,?\s*n[aã]o)|ainda(?!\s+n[aã]o)|continua|segue)\b/i.test(sent)) return { st: 'historica', motivo: 'menção a período passado', frase: sent.trim() };
+  if (semHist(sent) && !/\b(?:hoje(?!,?\s*n[aã]o)|atualmente(?!,?\s*n[aã]o)|ainda(?!\s+n[aã]o)|continua|segue)\b/i.test(sent)) return { st: 'historica', motivo: 'menção a período passado', frase: sent.trim() };
   return { st: 'atual', motivo: '', frase: sent.trim() };
 }
 function semHits(c, need) {
@@ -40,7 +60,7 @@ function semHits(c, need) {
       if (!rx) return; const g = new RegExp(rx.source, rx.flags.replace('g', '') + 'g'); let m;
       while ((m = g.exec(t))) {
         if (!m[0].length) { g.lastIndex++; continue; } if (seen.has(m.index)) continue; seen.add(m.index);
-        const e = semEstado(t, m.index, m[0].length), h = { term: m[0], src: p.src, snip: snippet(t, m.index), st: e.st, motivo: e.motivo, frase: e.frase, via: ri ? 'sinônimo' : 'termo' };
+        const e = semEstado(t, m.index, m[0].length); if (e.st === 'atual' && !ri && semGenerico(need, m[0], e.frase)) { e.st = 'generica'; e.motivo = 'termo genérico sem indício de dificuldade ou processo manual na mesma frase'; } const h = { term: m[0], src: p.src, snip: snippet(t, m.index), st: e.st, motivo: e.motivo, frase: e.frase, via: ri ? 'sinônimo' : 'termo' };
         if (e.st === 'atual') { if (na < 3) { out.push(h); na++; } } else if (ni < 3) { out.push(h); ni++; }
       }
     });
@@ -142,7 +162,7 @@ function semOpps(c) {
   });
 }
 /* ---------- interface ---------- */
-const SEM_ST = { atual: ['atual', 'ok'], negada: ['negada', 'off'], historica: ['histórica', 'warn'], resolvida: ['resolvida', 'warn'], incerta: ['incerta', 'warn'] };
+const SEM_ST = { atual: ['atual', 'ok'], generica: ['genérica', 'off'], negada: ['negada', 'off'], historica: ['histórica', 'warn'], resolvida: ['resolvida', 'warn'], incerta: ['incerta', 'warn'] };
 function semPanel(c) {
   const e = UI.sem?.key === c.key ? UI.sem : null, T = aiTarefa('semantica'), st = iaStatusOf(T.prov), ign = needIgnorados(c), s = c.semIA, I = semIdx();
   let h = `<h4>Análise semântica ${chip('INFERÊNCIA')}</h4><p class="sm"><b>Camada local ativa</b> (sem IA): reconhece paráfrases e sinônimos por necessidade, e separa necessidade <b>atual</b> de menção negada, histórica ou problema resolvido. Base de Soluções indexada: ${I.chunks.length} trecho(s) em ${new Set(I.chunks.map(x => x.sid)).size} solução(ões). Similaridade textual não prova necessidade.</p>`;

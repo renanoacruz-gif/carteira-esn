@@ -64,14 +64,14 @@ const modalidadeRe = /modalidade[^\n:]{0,25}:\s*[^\n]{3,40}/i;
 
 /* Necessidades (palavras que, na planilha/observações/documentos do próprio cliente, indicam evidência individual) */
 const NEEDS = {
- fiscal:/tribut|fiscal|reforma|\bibs\b|\bcbs\b|nf-?e|nfs-?e|nota fiscal|icms|sped|cfop|\bncm\b|classifica[cç][aã]o tribut/i,
+ fiscal:/tribut|fiscal|reforma tribut\w*|\bibs\b|\bcbs\b|\bnf-?e\b|\bnfs-?e\b|nota fiscal|\bicms\b|\bsped\b|\bcfop\b|\bncm\b|classifica[cç][aã]o tribut/i,
  sst:/\bsst\b|nr-?1\b|nr-?17|psicossoc|absente|afastament|esocial|\bpgr\b|\bgro\b|sa[uú]de ocupacional|banco de horas|hora extra|jornada|\bponto\b/i,
  financeiro:/capital de giro|inadimpl|cobran[cç]a|boleto|concilia|antecip|prazo de pagamento|receb[ií]ve|fluxo de caixa|\bpix\b|contas a (pagar|receber)/i,
- processos:/aprova[cç]|workflow|fluxo de trabalho|processo manual|papel\b|documentos?\b|assinatura|planilha|\bged\b|protocolo|solicita[cç]/i,
+ processos:/\baprova[cç]\w*|workflow|fluxo de trabalho|processo manual|\bpapel\b|\bdocumentos?\b|assinatura|planilha|\bged\b|\bprotocolo\b|\bsolicita[cç]\w*/i,
  producao:/produ[cç][aã]o|\bpcp\b|\boee\b|paradas?\b|apontamento|ch[aã]o de f[aá]brica|capacidade|programa[cç][aã]o|perdas?\b|retrabalho|manuten[cç]/i,
  analytics:/dashboard|indicador|\bkpi\b|\bbi\b|relat[oó]rio|funil|pipeline|forecast|comiss/i,
- logistica:/entrega|\brotas?\b|frota|expedi[cç]|armaz[eé]m|\bcd\b|picking|estoque|separa[cç][aã]o|agendamento|doca|transporte|frete/i,
- sustentacao:/\bscc\b|sustenta[cç]|chamados?\b|upgrade|release|vers[aã]o|atualiza[cç]|lentid|banco de dados|backup|homologa|infra/i,
+ logistica:/\bentregas?\b|\brotas?\b|frota|expedi[cç]|armaz[eé]m|\bcd\b|picking|estoque|separa[cç][aã]o|agendamento|doca|transporte|frete/i,
+ sustentacao:/\bscc\b|sustenta[cç]|\bchamados?\b|\bupgrade\b|\brelease\b|vers[aã]o(?![\wÀ-ÿ])|atualiza[cç]|lentid|banco de dados|\bbackup\b|homologa|\binfra(?:estrutura)?\b/i,
  treinamento:/treinamento|capacita|ado[cç][aã]o|uso do sistema|parametriza|customiza|\bgap\b/i,
  nfse:/nfs-?e|nota de servi[cç]o|\biss\b|munic[ií]pi/i,
  obras:/\bobras?\b|empreendimento|medi[cç][aã]o|canteiro|or[cç]amento de obra|engenharia/i,

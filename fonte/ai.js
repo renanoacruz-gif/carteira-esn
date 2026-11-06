@@ -112,7 +112,8 @@ function aiStatus() {
 }
 
 async function aiPack() {
-  if (!window.JSZip) { offer('worker.js', WORKER_SRC); return toast('JSZip indisponível: baixado só worker.js (veja wrangler.toml e LEIAME no aplicativo).'); }
+  if (!WORKER_SRC) return toast('Pacote do backend indisponível nesta versão (o backend é este servidor).');
+  if (!(await vend('jszip'))) { offer('worker.js', WORKER_SRC); return toast('JSZip indisponível: baixado só worker.js (veja wrangler.toml e LEIAME no aplicativo).'); }
   const z = new JSZip(); z.file('worker.js', WORKER_SRC); z.file('wrangler.toml', WORKER_TOML); z.file('LEIAME.md', WORKER_README);
   offer('backend-gemini-carteira.zip', await z.generateAsync({ type: 'blob' }));
 }

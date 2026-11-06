@@ -68,7 +68,7 @@ const OP0 = new Set(Object.getOwnPropertyNames(Object.prototype));
 async function readTable(file, buf) {
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'csv' || ext === 'txt' && /[;,\t]/.test(decodeText(buf).slice(0, 500))) return { sheets: [{ name: 'CSV', rows: parseCSV(decodeText(buf)) }] };
-  if (!window.XLSX) throw new Error('Biblioteca XLSX indisponível neste ambiente (CDN bloqueado?).');
+  if (!(await vend('xlsx'))) throw new Error('Biblioteca XLSX indisponível neste ambiente (CDN bloqueado?).');
   const p0 = Object.getOwnPropertyNames(Object.prototype).length; /* defesa em profundidade: CVE-2023-30533 (poluição de protótipo no SheetJS < 0.19.3) */
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   if (Object.getOwnPropertyNames(Object.prototype).length !== p0) { for (const k of Object.getOwnPropertyNames(Object.prototype)) if (!OP0.has(k)) delete Object.prototype[k]; throw new Error('Planilha rejeitada: tentativa de alterar objetos internos do navegador.'); }
@@ -76,7 +76,7 @@ async function readTable(file, buf) {
 }
 /* PDF: devolve linhas {p, text} reconstruídas por coordenadas. PDFs escaneados (sem camada de texto) NÃO são lidos (sem OCR). */
 async function readPdf(buf) {
-  if (!window.pdfjsLib) throw new Error('Biblioteca PDF indisponível neste ambiente (CDN bloqueado?).');
+  if (!(await vend('pdfjs'))) throw new Error('Biblioteca PDF indisponível neste ambiente (CDN bloqueado?).');
   let pdf, last;
   for (const src of [PDF_WORKER, PDF_WORKER_DIRECT]) { try { pdfjsLib.GlobalWorkerOptions.workerSrc = src; pdf = await pdfjsLib.getDocument({ data: buf.slice(0), isEvalSupported: false }).promise; break; } catch (e) { last = e; } }
   if (!pdf) throw last || new Error('Falha ao abrir o PDF.');
@@ -480,7 +480,7 @@ function analyzeClient(c, st) {
   c.conflicts = conflicts(c);
   c.doc = docStatus(c);
   c.opps = buildOpps(c, st.meta.weights);
-  c.opps = unifyOpps(c, [...c.opps, ...consOpps(c), ...solContentOpps(c), ...adocaoOpps(c), ...semOpps(c)]); sgPost(c); semPost(c);
+  { const base = [...c.opps, ...consOpps(c), ...solContentOpps(c), ...adocaoOpps(c), ...semOpps(c), ...fsOpps(c), ...cmpOpps(c), ...relOpps(c)]; const dOp = dorOpps(c, base), tOp = dtOpps(c, base); c.opps = unifyOpps(c, [...base, ...dOp, ...tOp]); } sgPost(c); semPost(c); c.opps.forEach(o => { o.origemTipo = oppOrigemTipos(o); });
   c.topScore = c.opps[0]?.score ?? null;
   c.topConf = c.opps[0]?.conf ?? null;
   c.fstat = fichaStatus(c, refCompOf(st));

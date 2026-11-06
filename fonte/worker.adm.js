@@ -20,12 +20,13 @@ const ADM_FUNCS = {
   relatorio_exportar: { rot: 'Exportação de relatório', util: 1, org: 'c' },
   dados_backup: { rot: 'Backup, restauração e limpeza', util: 0, org: 'c' },
   integracao_teste: { rot: 'Teste de integração', util: 0, org: 'sc' },
-  coleta_falha: { rot: 'Falha da coleta (relatada pelo navegador)', util: 0, org: 'c' }
+  coleta_falha: { rot: 'Falha da coleta (relatada pelo navegador)', util: 0, org: 'c' },
+  desempenho_abertura: { rot: 'Desempenho da abertura (tempos do navegador)', util: 0, org: 'c' }
 };
 const ADM_PRINCIPAIS = ['import_carteira', 'ficha_upload', 'raiox_gerar', 'diag_abrir', 'recomendacao_leitura', 'pesquisa_ic'];
 const ADM_CFG0 = { inatividade_dias: 14, sessao_min: 30, retencao_dias: 180, principais: ADM_PRINCIPAIS };
 const ADM_FASES = ['iniciada', 'concluida', 'erro'], ADM_RES = ['ok', 'parcial', 'erro', 'cancelado'];
-const ADM_NUM = ['n', 'n_ok', 'n_erro', 'n_dup', 'n_pend', 'clientes', 'itens', 'conc'];
+const ADM_NUM = ['n', 'n_ok', 'n_erro', 'n_dup', 'n_pend', 'clientes', 'itens', 'conc', 'fcp_ms', 'lcp_ms', 'pronto_ms', 'cls_m'];
 const ADM_ENUM = { via: ['link', 'arquivo', 'texto', 'backend', 'pagina', 'manual', 'direto'], tipo: ['pdf', 'json', 'csv', 'html', 'xlsx', 'raiox', 'ficha', 'doc', 'imagem', 'carteira', 'backup', 'cliente', 'segmento', 'produto', 'regulatorio', 'marcos', 'teste', 'status', 'ia', 'oportunidades'], leitura: ['faz_sentido', 'investigar', 'ja_atendida', 'descartar', 'validada', 'descartada'], op: ['export', 'import', 'limpar', 'restaurar'], modo: ['lote', 'individual', 'auto'] };
 const ADM_COD = /^[a-z0-9_]{1,40}$/, ADM_ID = /^[A-Za-z0-9_\-]{1,64}$/;
 const ADM_MEM = { init: null, falhas: 0, ultimaFalha: '', rate: new Map() };

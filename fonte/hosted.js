@@ -15,13 +15,25 @@ const hkNomeEmail = e => String(e || '').split('@')[0].split(/[._\-+]+/).filter(
 if (HOST && !window.claude) {
   const segEnc = s => String(s).replace(/[^A-Za-z0-9_.@+:\-]/g, ch => [...new TextEncoder().encode(ch)].map(b => '~' + b.toString(16).padStart(2, '0')).join(''));
   const segDec = s => { try { const b = []; for (let i = 0; i < s.length; i++) { if (s[i] === '~' && /^[0-9a-f]{2}$/i.test(s.slice(i + 1, i + 3))) { b.push(parseInt(s.slice(i + 1, i + 3), 16)); i += 2; } else b.push(...new TextEncoder().encode(s[i])); } return new TextDecoder().decode(new Uint8Array(b)); } catch { return s; } };
-  const api = async (rota, corpo) => {
-    let r; try { r = await fetch(rota, { method: corpo ? 'POST' : 'GET', headers: corpo ? { 'content-type': 'application/json' } : {}, body: corpo ? JSON.stringify(corpo) : undefined, credentials: 'same-origin', redirect: 'manual' }); }
-    catch { throw Object.assign(new Error('Sem conexão com o servidor.'), { code: 'rede' }); }
+  /* Item 12: tempo limite por requisição (leitura 30 s, escrita 60 s) e 1 nova tentativa só para LEITURA (get/list/me) em falha de rede ou tempo esgotado; escrita nunca é repetida aqui (a fila do flush recoloca o item). Valores sobrescrevíveis só por window.__apiTo (testes). */
+  const apiUma = async (rota, corpo, leitura) => {
+    const to = window.__apiTo || { r: 30000, w: 60000 }, ac = new AbortController(); let estourou = false;
+    const tm = setTimeout(() => { estourou = true; ac.abort(); }, leitura ? to.r : to.w);
+    try {
+    let r; try { r = await fetch(rota, { method: corpo ? 'POST' : 'GET', headers: corpo ? { 'content-type': 'application/json' } : {}, body: corpo ? JSON.stringify(corpo) : undefined, credentials: 'same-origin', redirect: 'manual', signal: ac.signal }); }
+    catch { throw estourou ? Object.assign(new Error('O servidor demorou a responder.'), { code: 'tempo_esgotado' }) : Object.assign(new Error('Sem conexão com o servidor.'), { code: 'rede' }); }
     if (r.type === 'opaqueredirect' || r.status === 302) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' });
     let j; try { j = await r.json(); } catch { if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' }); throw Object.assign(new Error('Resposta inválida do servidor (HTTP ' + r.status + ').'), { code: 'http_' + r.status }); }
     if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual });
     return j;
+    } finally { clearTimeout(tm); }
+  };
+  const api = async (rota, corpo) => {
+    const leitura = !corpo || corpo.op === 'get' || corpo.op === 'list';
+    for (let t = 0; ; t++) {
+      try { return await apiUma(rota, corpo, leitura); }
+      catch (e) { if (!(leitura && t < 1 && (e.code === 'rede' || e.code === 'tempo_esgotado'))) throw e; await new Promise(r => setTimeout(r, 500)); }
+    }
   };
   let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
   const lastGet = {};

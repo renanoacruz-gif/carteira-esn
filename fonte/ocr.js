@@ -120,7 +120,7 @@ function ocrCard(rec) {
     <div class="row sm">${cl ? `<button class="btn pri sm" data-a="ocInc" data-id="${esc(rec.id)}">${rec.incorporado ? 'Atualizar no cliente' : 'Incorporar ao cliente (como indício)'}</button><button class="btn ghost sm" data-a="open" data-k="${esc(cl.key)}">Abrir cliente</button>` : ''}</div>`;
   }
   h += `<div class="row sm"><button class="btn ghost sm" data-a="ocVer" data-id="${esc(rec.id)}">${UI.oc.ver === rec.id ? 'Ocultar original' : 'Ver original'}</button><button class="btn ghost sm" data-a="ocDel" data-id="${esc(rec.id)}">Excluir</button></div>`;
-  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : `<img alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">`;
+  if (UI.oc.ver === rec.id) h += rec.mime === 'application/pdf' ? `<p class="sm muted">Original em PDF guardado (${rec.n} parte(s)); abra pelo seu arquivo de origem.</p>` : `<img loading="lazy" decoding="async" alt="Original enviado: ${esc(rec.nome)}" src="data:${rec.mime};base64,${ocImgB64(rec.id)}" style="max-width:100%;max-height:420px;border:1px solid var(--bd);border-radius:6px">`;
   return h + '</div>';
 }
 function ocrPanel() {

@@ -130,10 +130,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Tab' && UI.confirm && MODALS[UI.confirm]) { const f = [...$('#modal').querySelectorAll('button')]; if (!f.length) return; const i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } }
   if (e.key === 'Tab' && UI.sbOpen && isMobile()) { const f = [...$('#sb').querySelectorAll('button')]; const i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } }
   if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.isContentEditable) { e.preventDefault(); $('#gq')?.focus(); }
-  if (e.key === 'Enter' && e.target.id === 'gq') { const f = $('#gres .gr'); if (f) { e.preventDefault(); f.click(); } }
-  if (e.key === 'ArrowDown' && e.target.id === 'gq') { $('#gres .gr')?.focus(); }
+  if (e.key === 'Enter' && e.target.id === 'gq') { deb.flush('gq'); const f = $('#gres .gr'); if (f) { e.preventDefault(); f.click(); } }
+  if (e.key === 'ArrowDown' && e.target.id === 'gq') { deb.flush('gq'); $('#gres .gr')?.focus(); }
   if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target.classList?.contains('gr')) { e.preventDefault(); (e.key === 'ArrowDown' ? e.target.nextElementSibling : e.target.previousElementSibling)?.focus?.(); }
 });
-document.addEventListener('input', e => { if (e.target.id === 'gq') gSearch(e.target.value); });
+document.addEventListener('input', e => { if (e.target.id === 'gq') { const v = e.target.value; deb('gq', () => gSearch(v), 90); } });
 document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { const g = $('#gres'); if (g && !g.hidden) g.hidden = true; } });
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });

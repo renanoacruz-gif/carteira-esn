@@ -118,7 +118,7 @@ function extractTable(sh, file) {
 function zipGuard(z) { if (Object.keys(z.files).length > 20000) throw new Error('Arquivo compactado com entradas demais (possível arquivo malicioso); não foi lido.'); }
 async function zipTxt(f) { const n = f && f._data && f._data.uncompressedSize; if (n > 60e6) throw new Error('Conteúdo descompactado acima de 60 MB (possível arquivo malicioso); não foi lido.'); return f.async('string'); }
 async function readDocx(buf) {
-  if (!window.JSZip) throw new Error('Biblioteca DOCX (JSZip) indisponível neste ambiente.');
+  if (!(await vend('jszip'))) throw new Error('Biblioteca DOCX (JSZip) indisponível neste ambiente.');
   const z = await JSZip.loadAsync(buf); zipGuard(z); const f = z.file('word/document.xml'); if (!f) throw new Error('DOCX inválido: word/document.xml ausente.');
   const doc = new DOMParser().parseFromString(await zipTxt(f), 'application/xml'); if (doc.querySelector('parsererror')) throw new Error('DOCX inválido: XML do documento ilegível.');
   const body = [...doc.getElementsByTagName('*')].find(n => n.localName === 'body'); if (!body) throw new Error('DOCX inválido: corpo ausente.');
@@ -136,7 +136,7 @@ async function readDocx(buf) {
 }
 
 async function readPptx(buf) {
-  if (!window.JSZip) throw new Error('Biblioteca (JSZip) indisponível neste ambiente.');
+  if (!(await vend('jszip'))) throw new Error('Biblioteca (JSZip) indisponível neste ambiente.');
   const z = await JSZip.loadAsync(buf); zipGuard(z); const names = Object.keys(z.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => +a.match(/(\d+)\.xml/)[1] - +b.match(/(\d+)\.xml/)[1]); const out = [];
   for (const n of names) { const xml = await zipTxt(z.file(n)); const sl = +n.match(/(\d+)\.xml/)[1];
     xml.split(/<\/a:p>/).forEach(p => { const t = (p.match(/<a:t[^>]*>[^<]*<\/a:t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join('').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim(); if (t) out.push({ text: t, loc: 'slide ' + sl }); }); }
