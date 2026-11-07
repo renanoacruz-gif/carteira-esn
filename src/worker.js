@@ -999,6 +999,7 @@ async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg; if (!admDb(env)) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503);
   try {
     if (url.pathname === '/api/adm/resumo' && req.method === 'GET') return J({ ok: true, ...(await admResumo(env, url)) });
+    if (url.pathname === '/api/adm/lembrete' && req.method === 'GET') return J({ ok: true, ...(await pushAdocao(env)) });
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
@@ -1015,7 +1016,7 @@ export { admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
 const PUSH_HOSTS = /^(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)$/;
 const PUSH_MAX_APARELHOS = 5, PUSH_LOTE = 40, PUSH_FALHAS_MAX = 5;
 const PUSH_MEM = { init: null, key: null, rate: new Map() };
-const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)'];
+const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)', 'CREATE TABLE IF NOT EXISTS push_envios (dia TEXT NOT NULL, turno TEXT NOT NULL, aparelhos INTEGER NOT NULL DEFAULT 0, enviados INTEGER NOT NULL DEFAULT 0, pulados_uso INTEGER NOT NULL DEFAULT 0, removidos INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, adiados INTEGER NOT NULL DEFAULT 0, config_invalida INTEGER NOT NULL DEFAULT 0, ts TEXT NOT NULL, PRIMARY KEY(dia,turno))', 'CREATE TABLE IF NOT EXISTS push_resumo (email TEXT PRIMARY KEY, n INTEGER NOT NULL, em TEXT NOT NULL)'];
 const pushB64u = b => { const a = new Uint8Array(b); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const pushUnb64u = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 const pushOk = env => !!(env && env.VAPID_PUBLIC && env.VAPID_PRIVATE);
@@ -1087,6 +1088,10 @@ async function pushRota(req, env, au, url) {
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
     return J({ ok: true, aparelhos: r?.n || 0, horarios: ['09:00', '14:00'], dias: 'seg-sex' });
   }
+  if (p === '/api/push/resumo' && m === 'GET') { /* só o número agregado calculado no navegador do próprio usuário */
+    const r = await db.prepare('SELECT n, em FROM push_resumo WHERE email=?').bind(au.user).first();
+    return J({ ok: true, n: r ? r.n : null, em: r ? r.em : null });
+  }
   if (m !== 'POST') return pushErro('metodo', 'Use POST.', 405);
   const q = await pushCorpo(req); if (q === null) return pushErro('requisicao_invalida', 'Corpo inválido.', 400);
   if (p === '/api/push/inscrever') {
@@ -1097,10 +1102,18 @@ async function pushRota(req, env, au, url) {
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
     return J({ ok: true, aparelhos: r?.n || 0 });
   }
+  if (p === '/api/push/resumo') {
+    const n = q.n; if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 999) return pushErro('requisicao_invalida', 'n deve ser um inteiro entre 0 e 999.', 400);
+    const t = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
+    if (!t || !t.n) return J({ ok: true, ignorado: true }); /* sem aparelho inscrito não guarda nada */
+    await db.prepare('INSERT INTO push_resumo(email,n,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET n=excluded.n, em=excluded.em').bind(au.user, n, new Date().toISOString()).run();
+    return J({ ok: true });
+  }
   if (p === '/api/push/cancelar') {
     if (q.endpoint) await db.prepare('DELETE FROM push_subs WHERE endpoint=? AND email=?').bind(String(q.endpoint).slice(0, 1000), au.user).run();
     else await db.prepare('DELETE FROM push_subs WHERE email=?').bind(au.user).run();
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
+    if (!r || !r.n) await db.prepare('DELETE FROM push_resumo WHERE email=?').bind(au.user).run();
     return J({ ok: true, aparelhos: r?.n || 0 });
   }
   if (p === '/api/push/teste') {
@@ -1126,8 +1139,34 @@ async function pushAgendado(env, quando) {
   const alvo = subs.filter(s => !(s.ua && s.ua >= ini)), pulados = subs.length - alvo.length, lote = alvo.slice(0, PUSH_LOTE), adiados = alvo.length - lote.length;
   const r = await pushLote(env, db, lote.map(s => s.endpoint));
   const res = { dia, turno, aparelhos: subs.length, enviados: r.ok, pulados_uso: pulados, removidos: r.removido, falhas: r.falha + r.auth, config_invalida: r.auth > 0, adiados };
+  await db.prepare('INSERT OR REPLACE INTO push_envios(dia,turno,aparelhos,enviados,pulados_uso,removidos,falhas,adiados,config_invalida,ts) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(dia, turno, res.aparelhos, res.enviados, res.pulados_uso, res.removidos, res.falhas, res.adiados, res.config_invalida ? 1 : 0, new Date().toISOString()).run();
+  await db.prepare('DELETE FROM push_resumo WHERE email NOT IN (SELECT email FROM push_subs)').run(); /* aparelho removido pelo envio: não deixa número órfão */
+  await db.prepare('DELETE FROM push_envios WHERE dia < ?').bind(new Date((quando || Date.now()) - 93 * 86400000).toISOString().slice(0, 10)).run();
   await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('push_ultimo',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify({ ...res, ts: new Date().toISOString() })).run();
   return res;
+}
+
+/* Adoção do lembrete para o painel administrativo: só contagens e alertas, sem e-mails nem endpoints. */
+async function pushAdocao(env, quando) {
+  const cfg = pushOk(env), db = await pushInit(env); if (!db) return { configurado: cfg, indisponivel: true, alertas: [{ codigo: 'sem_banco', texto: 'Banco indisponível: não foi possível consultar os lembretes.' }] };
+  const agora = quando || Date.now(), brt = new Date(agora - 3 * 3600 * 1000), hoje = brt.toISOString().slice(0, 10), min = brt.getUTCHours() * 60 + brt.getUTCMinutes(), dow = brt.getUTCDay();
+  const um = async (sql, ...a) => (await db.prepare(sql).bind(...a).first()) || {};
+  const ap = await um('SELECT COUNT(*) n, COUNT(DISTINCT email) u, SUM(CASE WHEN falhas>0 THEN 1 ELSE 0 END) c FROM push_subs');
+  const resumos = await um('SELECT COUNT(*) n FROM push_resumo WHERE em >= ?', new Date(agora - 5 * 86400000).toISOString());
+  const dia0 = d => new Date(agora - 3 * 3600000 - d * 86400000).toISOString().slice(0, 10);
+  const hist = ((await db.prepare('SELECT dia,turno,aparelhos,enviados,pulados_uso,removidos,falhas,adiados,config_invalida,ts FROM push_envios WHERE dia >= ? ORDER BY dia DESC, turno ASC').bind(dia0(17)).all()).results || []);
+  const s7 = hist.filter(x => x.dia >= dia0(6)).reduce((a, x) => { a.enviados += x.enviados; a.pulados_uso += x.pulados_uso; a.falhas += x.falhas; a.removidos += x.removidos; a.turnos++; return a; }, { enviados: 0, pulados_uso: 0, falhas: 0, removidos: 0, turnos: 0 });
+  const alertas = [], tem = (d, t) => hist.some(x => x.dia === d && x.turno === t);
+  if (!cfg && ap.n > 0) alertas.push({ codigo: 'vapid_ausente', texto: 'Chaves VAPID ausentes no Worker: há ' + ap.n + ' aparelho(s) inscrito(s), mas nenhum lembrete é enviado.' });
+  if (dow >= 1 && dow <= 5 && ap.n > 0) {
+    if (min >= 9 * 60 + 30 && !tem(hoje, 'manha')) alertas.push({ codigo: 'turno_nao_executou', texto: 'O turno das 09:00 de hoje não foi registrado.' });
+    if (min >= 14 * 60 + 30 && !tem(hoje, 'tarde')) alertas.push({ codigo: 'turno_nao_executou', texto: 'O turno das 14:00 de hoje não foi registrado.' });
+  }
+  const ult = hist.slice().sort((a, b) => (b.ts > a.ts ? 1 : -1))[0];
+  if (ult && ult.config_invalida) alertas.push({ codigo: 'config_invalida', texto: 'O último turno (' + ult.dia + ', ' + (ult.turno === 'manha' ? '09:00' : '14:00') + ') foi recusado pelo serviço de push: confira as chaves VAPID.' });
+  const rec = hist.slice().sort((a, b) => (b.ts > a.ts ? 1 : -1)).slice(0, 3), tent = rec.reduce((a, x) => a + x.enviados + x.falhas, 0), fal = rec.reduce((a, x) => a + x.falhas, 0);
+  if (tent >= 3 && fal / tent >= 0.5) alertas.push({ codigo: 'falhas_altas', texto: 'Falhas em ' + fal + ' de ' + tent + ' envios nos últimos turnos.' });
+  return { configurado: cfg, aparelhos: ap.n || 0, usuarios: ap.u || 0, aparelhos_com_falha: ap.c || 0, com_resumo_recente: resumos.n || 0, ultimos_7_dias: s7, historico: hist.slice(0, 28), alertas };
 }
 
 export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { ctx.waitUntil(pushAgendado(env, ev && ev.scheduledTime).catch(e => console.error('push_agendado', e && e.name))); } };
