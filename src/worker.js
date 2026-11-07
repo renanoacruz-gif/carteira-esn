@@ -1076,7 +1076,10 @@ const pushErro = (codigo, mensagem, status) => J({ ok: false, erro: { codigo, me
 async function pushRota(req, env, au, url) {
   if (!au.user) return pushErro('nao_autorizado', 'Lembretes exigem identidade.', 401);
   const p = url.pathname, m = req.method;
-  if (!pushOk(env)) return pushErro('nao_configurado', 'Lembrete diário ainda não configurado pelo administrador.', 503);
+  if (!pushOk(env)) { /* diagnóstico sem valores: só estado e nomes das chaves parecidas */
+    const est = k => env[k] === undefined ? 'ausente' : (typeof env[k] === 'string' && env[k].trim() ? 'ok' : 'vazio');
+    return J({ ok: false, erro: { codigo: 'nao_configurado', mensagem: 'Lembrete diário ainda não configurado pelo administrador.' }, diag: { VAPID_PUBLIC: est('VAPID_PUBLIC'), VAPID_PRIVATE: est('VAPID_PRIVATE'), nomes_vapid: Object.keys(env).filter(k => /vapid/i.test(k)).map(k => JSON.stringify(k)) } }, 503);
+  }
   if (p === '/api/push/chave' && m === 'GET') return J({ ok: true, chave: env.VAPID_PUBLIC });
   if (pushLimite(au.user, 'geral', 60)) return pushErro('limite', 'Muitos pedidos. Aguarde um minuto.', 429);
   const db = await pushInit(env); if (!db) return pushErro('indisponivel', 'Banco indisponível.', 503);
