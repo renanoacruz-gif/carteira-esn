@@ -1,7 +1,7 @@
 # Conteúdo das páginas legais. Fatos técnicos conferidos no código (worker.js, adm.js, schema, wrangler.toml, README).
 CONTATO = 'renan.oscar@totvs.com.br'
-DATA = '06/11/2026'
-VERSAO = '1.1'
+DATA = '07/11/2026'
+VERSAO = '1.2'
 
 def tb(head, rows):
     h = ''.join(f'<th>{c}</th>' for c in head)
@@ -76,7 +76,7 @@ PAGES['privacidade'] = dict(
     ['<b>Registro de uso</b>: recurso usado, data e hora, resultado, tempo de processamento, e-mail do usuário e medidas de desempenho da abertura (tempos do navegador e quantidade de clientes)','Acompanhar adoção e funcionamento, e medir desempenho','Nunca grava conteúdo de fichas, prints, pesquisas, contratos ou respostas de IA, nem nomes de clientes, CNPJs ou valores'],
     ['<b>Tentativas de acesso negadas</b>: data, e-mail informado, motivo e rota','Segurança','Guardadas por 90 dias'],
     ['<b>Observações de segurança do navegador</b>: regra de segurança acionada e destino bloqueado, com contagem','Segurança e correção de falhas','Sem identificação de usuário'],
-    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro e contagem de falhas de envio','Avisar às 8h30 dos dias úteis, só se você ainda não abriu o sistema no dia','Só existe se você ativar. Não leva dados da carteira. Pode desativar a qualquer momento em Conta'],
+    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro e contagem de falhas de envio','Avisar às 9h e às 14h dos dias úteis, só se você ainda não abriu o sistema no período','Só existe se você ativar. Não leva dados da carteira. Pode desativar a qualquer momento em Conta'],
     ['<b>Preferências locais</b>: chave de IA, avisos já vistos e configurações, no armazenamento do seu navegador','Funcionamento do sistema','Ficam no seu navegador; a chave de IA não é gravada pelo servidor'],
   ])+'''<p>As páginas públicas (landing e documentos) não usam cookies de rastreamento nem ferramentas de análise de audiência.</p>'''),
   ('Base legal', '''<p>O tratamento tem como base, em regra, o <b>legítimo interesse</b> da TOTVS na gestão da sua operação comercial e na segurança do ambiente (LGPD, art. 7º, IX) e, quando aplicável, a execução das atividades decorrentes da relação de trabalho e de contratos com clientes (art. 7º, V). As bases são definidas e validadas pelo controlador e pelo Encarregado.</p>'''),

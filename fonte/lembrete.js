@@ -1,4 +1,4 @@
-/* Lembrete diário 8h30 (seg-sex) por notificação do navegador (Web Push). Estado em memória; "agora não" fica em localStorage. */
+/* Lembretes 9h e 14h (seg-sex) por notificação do navegador (Web Push). Estado em memória; "agora não" fica em localStorage. */
 const LEM = { st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
 try {
   LEM.sup = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -28,14 +28,14 @@ function lemGarantir() { if (LEM.st === null) { LEM.st = { cfg: false, carregand
 function lemBanner() {
   lemGarantir();
   if (!LEM.sup || !LEM.st || !LEM.st.cfg || LEM.local || lsGet('lem.nao') === '1' || Notification.permission === 'denied') return '';
-  return `<div class="card" id="lem-b"><div class="row"><b>Lembrete diário às 8h30</b><span class="sp"></span><button class="btn ghost sm" data-a="lemFechar">Agora não</button></div><p class="sm">Receba um aviso neste aparelho nos dias úteis, somente se você ainda não tiver aberto a ferramenta no dia.</p><button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar lembrete</button></div>`;
+  return `<div class="card" id="lem-b"><div class="row"><b>Lembretes às 9h e às 14h</b><span class="sp"></span><button class="btn ghost sm" data-a="lemFechar">Agora não</button></div><p class="sm">Receba dois avisos neste aparelho nos dias úteis. O da manhã só vem se você ainda não abriu a ferramenta no dia, e o da tarde só se não abriu desde o meio-dia.</p><button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar lembrete</button></div>`;
 }
 function lemCard() {
   lemGarantir();
   let h = '<div class="card" id="lem"><h3>Lembrete diário</h3>';
   if (!LEM.st || LEM.st.carregando) return h + '<p class="sm muted">Verificando…</p></div>';
   if (!LEM.st.cfg) return h + `<p class="sm muted">${LEM.st.erro ? 'Não foi possível consultar o lembrete agora. Tente novamente mais tarde.' : 'Ainda não ativado pelo administrador da ferramenta.'}</p></div>`;
-  h += '<p class="sm">Notificação às 8h30 (Brasília), de segunda a sexta, somente se você ainda não abriu a ferramenta no dia. Guardamos apenas seu e-mail e o endereço de notificação deste aparelho, nunca dados da carteira.</p>';
+  h += '<p class="sm">Notificações às 9h e às 14h (Brasília), de segunda a sexta. A das 9h só vem se você ainda não abriu a ferramenta no dia, e a das 14h só se não abriu desde o meio-dia. Guardamos apenas seu e-mail e o endereço de notificação deste aparelho, nunca dados da carteira.</p>';
   if (!LEM.sup) h += `<p class="sm muted">${LEM.ios ? 'No iPhone/iPad (iOS 16.4 ou superior): toque em Compartilhar → Adicionar à Tela de Início, abra pelo ícone e ative aqui.' : 'Este navegador não oferece notificações.'}</p>`;
   else if (Notification.permission === 'denied') h += '<p class="sm muted">Notificações bloqueadas neste navegador. Libere nas configurações do site e volte aqui.</p>';
   else h += `<div class="row">${LEM.local ? `<span class="pill p-info">Ativo neste aparelho</span><span class="sp"></span><button class="btn ghost sm" data-a="lemTeste" ${LEM.busy ? 'disabled' : ''}>Enviar teste</button><button class="btn ghost sm" data-a="lemOff" ${LEM.busy ? 'disabled' : ''}>Desativar</button>` : `<button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar neste aparelho</button>`}</div>`;

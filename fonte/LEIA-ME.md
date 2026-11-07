@@ -38,10 +38,10 @@ Regra central: **"não identificado nos documentos" ≠ "cliente não possui"**.
 - `t66.py` (56 checagens de segurança). Rodar com o servidor de teste em :8790; opcionalmente `/tmp/vapid_prod.txt` para conferir que a chave privada não está no repo.
 - Relatório: `rodada19_auditoria_seguranca.html`.
 
-## Lembrete diário 8h30 (branch `feat/lembrete-diario`)
-- Web Push **sem conteúdo**: cron `30 11 * * MON-FRI` (08:30 de Brasília, UTC-3) → Worker envia push vazio a cada aparelho inscrito → `public/sw.js` mostra texto fixo. Pula quem abriu o sistema no dia (`usuarios.ultimo_acesso` ≥ 00:00 BRT). Feriados não tratados.
+## Lembretes 9h e 14h (branches `feat/lembrete-diario`, `feat/lembrete-duas-vezes`)
+- Web Push **sem conteúdo**: crons `0 12 * * MON-FRI` (09:00 de Brasília, UTC-3) e `0 17 * * MON-FRI` (14:00) → Worker envia push vazio a cada aparelho inscrito → `public/sw.js` mostra texto fixo. Turno da manhã pula quem abriu o sistema desde 00:00 BRT; turno da tarde pula quem abriu desde 12:00 BRT (`usuarios.ultimo_acesso`). O texto da notificação é escolhido pelo SW pela hora local do aparelho (< 12h = manhã). Feriados não tratados.
 - Arquivos: `worker.push.js` (rotas `/api/push/*`, VAPID ES256, cron), `sw.js`, `lembrete.js` (banner no painel + cartão em Conta), `gerar_vapid.mjs`, `t65.py`.
-- Tabela `push_subs(endpoint, email, criado_em, ultimo_ok, falhas)`, criada em execução. Máx. 5 aparelhos por conta; 404/410 removem; 5 falhas seguidas removem; no máx. 40 envios por execução (limite de 50 subrequests do plano Free); trava diária em `adm_cfg.push_dia`; resumo em `adm_cfg.push_ultimo`.
+- Tabela `push_subs(endpoint, email, criado_em, ultimo_ok, falhas)`, criada em execução. Máx. 5 aparelhos por conta; 404/410 removem; 5 falhas seguidas removem; no máx. 40 envios por execução (limite de 50 subrequests do plano Free); trava por turno em `adm_cfg.push_dia_manha` e `push_dia_tarde`; resumo em `adm_cfg.push_ultimo`.
 - SSRF: endpoint só de FCM, Mozilla, Apple e WNS, https, sem porta/credenciais. `127.0.0.1` só com `ALLOW_TEST_USER=1`.
 - **Ativar em produção:** `node fonte/gerar_vapid.mjs` → cadastrar `VAPID_PUBLIC` e `VAPID_PRIVATE` como *Secret* no Worker (Settings → Variables and Secrets). Sem eles o recurso fica desligado (rotas 503, cron não faz nada). Opcional: `VAPID_SUBJECT` (`mailto:`), padrão = 1º de `ADMIN_EMAILS`.
 - iPhone: só funciona com o app adicionado à Tela de Início (iOS 16.4+). Entrega é best-effort dos serviços de push.
