@@ -31,6 +31,13 @@ Regra central: **"não identificado nos documentos" ≠ "cliente não possui"**.
 - **H** `dt.js`: gatilhos de data (vigência, renovação, fim de desconto) em fichas e documentos. Data **encontrada** (trecho) ≠ **interpretada** (ISO) ≠ **confirmada** (você). Só confirmada e dentro da janela (`renovDays`) gera oportunidade; competência/vencimento de fatura são ignorados; desconto confirmado anexa evidência à oportunidade de desconto (B) em vez de duplicar. Lembretes contratuais e alertas de sustentação/regulatório inalterados. Teste: `t58.py`.
 - Regressão rodada: t40, t44, t47a/b/c, t48a/b, t49, t49b, t50–t58 (ver /tmp/reg.log da sessão). Validação com dados reais de clientes **não** foi feita: os testes usam dados sintéticos.
 
+## Auditoria de segurança — rodada 19 (branch `sec/auditoria-rodada-19`)
+- Guarda anti-CSRF em `handle()`: escrita em `/api/*` com `Sec-Fetch-Site` cross-site/same-site ou `Origin` de outro host → 403 `origem_invalida`. Sem esses cabeçalhos (clientes não-navegador) segue permitido.
+- `x-test-user` só vale com host localhost/127.0.0.1 (mesmo com `ALLOW_TEST_USER=1`); aparelho de push em `127.0.0.1` idem.
+- Rotas push: 60 pedidos/min e 3 testes/min por usuário.
+- `t66.py` (56 checagens de segurança). Rodar com o servidor de teste em :8790; opcionalmente `/tmp/vapid_prod.txt` para conferir que a chave privada não está no repo.
+- Relatório: `rodada19_auditoria_seguranca.html`.
+
 ## Lembrete diário 8h30 (branch `feat/lembrete-diario`)
 - Web Push **sem conteúdo**: cron `30 11 * * MON-FRI` (08:30 de Brasília, UTC-3) → Worker envia push vazio a cada aparelho inscrito → `public/sw.js` mostra texto fixo. Pula quem abriu o sistema no dia (`usuarios.ultimo_acesso` ≥ 00:00 BRT). Feriados não tratados.
 - Arquivos: `worker.push.js` (rotas `/api/push/*`, VAPID ES256, cron), `sw.js`, `lembrete.js` (banner no painel + cartão em Conta), `gerar_vapid.mjs`, `t65.py`.
