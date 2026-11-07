@@ -258,6 +258,7 @@ async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg; if (!admDb(env)) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503);
   try {
     if (url.pathname === '/api/adm/resumo' && req.method === 'GET') return J({ ok: true, ...(await admResumo(env, url)) });
+    if (url.pathname === '/api/adm/lembrete' && req.method === 'GET') return J({ ok: true, ...(await pushAdocao(env)) });
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });

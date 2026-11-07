@@ -8779,7 +8779,7 @@ const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e 
 function telAvisoUmaVez() { if (!TEL.on) return; try { if (lsGet('adm.aviso') === '1') return; lsSet('adm.aviso', '1'); setTimeout(() => toast('Registramos eventos de uso (recurso, data, resultado), sem conteúdo de carteira. Detalhes em Configurações → Conta.'), 1500); } catch { /* ok */ } }
 
 /* ---------------- Painel Administrador ---------------- */
-const ADMV = { data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', msg: '', rosterTxt: '' };
+const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', msg: '', rosterTxt: '' };
 window.__PAINEL = false;
 function admPainelOn(v) {
   window.__PAINEL = v === true;
@@ -8803,6 +8803,7 @@ async function admLoad() {
     const p = new URLSearchParams(); if (ADMV.de && ADMV.ate) { p.set('de', new Date(ADMV.de + 'T00:00:00').toISOString()); p.set('ate', new Date(ADMV.ate + 'T23:59:59').toISOString()); } else p.set('dias', String(ADMV.dias));
     if (ADMV.func) p.set('func', ADMV.func);
     ADMV.data = await admApi('/api/adm/resumo?' + p.toString());
+    try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
 const admPct = v => v == null ? '—' : (v * 100).toFixed(1).replace('.', ',') + '%';
@@ -8862,8 +8863,20 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
+  h += admLemCard(ADMV.lem);
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
+}
+function admLemCard(l) {
+  if (!l) return '';
+  if (l.erro) return '<div class="card"><h3>Lembretes (push)</h3><div class="sm muted">Não foi possível consultar os lembretes agora.</div></div>';
+  const al = (l.alertas || []).map(a => `<div class="alert d" role="alert"><b>Lembretes:</b> ${esc(a.texto)}</div>`).join('');
+  const t7 = l.ultimos_7_dias || {}, lt = x => x === 'manha' ? '09:00' : '14:00';
+  const k = [['Aparelhos ativos', l.aparelhos], ['Executivos com lembrete', l.usuarios], ['Enviados (7 dias)', t7.enviados || 0], ['Dispensados: já tinham aberto (7 dias)', t7.pulados_uso || 0], ['Falhas (7 dias)', t7.falhas || 0], ['Com resumo recente (5 dias)', l.com_resumo_recente]];
+  return `<div class="card" id="adm-lem"><h3>Lembretes (push) <span class="pill ${l.configurado ? 'p-ok' : 'p-bad'}">${l.configurado ? 'chaves configuradas' : 'chaves ausentes'}</span></h3>${al || '<div class="sm muted">Nenhum alerta.</div>'}
+    <div class="grid g3" style="margin-top:8px">${k.map(([r, v]) => `<div class="card"><div class="sm muted">${esc(r)}</div><b style="font-size:1.4em">${esc(v ?? 0)}</b></div>`).join('')}</div>
+    ${(l.historico || []).length ? `<details class="sm" style="margin-top:8px"><summary>Últimos turnos (${l.historico.length})</summary><div class="tw"><table><thead><tr><th>Dia</th><th>Turno</th><th class="r">Aparelhos</th><th class="r">Enviados</th><th class="r">Já abriram</th><th class="r">Removidos</th><th class="r">Falhas</th><th class="r">Adiados</th></tr></thead><tbody>${l.historico.map(x => `<tr><td>${esc(x.dia)}</td><td>${lt(x.turno)}</td><td class="r">${x.aparelhos}</td><td class="r">${x.enviados}</td><td class="r">${x.pulados_uso}</td><td class="r">${x.removidos}</td><td class="r">${x.falhas}${x.config_invalida ? ' ⚠' : ''}</td><td class="r">${x.adiados}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="sm muted" style="margin-top:8px">Nenhum turno registrado ainda.</div>'}
+    <div class="sm muted" style="margin-top:6px">Mostra só contagens por turno; não há e-mails nem endereços de aparelho aqui. Envio é tentativa: entrega depende do navegador e do sistema do aparelho.</div></div>`;
 }
 function admCsv(d) {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
@@ -8987,6 +9000,28 @@ const LEM_ACT = {
   const h = typeof hojeCard === 'function' ? hojeCard : null, c = typeof vConta === 'function' ? vConta : null;
   if (h) globalThis.hojeCard = function () { return lemBanner() + h(); };
   if (c) globalThis.vConta = function () { return c() + lemCard(); };
+}
+
+/* Resumo para o texto do aviso: o navegador conta os clientes com motivo para aprofundar (mesma regra do card "Onde vale aprofundar hoje")
+   e envia só esse inteiro. O servidor nunca lê a carteira. Só envia neste aparelho com lembrete ativo e com a carteira carregada. */
+const LEMR = { n: null, env: null, t: 0, busy: false, tm: 0 };
+function lemReportar() {
+  clearTimeout(LEMR.tm);
+  LEMR.tm = setTimeout(async () => {
+    try {
+      const n = LEMR.n; if (!LEM.local || LEMR.busy || !Number.isInteger(n) || n < 0 || n > 999) return;
+      if (n === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
+      LEMR.busy = true; const r = await lemApi('/api/push/resumo', { n }); if (r.ok) { LEMR.env = n; LEMR.t = Date.now(); }
+    } catch { /* sem efeito: o aviso volta ao texto geral */ } finally { LEMR.busy = false; }
+  }, 2500);
+}
+{
+  const hi = typeof hojeItens === 'function' ? hojeItens : null;
+  if (hi) globalThis.hojeItens = function () {
+    const out = hi.apply(this, arguments);
+    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; lemReportar(); } } catch { /* sem efeito */ }
+    return out;
+  };
 }
 
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
