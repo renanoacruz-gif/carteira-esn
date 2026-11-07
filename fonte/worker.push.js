@@ -17,11 +17,11 @@ async function pushInit(env) {
   await PUSH_MEM.init; return db;
 }
 /* SSRF: o Worker só envia a serviços de push conhecidos, por https, sem porta nem credenciais */
-function pushEndpointOk(ep, env) {
+function pushEndpointOk(ep, local) {
   try {
     if (typeof ep !== 'string' || ep.length > 1000) return false;
     const u = new URL(ep);
-    if (env.ALLOW_TEST_USER === '1' && u.hostname === '127.0.0.1' && u.protocol === 'http:') return true; /* SOMENTE testes locais */
+    if (local && u.hostname === '127.0.0.1' && u.protocol === 'http:') return true; /* SOMENTE testes locais (servidor em localhost) */
     return u.protocol === 'https:' && !u.username && !u.password && !u.port && PUSH_HOSTS.test(u.hostname);
   } catch { return false; }
 }
@@ -58,6 +58,10 @@ async function pushLote(env, db, lista) {
   const w = async () => { while (i < lista.length) { const ep = lista[i++], st = await pushEnviar(env, ep); if (st === 401 || st === 403) { out.auth++; continue; } out[await pushRegistrarResultado(db, ep, st)]++; } };
   await Promise.all(Array.from({ length: Math.min(5, lista.length) }, w)); return out;
 }
+function pushLimite(user, balde, max) {
+  const now = Date.now(), k = balde + '|' + user, rr = PUSH_MEM.rate.get(k) || { t: now, n: 0 }; if (now - rr.t > 60000) { rr.t = now; rr.n = 0; } rr.n++; PUSH_MEM.rate.set(k, rr); if (PUSH_MEM.rate.size > 500) PUSH_MEM.rate.clear();
+  return rr.n > max;
+}
 const pushCorpo = async (req, max = 2000) => { const t = await req.text(); if (t.length > max) return null; try { return JSON.parse(t || '{}'); } catch { return null; } };
 const pushErro = (codigo, mensagem, status) => J({ ok: false, erro: { codigo, mensagem } }, status);
 async function pushRota(req, env, au, url) {
@@ -65,6 +69,7 @@ async function pushRota(req, env, au, url) {
   const p = url.pathname, m = req.method;
   if (!pushOk(env)) return pushErro('nao_configurado', 'Lembrete diário ainda não configurado pelo administrador.', 503);
   if (p === '/api/push/chave' && m === 'GET') return J({ ok: true, chave: env.VAPID_PUBLIC });
+  if (pushLimite(au.user, 'geral', 60)) return pushErro('limite', 'Muitos pedidos. Aguarde um minuto.', 429);
   const db = await pushInit(env); if (!db) return pushErro('indisponivel', 'Banco indisponível.', 503);
   if (p === '/api/push/status' && m === 'GET') {
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
@@ -73,7 +78,7 @@ async function pushRota(req, env, au, url) {
   if (m !== 'POST') return pushErro('metodo', 'Use POST.', 405);
   const q = await pushCorpo(req); if (q === null) return pushErro('requisicao_invalida', 'Corpo inválido.', 400);
   if (p === '/api/push/inscrever') {
-    if (!pushEndpointOk(q.endpoint, env)) return pushErro('endpoint_invalido', 'Endereço de notificação não aceito.', 400);
+    if (!pushEndpointOk(q.endpoint, testeLocal(req, env))) return pushErro('endpoint_invalido', 'Endereço de notificação não aceito.', 400);
     const agora = new Date().toISOString();
     await db.prepare('INSERT INTO push_subs(endpoint,email,criado_em,falhas) VALUES(?,?,?,0) ON CONFLICT(endpoint) DO UPDATE SET email=excluded.email, falhas=0').bind(q.endpoint, au.user, agora).run();
     await db.prepare('DELETE FROM push_subs WHERE email=? AND endpoint NOT IN (SELECT endpoint FROM push_subs WHERE email=? ORDER BY criado_em DESC LIMIT ?)').bind(au.user, au.user, PUSH_MAX_APARELHOS).run();
@@ -87,8 +92,7 @@ async function pushRota(req, env, au, url) {
     return J({ ok: true, aparelhos: r?.n || 0 });
   }
   if (p === '/api/push/teste') {
-    const now = Date.now(), rr = PUSH_MEM.rate.get(au.user) || { t: now, n: 0 }; if (now - rr.t > 60000) { rr.t = now; rr.n = 0; } rr.n++; PUSH_MEM.rate.set(au.user, rr); if (PUSH_MEM.rate.size > 300) PUSH_MEM.rate.clear();
-    if (rr.n > 3) return pushErro('limite', 'Aguarde um minuto para enviar outro teste.', 429);
+    if (pushLimite(au.user, 'teste', 3)) return pushErro('limite', 'Aguarde um minuto para enviar outro teste.', 429);
     const eps = ((await db.prepare('SELECT endpoint FROM push_subs WHERE email=?').bind(au.user).all()).results || []).map(x => x.endpoint);
     if (!eps.length) return pushErro('sem_aparelho', 'Nenhum aparelho inscrito. Ative o lembrete primeiro.', 404);
     const r = await pushLote(env, db, eps); return J({ ok: true, enviados: r.ok, removidos: r.removido, falhas: r.falha + r.auth, config_invalida: r.auth > 0 });

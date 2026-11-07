@@ -589,11 +589,13 @@ async function accessJwtId(req, env) {
     return (await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(s), new TextEncoder().encode(h + '.' + p))) ? { email: String(pl.email || '').toLowerCase(), sub: String(pl.sub || '') } : NO;
   } catch { return { email: '', sub: '' }; }
 }
+/* Identidade de teste (x-test-user) só vale em localhost, mesmo se ALLOW_TEST_USER for definido por engano em produção. */
+const testeLocal = (req, env) => env.ALLOW_TEST_USER === '1' && /^(localhost|127\.0\.0\.1)$/.test(new URL(req.url).hostname);
 async function authn(req, env, ctx) {
   let email = '', sub = '', verif = false;
   try { if (ctx?.access?.getIdentity) { const id = await ctx.access.getIdentity(); email = String(id?.email || '').toLowerCase(); sub = String(id?.user_uuid || id?.sub || id?.id || ''); verif = !!(email && sub); } } catch { email = ''; sub = ''; verif = false; }
   if (!email) { const j = await accessJwtId(req, env); email = j.email; sub = j.sub; verif = !!(email && sub); }
-  if (!email && env.ALLOW_TEST_USER === '1') { email = String(req.headers.get('x-test-user') || '').toLowerCase(); sub = String(req.headers.get('x-test-sub') || ''); verif = !!sub; } /* SOMENTE testes locais; nunca defina em produção */
+  if (!email && testeLocal(req, env)) { email = String(req.headers.get('x-test-user') || '').toLowerCase(); sub = String(req.headers.get('x-test-sub') || ''); verif = !!sub; } /* SOMENTE testes locais; nunca defina em produção */
   if (email) { if (!EMAIL_RE.test(email) || !email.endsWith('@' + DOMAIN_OK(env))) return { ok: false, erro: { codigo: 'dominio_nao_permitido', mensagem: `Acesso restrito a e-mails @${DOMAIN_OK(env)}.` }, status: 403 }; return { ok: true, user: email, sub, verif, admin: String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).includes(email) }; }
   if (authorized(req, env)) return { ok: true, user: null, admin: false };
   return { ok: false, erro: { codigo: 'nao_autorizado', mensagem: 'Entre pelo Cloudflare Access (e-mail corporativo) ou informe o APP_TOKEN.' }, status: 401 };
@@ -669,6 +671,12 @@ export async function handle(req, env, ctx) {
   env ||= {};
   const cors = corsFor(req, env);
   if (req.method === 'OPTIONS') return new Response(null, { status: cors ? 204 : 403, headers: cors || {} });
+  const ru = new URL(req.url);
+  if (ru.pathname.startsWith('/api/') && !/^(GET|HEAD)$/.test(req.method)) { /* defesa em profundidade contra CSRF (o cookie do Access é enviado pelo navegador): recusa escrita vinda de outro site */
+    const sf = req.headers.get('sec-fetch-site'), og = req.headers.get('origin');
+    let ogOk = true; if (og && og !== 'null') { try { ogOk = new URL(og).host === ru.host || !!(cors && cors['access-control-allow-origin']); } catch { ogOk = false; } } else if (og === 'null') ogOk = false;
+    if ((sf && sf !== 'same-origin' && sf !== 'none') || !ogOk) return J({ ok: false, erro: { codigo: 'origem_invalida', mensagem: 'Requisição de origem não permitida.' } }, 403);
+  }
   let r; try { r = await handleInner(req, env, ctx); } catch (e) { const cid = 'e_' + Math.random().toString(36).slice(2, 10); console.error('erro_interno', cid, e && e.name); r = J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha interna. Informe o código ' + cid + ' ao administrador.' }, correlacao: cid }, 500); }
   if (!cors) return r;
   const h = new Headers(r.headers); Object.entries(cors).forEach(([k, v]) => h.set(k, v)); return new Response(r.body, { status: r.status, headers: h });
