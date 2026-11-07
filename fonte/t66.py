@@ -66,9 +66,9 @@ for f in glob.glob(base+'public/**/*',recursive=True)+[base+'src/worker.js',base
     if pat.search(t) and '/vendor/' not in f: hit.append(f)
 ck('nenhum segredo conhecido no bundle/public/wrangler.toml', not hit, hit)
 import os
-vp=open('/tmp/vapid_prod.txt').read() if os.path.exists('/tmp/vapid_prod.txt') else ''; priv=vp.split('VAPID_PRIVATE=')[1].strip() if 'VAPID_PRIVATE=' in vp else 'sem-arquivo-local-xxxxxxxxxxxx'
+vp=open('/tmp/vapid_prod.txt').read() if os.path.exists('/tmp/vapid_prod.txt') else ''; priv=vp.split('VAPID_PRIVATE=')[1].strip() if 'VAPID_PRIVATE=' in vp else None
 allp=''.join(open(f,errors='ignore').read() for f in glob.glob(base+'**/*',recursive=True) if re.search(r'\.(js|html|toml|md|py|mjs|json|sql)$',f))
-ck('chave VAPID privada de produção não está no repositório', priv not in allp)
+(priv is None) or ck('chave VAPID privada de produção não está no repositório', priv not in allp)
 ck('ALLOW_TEST_USER não definido em wrangler.toml', not re.search(r'^\s*ALLOW_TEST_USER\s*=',open(base+'wrangler.toml').read(),re.M))
 st,b,h=call('/sobre/'); hl={k.lower():v for k,v in h.items()}
 ck('página pública /sobre/ servida', st==200)

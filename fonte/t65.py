@@ -87,7 +87,7 @@ hits.clear(); sched(ms(2026,11,11)); time.sleep(1.5); r=json.loads(d1("SELECT va
 ck('lote limitado a 40 por execução', len(hits)==40 and r['adiados']==5, (len(hits),r))
 # 6) sem segredos: serviço desligado (checagem estática do build)
 src=open('/home/claude/carteira-esn/src/worker.js').read()
-ck('sem VAPID → rotas 503 e cron não faz nada', "pulado: 'nao_configurado'" in src and "'nao_configurado', 'Lembrete diário ainda não configurado" in src)
+ck('sem VAPID → rotas 503 e cron não faz nada', "pulado: 'nao_configurado'" in src and "codigo: 'nao_configurado', mensagem: 'Lembrete diário ainda não configurado" in src and "status 503" not in src and "}, 503);" in src)
 ck('cron declarado em wrangler.toml', 'crons = ["30 11 * * MON-FRI"]' in open('/home/claude/carteira-esn/wrangler.toml').read())
 ck('/sw.js servido sem cache', 'no-cache' in open('/home/claude/carteira-esn/public/_headers').read().split('/sw.js')[1])
 ck('sw.js publicado idêntico à fonte', open('/home/claude/carteira-esn/public/sw.js').read()==open('/home/claude/carteira-esn/fonte/sw.js').read())
