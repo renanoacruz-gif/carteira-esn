@@ -201,7 +201,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admLemCard(ADMV.lem);
+  h += admLemCard(ADMV.lem) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -216,6 +216,14 @@ function admLemCard(l) {
     ${(l.historico || []).length ? `<details class="sm" style="margin-top:8px"><summary>Últimos turnos (${l.historico.length})</summary><div class="tw"><table><thead><tr><th>Dia</th><th>Turno</th><th class="r">Aparelhos</th><th class="r">Enviados</th><th class="r">Já abriram</th><th class="r">Removidos</th><th class="r">Falhas</th><th class="r">Adiados</th></tr></thead><tbody>${l.historico.map(x => `<tr><td>${esc(x.dia)}</td><td>${lt(x.turno)}</td><td class="r">${x.aparelhos}</td><td class="r">${x.enviados}</td><td class="r">${x.pulados_uso}</td><td class="r">${x.removidos}</td><td class="r">${x.falhas}${x.config_invalida ? ' ⚠' : ''}</td><td class="r">${x.adiados}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="sm muted" style="margin-top:8px">Nenhum turno registrado ainda.</div>'}
     <div class="sm muted" style="margin-top:6px">Mostra só contagens por turno; não há e-mails nem endereços de aparelho aqui. Envio é tentativa: entrega depende do navegador e do sistema do aparelho.</div></div>`;
 }
+function admConviteTxt() {
+  const u = location.origin;
+  return `Olá! A Gestão de Carteira ESN já está no ar: ${u}\n\nEntre com seu e-mail @totvs.com.br (o sistema envia um código por e-mail). Na tela inicial, o quadro "Primeiros passos" guia: importar sua carteira, conectar sua chave de IA, anexar uma ficha e ativar o lembrete das 9h e das 14h.\n\nSua carteira é privada: só você a vê. Termos e privacidade: ${u}/sobre/\n\nQualquer dúvida, é só me chamar.`;
+}
+function admConviteCard() {
+  return `<div class="card" id="adm-convite"><h3>Convite para novos executivos</h3><p class="sm muted">Texto pronto para enviar por e-mail ou chat. Edite à vontade antes de copiar. Quem entra precisa ter e-mail @totvs.com.br; o acesso é liberado pelo Cloudflare Access.</p>
+    <textarea id="adm-convite-txt" rows="7" style="width:100%">${esc(admConviteTxt())}</textarea><div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="admCopiarConvite">Copiar texto</button></div></div>`;
+}
 function admCsv(d) {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
   L.push(['Relatório administrativo', 'Período', d.periodo.de, d.periodo.ate, 'Cobertura desde', d.cobertura_inicio || ''].map(q).join(';'));
@@ -229,6 +237,7 @@ function admCsv(d) {
 }
 function admRosterParse(txt) { return String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[;,\t]/).map(x => x.trim()); return { email: p[0], nome: p[1] || '' }; }).filter(x => /@/.test(x.email)); }
 const ADM_ACT = {
+  admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
   admReload: () => { ADMV.data = null; ADMV.msg = ''; admLoad(); render(); },
   admExport: () => { if (!ADMV.data) return; TEL.mudo++; Promise.resolve(offer(`relatorio-administrativo-${new Date().toISOString().slice(0, 10)}.csv`, admCsv(ADMV.data))).finally(() => { TEL.mudo--; }); },
   admCfgSave: async () => {

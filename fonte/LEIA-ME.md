@@ -2,6 +2,13 @@
 Módulos JS/CSS concatenados por `build.py` (ajuste `d=` para esta pasta e o destino do pacote) em `public/index.html` + `src/worker.js`.
 Fluxo: alterar aqui → rodar build → commitar `public/` e `src/` → o Cloudflare publica sozinho (Workers Builds).
 
+## Mapa de features — Onda 1 (branch `feat/mapa-ondas`)
+- Lembrete: lote >40 aparelhos com continuação (crons `10,20 12,17`; alvo = aparelhos sem linha em `push_enviados`), agrupamento de escritas no D1 (limite por invocação), feriados nacionais + Carnaval/Sexta Santa/Corpus Christi (`pushFeriado`; estadual/municipal → usar Pausar), pausa por pessoa (`push_pausa`, até 90 dias), turnos 9h/14h por pessoa (`push_pref`), vigia `40 12,17` (`pushVigia`: avisa só o admin, sem repetir no dia).
+- Notificação: toque abre/foca o app e leva a "Onde vale aprofundar hoje" (`?lembrete=1` / postMessage). Texto do admin quando há alerta.
+- Onboarding "Primeiros passos" (`onb.js`), convite pronto no painel admin, textos de chaves de IA ("Configurações → IA e provedores → Minhas chaves de IA"), Integrações sem itens do Claude da página no modo hospedado.
+- Privacidade: /sobre v1.4 (pausa e turnos). Testes: `t69.py` (54), `t68_sw.mjs`, `t65.py`.
+- Fora do escopo desta onda: G4, I4, I6, D3 e testes em aparelhos reais (Q5).
+
 ## Segurança (rodada 16)
 - Testes: `t48a.py` (API: IDOR, catálogo, SSRF, OCR, cabeçalhos, CSP) e `t48b.py` (navegador: XSS por mutação, CSV, backup malicioso, arquivos inválidos). Requerem `wrangler dev --local` com `ALLOW_TEST_USER=1`.
 - Variante hospedada: bibliotecas em `public/vendor` (versões/SHA-256 em `fonte/vendor/VENDOR.md`) e cabeçalhos em `public/_headers`. A CSP completa está em *Report-Only*; violações aparecem no painel Administrador.

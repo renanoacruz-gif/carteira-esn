@@ -7,7 +7,8 @@ async function resumoTexto() {
   try {
     const r = await fetch('/api/push/resumo', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store', signal: c.signal });
     if (!r.ok) return null;
-    const j = await r.json(); if (!j || !j.ok || !Number.isInteger(j.n) || j.n < 1 || !j.em) return null;
+    const j = await r.json(); if (j && j.ok && j.alerta === true) return 'Atenção: o lembrete diário teve um problema hoje. Abra o painel Administrador para ver o detalhe.';
+    if (!j || !j.ok || !Number.isInteger(j.n) || j.n < 1 || !j.em) return null;
     const em = new Date(j.em); if (!(Date.now() - em.getTime() < 5 * 86400000)) return null;
     const hoje = em.toDateString() === new Date().toDateString(), q = j.n === 1 ? '1 cliente' : j.n + ' clientes';
     return hoje ? q + ' com motivo para aprofundar hoje. Abra a ferramenta e veja quais.' : q + ' com motivo para aprofundar na sua última visita (' + String(em.getDate()).padStart(2, '0') + '/' + String(em.getMonth() + 1).padStart(2, '0') + '). Abra e confira.';
@@ -23,7 +24,7 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => {
-    for (const c of l) if ('focus' in c) return c.focus();
+    for (const c of l) if ('focus' in c) { try { c.postMessage({ lembrete: 1 }); } catch (x) { /* ok */ } return c.focus(); }
     return self.clients.openWindow('/?lembrete=1');
   }));
 });

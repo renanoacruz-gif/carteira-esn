@@ -4275,7 +4275,7 @@ async function bkDireto(tipo, pedido, timeout = tipo === 'importar' ? 170000 : t
 /* Envia um pedido. Retorna {via:'direto', resp} ou {via:'manual'} (arquivo oferecido para download). Nunca finge sucesso. */
 async function bkChamar(tipo, pedido, arquivo) {
   if (pedido?.provedor === 'pagina') { if (tipo === 'ocr') return { via: 'direto', resp: await pgOcr(pedido) }; if (tipo === 'ia' || tipo === 'ia_teste') return { via: 'direto', resp: await pgIA(tipo, pedido) }; }
-  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Integrações → Minhas chaves de IA.`); }
+  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Configurações → IA e provedores → Minhas chaves de IA.`); }
   if (window.__HOSTED__ || (BK.direto !== false && bkPronto() && BK.token)) {
     try { return { via: 'direto', resp: await bkDireto(tipo, pedido) }; }
     catch (e) { BK.ultimoErro = e.message; if (window.__HOSTED__ || !['bloqueado_ambiente', 'rede'].includes(e.codigo)) throw e; }
@@ -5682,10 +5682,10 @@ function icapLinhas() {
   return L;
 }
 function icapHtml() {
-  const L = icapLinhas(), est = o => o === true ? pill('Verificado em execução real', 'ok') : o === false ? pill('Com erro / não comprovado', 'bad') : pill('Não verificado', 'off');
+  const H = !!window.__HOSTED__, L = icapLinhas().filter(x => !(H && x.via === 'Claude desta página')).map(x => H ? { ...x, nota: /Claude desta página/.test(x.nota || '') ? '' : x.nota, ...(x.pend ? { pend: 'O servidor já está no ar: faça uma execução real pela tela correspondente (com sua chave em Configurações → IA e provedores) e o resultado fica registrado aqui.' } : {}) } : x), est = o => o === true ? pill('Verificado em execução real', 'ok') : o === false ? pill('Com erro / não comprovado', 'bad') : pill('Não verificado', 'off');
   return `<div class="card"><h3>Capacidades por tarefa</h3><p class="sm">Cada linha é uma capacidade distinta: <b>sucesso em texto não prova busca na web nem leitura de imagem</b>. “Verificado” significa que houve uma execução real bem-sucedida registrada aqui; simulações e testes de código não contam. Credenciais ficam só no backend e nunca são exibidas; o app registra resultado e hora, não o conteúdo enviado.</p>
   <div class="tw"><table class="chain"><thead><tr><th>Capacidade</th><th>Caminho</th><th>Estado</th><th>Última execução</th><th>Para onde os dados vão</th><th>Para ativar</th></tr></thead><tbody>${L.map(x => `<tr><td><b>${esc(x.cap)}</b>${x.nota ? `<div class="muted sm">${esc(x.nota)}</div>` : ''}</td><td>${esc(x.via)}</td><td>${est(x.ok)}</td><td class="sm">${x.det ? esc(x.det) : '<span class="muted">nunca executada</span>'}</td><td class="sm">${esc(x.dest)}</td><td class="sm">${x.ok === true ? '<span class="muted">—</span>' : esc(x.pend)}</td></tr>`).join('')}</tbody></table></div>
-  <div class="row"><button class="btn pri sm" data-a="pgTestarBtn">Testar Claude desta página (texto, JSON e imagem)</button><span class="muted sm">${S.meta.pgTeste ? 'Último teste: ' + esc(dtBR(S.meta.pgTeste.at)) : 'Ainda não testado.'}</span></div></div>`;
+  ${H ? '' : `<div class="row"><button class="btn pri sm" data-a="pgTestarBtn">Testar Claude desta página (texto, JSON e imagem)</button><span class="muted sm">${S.meta.pgTeste ? 'Último teste: ' + esc(dtBR(S.meta.pgTeste.at)) : 'Ainda não testado.'}</span></div>`}</div>`;
 }
 const ICAP_ACT = { pgTestarBtn: async () => { toast('Testando o Claude desta página…'); try { const R = await pgTestar(); toast(R.texto?.ok && R.json?.ok ? 'Teste concluído: texto e JSON OK' + (R.ocr?.ok ? ', imagem OK.' : '; imagem: ' + (R.ocr?.msg || 'falhou')) : 'Teste com falha: ' + (R.texto?.msg || R.json?.msg), R.texto?.ok && R.json?.ok ? 'ok' : 'bad'); } catch (e) { toast('Falha no teste: ' + pgErr(e).mensagem, 'bad'); } render(); } };
 
@@ -7092,7 +7092,7 @@ const prImp = (c, id) => (c.prImp || []).find(i => i.id === id);
 /* ---------- configuração de OCR: sem ela, arquivos ficam guardados e a ação necessária é mostrada ---------- */
 function prOcrPronto() {
   if (aiTarefa('ocr').prov === 'pagina') return { ok: true };
-  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Integrações → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
+  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Configurações → IA e provedores → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
   if (bkModo() === 'manual') return { ok: false, acao: 'Este ambiente não chama o backend de OCR diretamente. Configure o backend em Integrações ou escolha o provedor “Claude desta página” em Configurar IA.', nav: 'integra' };
   return { ok: true };
 }
@@ -8863,7 +8863,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admLemCard(ADMV.lem);
+  h += admLemCard(ADMV.lem) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -8878,6 +8878,14 @@ function admLemCard(l) {
     ${(l.historico || []).length ? `<details class="sm" style="margin-top:8px"><summary>Últimos turnos (${l.historico.length})</summary><div class="tw"><table><thead><tr><th>Dia</th><th>Turno</th><th class="r">Aparelhos</th><th class="r">Enviados</th><th class="r">Já abriram</th><th class="r">Removidos</th><th class="r">Falhas</th><th class="r">Adiados</th></tr></thead><tbody>${l.historico.map(x => `<tr><td>${esc(x.dia)}</td><td>${lt(x.turno)}</td><td class="r">${x.aparelhos}</td><td class="r">${x.enviados}</td><td class="r">${x.pulados_uso}</td><td class="r">${x.removidos}</td><td class="r">${x.falhas}${x.config_invalida ? ' ⚠' : ''}</td><td class="r">${x.adiados}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="sm muted" style="margin-top:8px">Nenhum turno registrado ainda.</div>'}
     <div class="sm muted" style="margin-top:6px">Mostra só contagens por turno; não há e-mails nem endereços de aparelho aqui. Envio é tentativa: entrega depende do navegador e do sistema do aparelho.</div></div>`;
 }
+function admConviteTxt() {
+  const u = location.origin;
+  return `Olá! A Gestão de Carteira ESN já está no ar: ${u}\n\nEntre com seu e-mail @totvs.com.br (o sistema envia um código por e-mail). Na tela inicial, o quadro "Primeiros passos" guia: importar sua carteira, conectar sua chave de IA, anexar uma ficha e ativar o lembrete das 9h e das 14h.\n\nSua carteira é privada: só você a vê. Termos e privacidade: ${u}/sobre/\n\nQualquer dúvida, é só me chamar.`;
+}
+function admConviteCard() {
+  return `<div class="card" id="adm-convite"><h3>Convite para novos executivos</h3><p class="sm muted">Texto pronto para enviar por e-mail ou chat. Edite à vontade antes de copiar. Quem entra precisa ter e-mail @totvs.com.br; o acesso é liberado pelo Cloudflare Access.</p>
+    <textarea id="adm-convite-txt" rows="7" style="width:100%">${esc(admConviteTxt())}</textarea><div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="admCopiarConvite">Copiar texto</button></div></div>`;
+}
 function admCsv(d) {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
   L.push(['Relatório administrativo', 'Período', d.periodo.de, d.periodo.ate, 'Cobertura desde', d.cobertura_inicio || ''].map(q).join(';'));
@@ -8891,6 +8899,7 @@ function admCsv(d) {
 }
 function admRosterParse(txt) { return String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[;,\t]/).map(x => x.trim()); return { email: p[0], nome: p[1] || '' }; }).filter(x => /@/.test(x.email)); }
 const ADM_ACT = {
+  admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
   admReload: () => { ADMV.data = null; ADMV.msg = ''; admLoad(); render(); },
   admExport: () => { if (!ADMV.data) return; TEL.mudo++; Promise.resolve(offer(`relatorio-administrativo-${new Date().toISOString().slice(0, 10)}.csv`, admCsv(ADMV.data))).finally(() => { TEL.mudo--; }); },
   admCfgSave: async () => {
@@ -8919,12 +8928,12 @@ async function admRosterFile(f) {
 }
 
 /* Lembretes 9h e 14h (seg-sex) por notificação do navegador (Web Push). Estado em memória; "agora não" fica em localStorage. */
-const LEM = { st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
+const LEM = { foco: false, st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
 try {
   LEM.sup = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   LEM.ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   LEM.app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); setTimeout(() => toast('Bom dia! Hora de olhar a carteira de hoje.'), 800); }
+  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); LEM.foco = true; setTimeout(() => toast('Hora de olhar a carteira de hoje.'), 800); }
 } catch { /* sem DOM */ }
 const lemB64 = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 async function lemApi(path, corpo) {
@@ -8936,11 +8945,12 @@ async function lemApi(path, corpo) {
   } catch { return { ok: false, status: 0, j: null }; } finally { clearTimeout(to); }
 }
 async function lemSubLocal() { try { const reg = await navigator.serviceWorker.getRegistration('/'); return reg ? await reg.pushManager.getSubscription() : null; } catch { return null; } }
+const lemSt = j => ({ cfg: true, aparelhos: j.aparelhos, pausa: j.pausa_ate || null, manha: j.manha !== false, tarde: j.tarde !== false });
 async function lemCarregar() {
   if (!LEM.sup && !LEM.ios) { LEM.st = { cfg: false }; return; }
   LEM.st = { cfg: false, carregando: true };
   const r = await lemApi('/api/push/status');
-  LEM.st = r.ok ? { cfg: true, aparelhos: r.j.aparelhos } : { cfg: false, erro: r.status !== 503 };
+  LEM.st = r.ok ? lemSt(r.j) : { cfg: false, erro: r.status !== 503 };
   if (LEM.sup) LEM.local = !!(await lemSubLocal()) && Notification.permission === 'granted';
   render();
 }
@@ -8959,7 +8969,14 @@ function lemCard() {
   if (!LEM.sup) h += `<p class="sm muted">${LEM.ios ? 'No iPhone/iPad (iOS 16.4 ou superior): toque em Compartilhar → Adicionar à Tela de Início, abra pelo ícone e ative aqui.' : 'Este navegador não oferece notificações.'}</p>`;
   else if (Notification.permission === 'denied') h += '<p class="sm muted">Notificações bloqueadas neste navegador. Libere nas configurações do site e volte aqui.</p>';
   else h += `<div class="row">${LEM.local ? `<span class="pill p-info">Ativo neste aparelho</span><span class="sp"></span><button class="btn ghost sm" data-a="lemTeste" ${LEM.busy ? 'disabled' : ''}>Enviar teste</button><button class="btn ghost sm" data-a="lemOff" ${LEM.busy ? 'disabled' : ''}>Desativar</button>` : `<button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar neste aparelho</button>`}</div>`;
-  if (LEM.st.aparelhos) h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+  if (LEM.st.aparelhos) {
+    h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+    const on = k => LEM.st[k] !== false, tg = (k, l) => `<button class="btn ${on(k) ? 'pri' : 'ghost'} sm" data-a="lemTurno" data-k="${k}" aria-pressed="${on(k)}" ${LEM.busy ? 'disabled' : ''}>${l}: ${on(k) ? 'ligado' : 'desligado'}</button>`;
+    h += `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Turnos:</span>${tg('manha', '9h')}${tg('tarde', '14h')}</div>`;
+    h += LEM.st.pausa ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill p-warn">Em pausa até ${esc(LEM.st.pausa.split('-').reverse().join('/'))}</span><button class="btn ghost sm" data-a="lemRetomar" ${LEM.busy ? 'disabled' : ''}>Retomar agora</button></div>`
+      : `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Pausar (férias, folga):</span>${[7, 15, 30].map(d => `<button class="btn ghost sm" data-a="lemPausa" data-d="${d}" ${LEM.busy ? 'disabled' : ''}>${d} dias</button>`).join('')}</div>`;
+    h += '<p class="sm muted">O lembrete não é enviado em feriados nacionais, Carnaval e Corpus Christi. Feriados estaduais e municipais não são tratados: use a pausa.</p>';
+  }
   if (LEM.msg) h += `<p class="sm" role="status">${esc(LEM.msg)}</p>`;
   return h + '</div>';
 }
@@ -8975,7 +8992,7 @@ const LEM_ACT = {
       const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: lemB64(k.j.chave) });
       const r = await lemApi('/api/push/inscrever', { endpoint: sub.endpoint });
       if (!r.ok) { try { await sub.unsubscribe(); } catch { /* ok */ } throw new Error('Não foi possível registrar este aparelho.'); }
-      LEM.local = true; LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
+      LEM.local = true; LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
     } catch (e) { LEM.msg = (e && e.message && !/^(Failed|Registration|Subscription|NotAllowed|Abort|Security|Type)/.test(e.name || '')) ? e.message : 'Não foi possível ativar neste aparelho.'; }
     LEM.busy = false; render();
   },
@@ -8985,8 +9002,25 @@ const LEM_ACT = {
       const sub = await lemSubLocal(), ep = sub && sub.endpoint;
       const r = ep ? await lemApi('/api/push/cancelar', { endpoint: ep }) : { ok: true, j: { aparelhos: LEM.st && LEM.st.aparelhos } };
       if (sub) { try { await sub.unsubscribe(); } catch { /* ok */ } }
-      LEM.local = false; if (r.ok) LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
+      LEM.local = false; if (r.ok) LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
     } catch { LEM.msg = 'Não foi possível desativar agora.'; }
+    LEM.busy = false; render();
+  },
+  lemTurno: async t => {
+    if (LEM.busy || !LEM.st) return; const k = t.dataset.k; if (k !== 'manha' && k !== 'tarde') return; LEM.busy = true; LEM.msg = ''; render();
+    const novo = { manha: LEM.st.manha !== false, tarde: LEM.st.tarde !== false }; novo[k] = !novo[k];
+    const r = await lemApi('/api/push/pref', novo); if (r.ok) { LEM.st = { ...LEM.st, manha: r.j.manha, tarde: r.j.tarde }; LEM.msg = 'Preferência salva.'; } else LEM.msg = 'Não foi possível salvar agora.';
+    LEM.busy = false; render();
+  },
+  lemPausa: async t => {
+    if (LEM.busy) return; const d = Math.min(90, Math.max(1, +t.dataset.d || 7)); LEM.busy = true; LEM.msg = ''; render();
+    const ate = new Date(Date.now() - 3 * 3600000 + d * 86400000).toISOString().slice(0, 10), r = await lemApi('/api/push/pausar', { ate });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: r.j.pausa_ate }; LEM.msg = 'Lembrete em pausa.'; } else LEM.msg = 'Não foi possível pausar agora.';
+    LEM.busy = false; render();
+  },
+  lemRetomar: async () => {
+    if (LEM.busy) return; LEM.busy = true; LEM.msg = ''; render(); const r = await lemApi('/api/push/pausar', { ate: null });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: null }; LEM.msg = 'Lembrete retomado.'; } else LEM.msg = 'Não foi possível retomar agora.';
     LEM.busy = false; render();
   },
   lemTeste: async () => {
@@ -8998,7 +9032,7 @@ const LEM_ACT = {
 };
 {
   const h = typeof hojeCard === 'function' ? hojeCard : null, c = typeof vConta === 'function' ? vConta : null;
-  if (h) globalThis.hojeCard = function () { return lemBanner() + h(); };
+  if (h) globalThis.hojeCard = function () { if (LEM.foco) lemIrParaHoje(6); return lemBanner() + h(); };
   if (c) globalThis.vConta = function () { return c() + lemCard(); };
 }
 
@@ -9022,6 +9056,35 @@ function lemReportar() {
     try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; lemReportar(); } } catch { /* sem efeito */ }
     return out;
   };
+}
+
+/* Aviso tocado: leva direto ao card "Onde vale aprofundar hoje" (com a app aberta ou não). */
+function lemIrParaHoje(tent) {
+  setTimeout(() => { const e = document.getElementById('hoje'); if (e) { LEM.foco = false; e.scrollIntoView({ block: 'start', behavior: 'smooth' }); } else if (tent > 1) lemIrParaHoje(tent - 1); else LEM.foco = false; }, 350);
+}
+try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.lembrete) { LEM.foco = true; try { UI.view = 'geral'; render(); } catch { /* sem efeito */ } } }); } catch { /* sem service worker */ }
+
+/* Primeiros passos (onboarding): lista curta na Visão da Carteira, calculada do estado real (nada é marcado à mão). Começa vazio: sem dados de exemplo. */
+function onbPassos() {
+  const cl = clients(), temChave = (() => { try { return Object.values(hkLer()).some(Boolean); } catch { return false; } })();
+  return [
+    { ok: cl.length > 0, t: 'Importar sua carteira', d: 'Planilha ou Planilha do Google, em Importar e fichas.', v: 'importar' },
+    { ok: temChave, t: 'Conectar sua chave de IA', d: 'Opcional para a análise por IA e o OCR. A chave fica só neste navegador.', v: 'ia' },
+    { ok: cl.some(c => c.fstat && c.fstat.k === 'disponivel'), t: 'Anexar uma ficha de faturamento', d: 'Sem ficha, o raio-X e o briefing ficam incompletos.', v: 'importar' },
+    { ok: !!(typeof LEM !== 'undefined' && LEM.local), t: 'Ativar o lembrete neste aparelho', d: 'Aviso às 9h e às 14h só se você ainda não abriu a ferramenta.', v: 'conta' }
+  ];
+}
+function onbCard() {
+  if (lsGet('onb.fim') === '1') return '';
+  const p = onbPassos(), n = p.filter(x => x.ok).length; if (n === p.length) return '';
+  return `<div class="card" id="onb"><div class="row"><h3>Primeiros passos</h3><span class="pill p-info">${n} de ${p.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="onbFim">Ocultar</button></div>
+  <ol class="sm" style="list-style:none;padding:0;margin:8px 0 0">${p.map(x => `<li class="row" style="gap:8px;padding:6px 0;border-top:1px solid var(--bd2)"><span aria-hidden="true">${x.ok ? '✔' : '○'}</span><div style="flex:1"><b>${esc(x.t)}</b>${x.ok ? ' <span class="muted">(feito)</span>' : ''}<div class="muted">${esc(x.d)}</div></div>${x.ok ? '' : `<button class="btn ghost sm" data-a="nav" data-v="${x.v}">Abrir</button>`}</li>`).join('')}</ol>
+  <p class="sm muted" style="margin-top:8px">Sua carteira é privada: só você a vê. Este quadro some quando os passos terminam, ou ao ocultar.</p></div>`;
+}
+const ONB_ACT = { onbFim: () => { lsSet('onb.fim', '1'); render(); } };
+{
+  const g = typeof vGeral === 'function' ? vGeral : null;
+  if (g) globalThis.vGeral = function (forExport) { const h = g.apply(this, arguments); return forExport ? h : onbCard() + h; };
 }
 
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
@@ -9105,7 +9168,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT, ONB_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;

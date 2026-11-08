@@ -21,7 +21,7 @@ const prImp = (c, id) => (c.prImp || []).find(i => i.id === id);
 /* ---------- configuração de OCR: sem ela, arquivos ficam guardados e a ação necessária é mostrada ---------- */
 function prOcrPronto() {
   if (aiTarefa('ocr').prov === 'pagina') return { ok: true };
-  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Integrações → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
+  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Configurações → IA e provedores → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
   if (bkModo() === 'manual') return { ok: false, acao: 'Este ambiente não chama o backend de OCR diretamente. Configure o backend em Integrações ou escolha o provedor “Claude desta página” em Configurar IA.', nav: 'integra' };
   return { ok: true };
 }

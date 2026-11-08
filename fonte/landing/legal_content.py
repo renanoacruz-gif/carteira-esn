@@ -1,7 +1,7 @@
 # Conteúdo das páginas legais. Fatos técnicos conferidos no código (worker.js, adm.js, schema, wrangler.toml, README).
 CONTATO = 'renan.oscar@totvs.com.br'
-DATA = '07/11/2026'
-VERSAO = '1.3'
+DATA = '08/11/2026'
+VERSAO = '1.4'
 
 def tb(head, rows):
     h = ''.join(f'<th>{c}</th>' for c in head)
@@ -76,7 +76,7 @@ PAGES['privacidade'] = dict(
     ['<b>Registro de uso</b>: recurso usado, data e hora, resultado, tempo de processamento, e-mail do usuário e medidas de desempenho da abertura (tempos do navegador e quantidade de clientes)','Acompanhar adoção e funcionamento, e medir desempenho','Nunca grava conteúdo de fichas, prints, pesquisas, contratos ou respostas de IA, nem nomes de clientes, CNPJs ou valores'],
     ['<b>Tentativas de acesso negadas</b>: data, e-mail informado, motivo e rota','Segurança','Guardadas por 90 dias'],
     ['<b>Observações de segurança do navegador</b>: regra de segurança acionada e destino bloqueado, com contagem','Segurança e correção de falhas','Sem identificação de usuário'],
-    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro, contagem de falhas de envio e um único número inteiro (quantos clientes têm motivo para aprofundar), calculado no seu navegador, com a data em que foi calculado','Avisar às 9h e às 14h dos dias úteis, só se você ainda não abriu o sistema no período, e informar esse número no texto do aviso','Só existe se você ativar. O servidor não lê nem guarda sua carteira, nomes de clientes ou valores: só esse número. Pode desativar a qualquer momento em Conta, o que apaga o cadastro e o número'],
+    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro, contagem de falhas de envio e um único número inteiro (quantos clientes têm motivo para aprofundar), calculado no seu navegador, com a data em que foi calculado; se você usar, também a data até a qual pausou os avisos e a sua escolha de receber (ou não) o aviso das 9h e o das 14h','Avisar às 9h e às 14h dos dias úteis, só se você ainda não abriu o sistema no período, e informar esse número no texto do aviso','Só existe se você ativar. O servidor não lê nem guarda sua carteira, nomes de clientes ou valores: só esse número. Pode desativar a qualquer momento em Conta, o que apaga o cadastro e o número'],
     ['<b>Preferências locais</b>: chave de IA, avisos já vistos e configurações, no armazenamento do seu navegador','Funcionamento do sistema','Ficam no seu navegador; a chave de IA não é gravada pelo servidor'],
   ])+'''<p>As páginas públicas (landing e documentos) não usam cookies de rastreamento nem ferramentas de análise de audiência.</p>'''),
   ('Base legal', '''<p>O tratamento tem como base, em regra, o <b>legítimo interesse</b> da TOTVS na gestão da sua operação comercial e na segurança do ambiente (LGPD, art. 7º, IX) e, quando aplicável, a execução das atividades decorrentes da relação de trabalho e de contratos com clientes (art. 7º, V). As bases são definidas e validadas pelo controlador e pelo Encarregado.</p>'''),
@@ -90,7 +90,7 @@ PAGES['privacidade'] = dict(
     ['Carteira (clientes, fichas, imagens)','Até você apagar, usando as funções de gerenciamento de dados, ou até o encerramento do seu acesso, conforme as regras internas da TOTVS'],
     ['Registro de uso','180 dias, prazo que o administrador pode ajustar entre 30 e 730 dias. Eventos mais antigos são apagados automaticamente'],
     ['Tentativas de acesso negadas','90 dias'],
-    ['Lembrete diário','Até você desativar, ou até o serviço de notificação informar que o aparelho não existe mais, ou após 5 falhas seguidas de envio. O número de clientes é substituído a cada atualização e apagado junto com o cadastro'],
+    ['Lembrete diário','Até você desativar, ou até o serviço de notificação informar que o aparelho não existe mais, ou após 5 falhas seguidas de envio. O número de clientes é substituído a cada atualização; pausa e escolha de turnos são apagadas junto com o cadastro'],
     ['Contagens de envio dos lembretes (por dia e turno, sem e-mail nem aparelho)','90 dias'],
     ['Backups exportados por você','Ficam com você, fora do sistema. Proteja-os e apague quando não forem mais necessários'],
   ])),
