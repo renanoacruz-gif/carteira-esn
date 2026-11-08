@@ -134,3 +134,10 @@ Somente apresentação; nenhuma lógica, id, classe ou data-* existente foi alte
 - **Fase 2 (style.css, CSS puro):** ícones por máscara SVG (`--i-*`) em pills de status, alertas e KPIs; estado vazio com ícone; elevação de cartões.
 - **Fase 3 (`refresh.js`, aditivo):** paleta Ctrl/⌘+K (reusa `data-a="nav"` e `gsOpen`), atalhos `?`, glossário, navegação interna com scroll-spy (≥1200px, telas longas), botão de topo com anel de progresso, CSS de impressão. Teste: `t72.py`.
 - Não feito (exigiria mexer em lógica): count-up nos KPIs, View Transitions (render é síncrono), destaque de linha vencida (falta classe no markup), tema escuro, WebGL/3D.
+
+## Camada 3D (branch feat/3d-layer) — `refresh3d.js`
+WebGL escrito à mão (sem biblioteca, sem rede, sem dados de exemplo). Só adiciona um cartão antes dos KPIs da Visão da Carteira (fora de `vGeral`, então exportações não mudam) e inclinação 3D nos KPIs.
+- **Orbe:** um ponto por cliente; cor = prioridade da principal oportunidade (Alta rosa, Média laranja, Baixa ciano, sem oportunidade cinza), tamanho = MRR da planilha, faixas de latitude = segmentos. Hover mostra o cliente; clique abre a ficha (reusa `data-a="gsOpen"`).
+- **Barras de MRR por segmento:** caixas com iluminação, rótulos HTML projetados; clique filtra Clientes pelo segmento (`data-a="segGo"`).
+- **Segurança de uso:** oculto em ≤900px; botão "3D ligado/desligado" (preferência `rf.fx3d`) troca para reserva 2D; `prefers-reduced-motion` = quadro estático; pausa fora da tela/aba oculta; perda de contexto cai para 2D.
+- Teste: `t73.py` (28 checagens).
