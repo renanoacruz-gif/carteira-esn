@@ -384,6 +384,43 @@ details>summary{min-height:32px;display:flex;align-items:center}
 .tw table{min-width:560px}
 .card{padding:var(--s3) var(--s4)}
 }
+
+/* =====================================================================
+   Fase 2 — hierarquia, feedback e estados (CSS puro, sem alterar markup)
+   Ícones: máscaras SVG inline (data:), cor herdada do texto.
+   ===================================================================== */
+:root{--i-ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");--i-warn:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4L2.5 20h19L12 4z'/%3E%3Cpath d='M12 10v4.5M12 17.4v.01'/%3E%3C/svg%3E");--i-bad:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 9l6 6M15 9l-6 6'/%3E%3C/svg%3E");--i-info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 7.6v.01'/%3E%3C/svg%3E");--i-off:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E");--i-inbox:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 13l3-8h12l3 8v6H3z'/%3E%3Cpath d='M3 13h5l1 3h6l1-3h5'/%3E%3C/svg%3E");--i-bars:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20v-7M12 20V5M19 20v-10'/%3E%3C/svg%3E");--i-flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 21V4'/%3E%3Cpath d='M5 4h12l-2.5 4 2.5 4H5'/%3E%3C/svg%3E");--i-trend:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8'/%3E%3Cpath d='M15 7h6v6'/%3E%3C/svg%3E")}
+.pill::before,.alert:not(.busy)::before,.kpi::after,.empty:not(:has(.ic))::before{content:"";display:inline-block;background:currentColor;-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+/* Status = cor + ícone + texto */
+.pill.p-ok,.pill.p-warn,.pill.p-bad,.pill.p-off,.pill.p-info{display:inline-flex;align-items:center;gap:4px}
+.pill.p-ok::before{--ico:var(--i-ok)}.pill.p-warn::before{--ico:var(--i-warn)}.pill.p-bad::before{--ico:var(--i-bad)}.pill.p-off::before{--ico:var(--i-off)}.pill.p-info::before{--ico:var(--i-info)}
+.pill:not(.p-ok):not(.p-warn):not(.p-bad):not(.p-off):not(.p-info)::before{display:none}
+.pill::before{width:11px;height:11px;flex:none}
+/* Alertas: ícone conforme a variante (cor da borda já indica a gravidade) */
+.alert:not(.busy){position:relative;padding-left:calc(var(--s4) + 24px)}
+.alert:not(.busy)::before{position:absolute;left:var(--s3);top:calc(var(--s3) + 1px);width:16px;height:16px;--ico:var(--i-warn);color:var(--warn-tx)}
+.alert.i:not(.busy)::before{--ico:var(--i-info);color:var(--link)}
+.alert.b:not(.busy)::before{--ico:var(--i-bad);color:var(--bad-tx)}
+.alert.g:not(.busy)::before{--ico:var(--i-ok);color:var(--ok-tx)}
+.hkbar.alert:not(.busy)::before{top:50%;transform:translateY(-50%)}
+/* KPIs: ícone discreto por variante (decorativo) */
+.kpi{position:relative;color:var(--txt)}
+.kpi::after{position:absolute;top:var(--s3);right:var(--s3);width:18px;height:18px;--ico:var(--i-bars);color:var(--ciano2);opacity:.6;transition:opacity var(--t),transform var(--t-md) var(--ease)}
+.kpi.w::after{--ico:var(--i-warn);color:var(--lar)}.kpi.r::after{--ico:var(--i-flag);color:var(--rosa)}.kpi.m::after{--ico:var(--i-trend);color:var(--ok)}.kpi.ok::after{--ico:var(--i-ok);color:var(--ok)}
+.kpi:hover::after{opacity:1;transform:scale(1.1)}
+.lt-kpis .kpi::after{display:none}
+/* Estados vazios: ícone de caixa acima do texto (apenas visual) */
+.empty:not(:has(.ic))::before{display:block;width:36px;height:36px;margin:0 auto var(--s3);--ico:var(--i-inbox);color:var(--bd3)}
+/* Cartões de oportunidade e cliente: elevação e hierarquia */
+.opp{border-radius:var(--r);box-shadow:var(--sh1);transition:box-shadow var(--t-md) var(--ease),border-color var(--t-md) var(--ease)}
+.opp:hover{box-shadow:var(--sh2)}
+.opp h4{font-size:var(--fs-xl);line-height:1.3}
+.ccard{transition:box-shadow var(--t-md) var(--ease)}.ccard:hover{box-shadow:var(--sh2)}
+.sti,.seg-card{transition:box-shadow var(--t-md) var(--ease),transform var(--t-md) var(--ease)}.seg-card:hover{transform:translateY(-1px);box-shadow:var(--sh2)}
+/* Navegação lateral: separação de grupos e rótulos */
+.sb-gl{margin-top:var(--s1)}
+@media(max-width:680px){.kpi::after{display:none}}
+@media print{.kpi::after,.alert::before,.pill::before{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head><body>
