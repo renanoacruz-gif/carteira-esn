@@ -141,3 +141,6 @@ WebGL escrito à mão (sem biblioteca, sem rede, sem dados de exemplo). Só adic
 - **Barras de MRR por segmento:** caixas com iluminação, rótulos HTML projetados; clique filtra Clientes pelo segmento (`data-a="segGo"`).
 - **Segurança de uso:** oculto em ≤900px; botão "3D ligado/desligado" (preferência `rf.fx3d`) troca para reserva 2D; `prefers-reduced-motion` = quadro estático; pausa fora da tela/aba oculta; perda de contexto cai para 2D.
 - Teste: `t73.py` (28 checagens).
+
+## Polimento leve (branch feat/polish-leve)
+Só CSS (bloco final de `style.css`, escopo `#app`/chrome; exportações não mudam): sombras em camadas e bordas suaves, cor dos KPIs/segmentos como traço curto (sem faixa), avisos sem listra lateral, pílulas e cabeçalhos de tabela em caixa normal, filtros em grade ordenada (≥901px), medida de texto 84ch, toc/botão de topo mais discretos, feedback tátil nos botões. Sem mudança de HTML/JS.
