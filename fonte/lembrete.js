@@ -109,14 +109,19 @@ const LEM_ACT = {
 
 /* Resumo para o texto do aviso: o navegador conta os clientes com motivo para aprofundar (mesma regra do card "Onde vale aprofundar hoje")
    e envia só esse inteiro. O servidor nunca lê a carteira. Só envia neste aparelho com lembrete ativo e com a carteira carregada. */
-const LEMR = { n: null, env: null, t: 0, busy: false, tm: 0 };
+/* Retornos que vencem hoje ou já venceram (prazos que o próprio usuário definiu); só o número sai do navegador. */
+function lemRetornos() {
+  try { const h = today(); return pendItems().filter(x => x.tipo === 'acao' || (x.tipo === 'prox' && x.prazo === h)).length; } catch { return null; }
+}
+const LEMR = { n: null, r: null, env: null, t: 0, busy: false, tm: 0 };
 function lemReportar() {
   clearTimeout(LEMR.tm);
   LEMR.tm = setTimeout(async () => {
     try {
       const n = LEMR.n; if (!LEM.local || LEMR.busy || !Number.isInteger(n) || n < 0 || n > 999) return;
-      if (n === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
-      LEMR.busy = true; const r = await lemApi('/api/push/resumo', { n }); if (r.ok) { LEMR.env = n; LEMR.t = Date.now(); }
+      const r = Number.isInteger(LEMR.r) && LEMR.r >= 0 && LEMR.r <= 999 ? LEMR.r : undefined, chave = n + '|' + r;
+      if (chave === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
+      LEMR.busy = true; const rs = await lemApi('/api/push/resumo', r === undefined ? { n } : { n, r }); if (rs.ok) { LEMR.env = chave; LEMR.t = Date.now(); }
     } catch { /* sem efeito: o aviso volta ao texto geral */ } finally { LEMR.busy = false; }
   }, 2500);
 }
@@ -124,7 +129,7 @@ function lemReportar() {
   const hi = typeof hojeItens === 'function' ? hojeItens : null;
   if (hi) globalThis.hojeItens = function () {
     const out = hi.apply(this, arguments);
-    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; lemReportar(); } } catch { /* sem efeito */ }
+    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; LEMR.r = lemRetornos(); lemReportar(); } } catch { /* sem efeito */ }
     return out;
   };
 }

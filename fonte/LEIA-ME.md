@@ -9,6 +9,14 @@ Fluxo: alterar aqui → rodar build → commitar `public/` e `src/` → o Cloudf
 - Privacidade: /sobre v1.4 (pausa e turnos). Testes: `t69.py` (54), `t68_sw.mjs`, `t65.py`.
 - Fora do escopo desta onda: G4, I4, I6, D3 e testes em aparelhos reais (Q5).
 
+## Mapa de features — Onda 2 (branch `feat/mapa-ondas`)
+- R1 Retornos: tarefas livres do cliente em `c.act['ret:…']` (`{texto, prazo, resp, status, origem}`), aba **Reunião e retornos** (`onda2.js`). Vencidos/hoje entram em Pendências e no aviso: `push_retornos(email, r, em)` (tabela separada, sem ALTER) e `POST /api/push/resumo {n, r?}`; SW diz "N clientes … e R retornos vencendo".
+- P2 Pós-reunião: ata → máscara no navegador (CNPJ, CPF, valores, e-mail, telefone) → `/api/ia` (tarefa `estruturado`, chave pessoal) → revisão com caixas → só o marcado é salvo (passos viram retornos; compromissos/objeções viram anotação datada em `c.mgmt.notes`). P3: rascunho de follow-up, só copia.
+- I2 Renovações 180 dias (`rnvCard`, só datas confirmadas) e I1 Carteira em risco (`riscoCard`, sinais documentados; não é previsão). D2 CSV para CRM/Mesa de Forecast (layout genérico: `CRM_HEAD`; ajustar quando houver o layout do destino). P1: briefing PDF ganhou "Combinados em aberto e datas confirmadas".
+- G5 Sugerir melhoria: `POST /api/sug` (5/dia, sem CNPJ/valores), tabela `sugestoes` (180 dias), painel admin "Sugestões do time" (`/api/adm/sugestoes`).
+- /sobre v1.5. Testes: `t70.py` (73), `t68_sw.mjs` (26).
+- **Não feito (Q2)**: xlsx ≥0.19.3 só em cdn.sheetjs.com (403 neste ambiente; baixe o `.tgz` e substitua `vendor/xlsx.full.min.js`); jspdf 2.5.1→4.x e pdfjs 3→6 são saltos de versão maior que exigem regressão visual dos PDFs.
+
 ## Segurança (rodada 16)
 - Testes: `t48a.py` (API: IDOR, catálogo, SSRF, OCR, cabeçalhos, CSP) e `t48b.py` (navegador: XSS por mutação, CSV, backup malicioso, arquivos inválidos). Requerem `wrangler dev --local` com `ALLOW_TEST_USER=1`.
 - Variante hospedada: bibliotecas em `public/vendor` (versões/SHA-256 em `fonte/vendor/VENDOR.md`) e cabeçalhos em `public/_headers`. A CSP completa está em *Report-Only*; violações aparecem no painel Administrador.

@@ -141,6 +141,7 @@ async function admLoad() {
     const p = new URLSearchParams(); if (ADMV.de && ADMV.ate) { p.set('de', new Date(ADMV.de + 'T00:00:00').toISOString()); p.set('ate', new Date(ADMV.ate + 'T23:59:59').toISOString()); } else p.set('dias', String(ADMV.dias));
     if (ADMV.func) p.set('func', ADMV.func);
     ADMV.data = await admApi('/api/adm/resumo?' + p.toString());
+    try { ADMV.sug = await admApi('/api/adm/sugestoes'); } catch { ADMV.sug = { erro: true }; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -201,7 +202,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admLemCard(ADMV.lem) + admConviteCard();
+  h += admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -236,7 +237,15 @@ function admCsv(d) {
   return '﻿' + L.join('\r\n');
 }
 function admRosterParse(txt) { return String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[;,\t]/).map(x => x.trim()); return { email: p[0], nome: p[1] || '' }; }).filter(x => /@/.test(x.email)); }
+const SUG_L = { geral: 'Geral', lembrete: 'Lembrete diário', importacao: 'Importação', oportunidades: 'Oportunidades', briefing: 'Briefing', retornos: 'Retornos e reuniões', outro: 'Outro' };
+function admSugCard(s) {
+  if (!s || s.erro) return '';
+  return `<div class="card"><h3>Sugestões do time <span class="pill ${s.nao_lidas ? 'p-warn' : 'p-info'}">${s.nao_lidas || 0} nova(s)</span></h3>
+  <p class="muted sm">Texto livre enviado por cada executivo em Conta → Sugerir melhoria (sem CNPJ nem valores). Apagadas automaticamente após 180 dias.</p>
+  ${s.itens && s.itens.length ? `<div class="tw" style="max-height:320px"><table><thead><tr><th>Quando</th><th>Quem</th><th>Área</th><th>Sugestão</th><th></th></tr></thead><tbody>${s.itens.map(x => `<tr class="${x.lida ? 'muted' : ''}"><td class="nw">${esc(dtBR(x.em))}</td><td class="sm">${esc(x.email)}</td><td>${esc(SUG_L[x.area] || x.area)}</td><td class="sm">${esc(x.texto)}</td><td>${x.lida ? '' : `<button class="btn ghost sm" data-a="admSugLida" data-id="${esc(x.id)}">Marcar como lida</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhuma sugestão recebida.</p>'}</div>`;
+}
 const ADM_ACT = {
+  admSugLida: async t => { try { await admApi('/api/adm/sugestoes', { id: t.dataset.id }); ADMV.sug = await admApi('/api/adm/sugestoes'); } catch (e) { toast(e.message); } render(); },
   admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
   admReload: () => { ADMV.data = null; ADMV.msg = ''; admLoad(); render(); },
   admExport: () => { if (!ADMV.data) return; TEL.mudo++; Promise.resolve(offer(`relatorio-administrativo-${new Date().toISOString().slice(0, 10)}.csv`, admCsv(ADMV.data))).finally(() => { TEL.mudo--; }); },

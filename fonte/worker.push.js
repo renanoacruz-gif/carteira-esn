@@ -6,7 +6,7 @@
 const PUSH_HOSTS = /^(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)$/;
 const PUSH_MAX_APARELHOS = 5, PUSH_LOTE = 40, PUSH_FALHAS_MAX = 5;
 const PUSH_MEM = { init: null, key: null, rate: new Map() };
-const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)', 'CREATE TABLE IF NOT EXISTS push_envios (dia TEXT NOT NULL, turno TEXT NOT NULL, aparelhos INTEGER NOT NULL DEFAULT 0, enviados INTEGER NOT NULL DEFAULT 0, pulados_uso INTEGER NOT NULL DEFAULT 0, removidos INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, adiados INTEGER NOT NULL DEFAULT 0, config_invalida INTEGER NOT NULL DEFAULT 0, ts TEXT NOT NULL, PRIMARY KEY(dia,turno))', 'CREATE TABLE IF NOT EXISTS push_resumo (email TEXT PRIMARY KEY, n INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_enviados (chave TEXT NOT NULL, endpoint TEXT NOT NULL, PRIMARY KEY(chave,endpoint))', 'CREATE TABLE IF NOT EXISTS push_pausa (email TEXT PRIMARY KEY, ate TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pref (email TEXT PRIMARY KEY, manha INTEGER NOT NULL DEFAULT 1, tarde INTEGER NOT NULL DEFAULT 1)'];
+const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)', 'CREATE TABLE IF NOT EXISTS push_envios (dia TEXT NOT NULL, turno TEXT NOT NULL, aparelhos INTEGER NOT NULL DEFAULT 0, enviados INTEGER NOT NULL DEFAULT 0, pulados_uso INTEGER NOT NULL DEFAULT 0, removidos INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, adiados INTEGER NOT NULL DEFAULT 0, config_invalida INTEGER NOT NULL DEFAULT 0, ts TEXT NOT NULL, PRIMARY KEY(dia,turno))', 'CREATE TABLE IF NOT EXISTS push_resumo (email TEXT PRIMARY KEY, n INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_enviados (chave TEXT NOT NULL, endpoint TEXT NOT NULL, PRIMARY KEY(chave,endpoint))', 'CREATE TABLE IF NOT EXISTS push_retornos (email TEXT PRIMARY KEY, r INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pausa (email TEXT PRIMARY KEY, ate TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pref (email TEXT PRIMARY KEY, manha INTEGER NOT NULL DEFAULT 1, tarde INTEGER NOT NULL DEFAULT 1)'];
 const pushB64u = b => { const a = new Uint8Array(b); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const pushUnb64u = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 const pushOk = env => !!(env && env.VAPID_PUBLIC && env.VAPID_PRIVATE);
@@ -86,6 +86,7 @@ async function pushRota(req, env, au, url) {
   if (p === '/api/push/resumo' && m === 'GET') { /* só o número agregado calculado no navegador do próprio usuário */
     const r = await db.prepare('SELECT n, em FROM push_resumo WHERE email=?').bind(au.user).first();
     const out = { ok: true, n: r ? r.n : null, em: r ? r.em : null };
+    const rr = await db.prepare('SELECT r, em FROM push_retornos WHERE email=?').bind(au.user).first(); if (rr) { out.r = rr.r; out.rem = rr.em; }
     if (au.user === String(env.PAINEL_ADMIN_EMAIL || 'renan.oscar@totvs.com.br').toLowerCase()) { /* só um sinal: o detalhe fica no painel */
       const al = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='push_alerta'").first(); let v = null; try { v = al && JSON.parse(al.valor); } catch { /* ignora */ }
       if (v && v.ts && Date.now() - Date.parse(v.ts) < 3 * 3600000) out.alerta = true;
@@ -106,7 +107,10 @@ async function pushRota(req, env, au, url) {
     const n = q.n; if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 999) return pushErro('requisicao_invalida', 'n deve ser um inteiro entre 0 e 999.', 400);
     const t = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
     if (!t || !t.n) return J({ ok: true, ignorado: true }); /* sem aparelho inscrito não guarda nada */
-    await db.prepare('INSERT INTO push_resumo(email,n,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET n=excluded.n, em=excluded.em').bind(au.user, n, new Date().toISOString()).run();
+    const r = q.r; if (r !== undefined && (typeof r !== 'number' || !Number.isInteger(r) || r < 0 || r > 999)) return pushErro('requisicao_invalida', 'r deve ser um inteiro entre 0 e 999.', 400);
+    const em = new Date().toISOString();
+    await db.prepare('INSERT INTO push_resumo(email,n,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET n=excluded.n, em=excluded.em').bind(au.user, n, em).run();
+    if (r !== undefined) await db.prepare('INSERT INTO push_retornos(email,r,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET r=excluded.r, em=excluded.em').bind(au.user, r, em).run();
     return J({ ok: true });
   }
   if (p === '/api/push/pausar') {
@@ -123,7 +127,7 @@ async function pushRota(req, env, au, url) {
     if (q.endpoint) await db.prepare('DELETE FROM push_subs WHERE endpoint=? AND email=?').bind(String(q.endpoint).slice(0, 1000), au.user).run();
     else await db.prepare('DELETE FROM push_subs WHERE email=?').bind(au.user).run();
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
-    if (!r || !r.n) { await db.prepare('DELETE FROM push_resumo WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pausa WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pref WHERE email=?').bind(au.user).run(); }
+    if (!r || !r.n) { await db.prepare('DELETE FROM push_resumo WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_retornos WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pausa WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pref WHERE email=?').bind(au.user).run(); }
     return J({ ok: true, aparelhos: r?.n || 0 });
   }
   if (p === '/api/push/teste') {
@@ -157,7 +161,7 @@ async function pushAgendado(env, quando) {
   const ts = new Date().toISOString();
   await db.prepare('INSERT INTO push_envios(dia,turno,aparelhos,enviados,pulados_uso,removidos,falhas,adiados,config_invalida,ts) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(dia,turno) DO UPDATE SET aparelhos=MAX(aparelhos,excluded.aparelhos), enviados=enviados+excluded.enviados, pulados_uso=MAX(pulados_uso,excluded.pulados_uso), removidos=removidos+excluded.removidos, falhas=falhas+excluded.falhas, adiados=excluded.adiados, config_invalida=MAX(config_invalida,excluded.config_invalida), ts=excluded.ts').bind(dia, turno, res.aparelhos, res.enviados, res.pulados_uso, res.removidos, res.falhas, res.adiados, res.config_invalida ? 1 : 0, ts).run();
   if (primeira) await db.prepare('DELETE FROM push_envios WHERE dia < ?').bind(new Date((quando || Date.now()) - 93 * 86400000).toISOString().slice(0, 10)).run();
-  await db.prepare('DELETE FROM push_resumo WHERE email NOT IN (SELECT email FROM push_subs)').run(); /* aparelho removido pelo envio: não deixa número órfão */
+  await db.prepare('DELETE FROM push_resumo WHERE email NOT IN (SELECT email FROM push_subs)').run(); await db.prepare('DELETE FROM push_retornos WHERE email NOT IN (SELECT email FROM push_subs)').run(); /* aparelho removido pelo envio: não deixa número órfão */
   await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('push_ultimo',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify({ ...res, ts })).run();
   return res;
 }

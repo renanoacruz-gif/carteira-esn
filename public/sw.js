@@ -8,10 +8,15 @@ async function resumoTexto() {
     const r = await fetch('/api/push/resumo', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store', signal: c.signal });
     if (!r.ok) return null;
     const j = await r.json(); if (j && j.ok && j.alerta === true) return 'Atenção: o lembrete diário teve um problema hoje. Abra o painel Administrador para ver o detalhe.';
-    if (!j || !j.ok || !Number.isInteger(j.n) || j.n < 1 || !j.em) return null;
+    if (!j || !j.ok || !j.em) return null;
     const em = new Date(j.em); if (!(Date.now() - em.getTime() < 5 * 86400000)) return null;
-    const hoje = em.toDateString() === new Date().toDateString(), q = j.n === 1 ? '1 cliente' : j.n + ' clientes';
-    return hoje ? q + ' com motivo para aprofundar hoje. Abra a ferramenta e veja quais.' : q + ' com motivo para aprofundar na sua última visita (' + String(em.getDate()).padStart(2, '0') + '/' + String(em.getMonth() + 1).padStart(2, '0') + '). Abra e confira.';
+    const n = Number.isInteger(j.n) && j.n > 0 ? j.n : 0, rok = Number.isInteger(j.r) && j.r > 0 && j.rem && Date.now() - new Date(j.rem).getTime() < 5 * 86400000, ret = rok ? j.r : 0;
+    if (!n && !ret) return null;
+    const hoje = em.toDateString() === new Date().toDateString(), q = n === 1 ? '1 cliente' : n + ' clientes', t = ret === 1 ? '1 retorno vencendo' : ret + ' retornos vencendo';
+    const dia = ' na sua última visita (' + String(em.getDate()).padStart(2, '0') + '/' + String(em.getMonth() + 1).padStart(2, '0') + ')';
+    if (n && ret) return q + ' com motivo para aprofundar e ' + t + (hoje ? ' hoje' : dia) + '. Abra a ferramenta e veja.';
+    if (ret) return t + (hoje ? ' hoje' : dia) + '. Abra a ferramenta e veja.';
+    return hoje ? q + ' com motivo para aprofundar hoje. Abra a ferramenta e veja quais.' : q + ' com motivo para aprofundar' + dia + '. Abra e confira.';
   } catch (e) { return null; } finally { clearTimeout(to); }
 }
 self.addEventListener('push', e => {

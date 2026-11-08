@@ -689,6 +689,7 @@ async function handleInner(req, env0, ctx) {
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
+  if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
   if (url.pathname.startsWith('/api/push/')) return pushRota(req, env0, au, url);
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
@@ -779,6 +780,7 @@ const ADM_DDL = [
   'CREATE INDEX IF NOT EXISTS eventos_ts ON eventos(ts)', 'CREATE INDEX IF NOT EXISTS eventos_usr ON eventos(usuario, ts)',
   'CREATE TABLE IF NOT EXISTS adm_cfg (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)',
+  'CREATE TABLE IF NOT EXISTS sugestoes (id TEXT PRIMARY KEY, email TEXT NOT NULL, em TEXT NOT NULL, area TEXT NOT NULL, texto TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0)',
   'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)'
 ];
 const admDb = env => env && env.DB && typeof env.DB.prepare === 'function' ? env.DB : null;
@@ -852,6 +854,7 @@ async function admGravar(env, linhas) {
 async function admPurgar(env, forcar) {
   const db = admDb(env); if (!db) return { eventos: 0, tentativas: 0 }; await admInit(env); const { cfg } = await admCfgLer(db), lim = new Date(Date.now() - cfg.retencao_dias * 864e5).toISOString();
   const a = await db.prepare('DELETE FROM eventos WHERE ts<?').bind(lim).run(), b = await db.prepare('DELETE FROM adm_tentativas WHERE ts<?').bind(new Date(Date.now() - 90 * 864e5).toISOString()).run();
+  await db.prepare('DELETE FROM sugestoes WHERE em<?').bind(new Date(Date.now() - 180 * 864e5).toISOString()).run();
   await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('ultima_purga', JSON.stringify(new Date().toISOString())).run();
   return { eventos: a.meta?.changes ?? 0, tentativas: b.meta?.changes ?? 0 };
 }
@@ -975,6 +978,28 @@ async function admResumo(env, url) {
   try { out.csp = ((await db.prepare('SELECT diretiva,alvo,n,ultimo FROM csp_obs ORDER BY n DESC LIMIT 30').all()).results || []); } catch { out.csp = []; }
   out.geradoEm = agora; return out;
 }
+const SUG_AREAS = ['geral', 'lembrete', 'importacao', 'oportunidades', 'briefing', 'retornos', 'outro'];
+const SUG_DADOS = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b|R\$\s*\d|\b\d{1,3}(\.\d{3})+,\d{2}\b/;
+/* POST /api/sug {area,texto} — qualquer executivo autenticado; texto livre curto, sem dados de cliente */
+async function admSugerir(req, env, au) {
+  const db = admDb(env); if (!db || !au.user) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'Indisponível no momento.' } }, 503);
+  let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
+  const area = SUG_AREAS.includes(q && q.area) ? q.area : null, texto = typeof (q && q.texto) === 'string' ? q.texto.replace(/\s+/g, ' ').trim() : '';
+  if (!area) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Escolha a área da sugestão.' } }, 400);
+  if (texto.length < 10 || texto.length > 1000) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Descreva a sugestão em 10 a 1000 caracteres.' } }, 400);
+  if (SUG_DADOS.test(texto)) return J({ ok: false, erro: { codigo: 'dados_sensiveis', mensagem: 'Não inclua CNPJ nem valores: descreva a ideia sem dados de clientes.' } }, 400);
+  await admInit(env);
+  const n = await db.prepare('SELECT COUNT(*) n FROM sugestoes WHERE email=? AND em>=?').bind(au.user, new Date(Date.now() - 864e5).toISOString()).first();
+  if (n && n.n >= 5) return J({ ok: false, erro: { codigo: 'limite', mensagem: 'Limite de 5 sugestões por dia. Tente amanhã.' } }, 429);
+  await db.prepare('INSERT INTO sugestoes(id,email,em,area,texto,lida) VALUES(?,?,?,?,?,0)').bind(crypto.randomUUID(), au.user, new Date().toISOString(), area, texto).run();
+  return J({ ok: true });
+}
+async function admSugestoes(req, env, url) {
+  const db = admDb(env); await admInit(env);
+  if (req.method === 'POST') { let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); } if (typeof (q && q.id) !== 'string' || q.id.length > 60) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'id inválido.' } }, 400); await db.prepare('UPDATE sugestoes SET lida=? WHERE id=?').bind(q.lida === false ? 0 : 1, q.id).run(); return J({ ok: true }); }
+  const r = await db.prepare('SELECT id,email,em,area,texto,lida FROM sugestoes ORDER BY lida ASC, em DESC LIMIT 100').all(), nl = await db.prepare('SELECT COUNT(*) n FROM sugestoes WHERE lida=0').first();
+  return J({ ok: true, itens: r.results || [], nao_lidas: nl ? nl.n : 0 });
+}
 async function admRoster(req, env, au) {
   const db = admDb(env); await admInit(env); let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
   const dom = '@' + DOMAIN_OK(env), agora = new Date().toISOString(); const lim = (await db.prepare('SELECT COUNT(*) c FROM adm_roster').first())?.c || 0;
@@ -1000,13 +1025,14 @@ async function admRota(req, env, au, url) {
   try {
     if (url.pathname === '/api/adm/resumo' && req.method === 'GET') return J({ ok: true, ...(await admResumo(env, url)) });
     if (url.pathname === '/api/adm/lembrete' && req.method === 'GET') return J({ ok: true, ...(await pushAdocao(env)) });
+    if (url.pathname === '/api/adm/sugestoes' && /^(GET|POST)$/.test(req.method)) return admSugestoes(req, env, url);
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
 
 /* ===== Lembrete diário (Web Push SEM conteúdo) =====
    Crons 12:00 e 17:00 UTC (09:00 e 14:00 em Brasília, UTC-3, sem horário de verão) de segunda a sexta. Envia um push vazio a cada aparelho inscrito;
@@ -1016,7 +1042,7 @@ export { admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
 const PUSH_HOSTS = /^(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)$/;
 const PUSH_MAX_APARELHOS = 5, PUSH_LOTE = 40, PUSH_FALHAS_MAX = 5;
 const PUSH_MEM = { init: null, key: null, rate: new Map() };
-const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)', 'CREATE TABLE IF NOT EXISTS push_envios (dia TEXT NOT NULL, turno TEXT NOT NULL, aparelhos INTEGER NOT NULL DEFAULT 0, enviados INTEGER NOT NULL DEFAULT 0, pulados_uso INTEGER NOT NULL DEFAULT 0, removidos INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, adiados INTEGER NOT NULL DEFAULT 0, config_invalida INTEGER NOT NULL DEFAULT 0, ts TEXT NOT NULL, PRIMARY KEY(dia,turno))', 'CREATE TABLE IF NOT EXISTS push_resumo (email TEXT PRIMARY KEY, n INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_enviados (chave TEXT NOT NULL, endpoint TEXT NOT NULL, PRIMARY KEY(chave,endpoint))', 'CREATE TABLE IF NOT EXISTS push_pausa (email TEXT PRIMARY KEY, ate TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pref (email TEXT PRIMARY KEY, manha INTEGER NOT NULL DEFAULT 1, tarde INTEGER NOT NULL DEFAULT 1)'];
+const PUSH_DDL = ['CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, email TEXT NOT NULL, criado_em TEXT NOT NULL, ultimo_ok TEXT, falhas INTEGER NOT NULL DEFAULT 0)', 'CREATE INDEX IF NOT EXISTS push_subs_email ON push_subs(email)', 'CREATE TABLE IF NOT EXISTS push_envios (dia TEXT NOT NULL, turno TEXT NOT NULL, aparelhos INTEGER NOT NULL DEFAULT 0, enviados INTEGER NOT NULL DEFAULT 0, pulados_uso INTEGER NOT NULL DEFAULT 0, removidos INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, adiados INTEGER NOT NULL DEFAULT 0, config_invalida INTEGER NOT NULL DEFAULT 0, ts TEXT NOT NULL, PRIMARY KEY(dia,turno))', 'CREATE TABLE IF NOT EXISTS push_resumo (email TEXT PRIMARY KEY, n INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_enviados (chave TEXT NOT NULL, endpoint TEXT NOT NULL, PRIMARY KEY(chave,endpoint))', 'CREATE TABLE IF NOT EXISTS push_retornos (email TEXT PRIMARY KEY, r INTEGER NOT NULL, em TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pausa (email TEXT PRIMARY KEY, ate TEXT NOT NULL)', 'CREATE TABLE IF NOT EXISTS push_pref (email TEXT PRIMARY KEY, manha INTEGER NOT NULL DEFAULT 1, tarde INTEGER NOT NULL DEFAULT 1)'];
 const pushB64u = b => { const a = new Uint8Array(b); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const pushUnb64u = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 const pushOk = env => !!(env && env.VAPID_PUBLIC && env.VAPID_PRIVATE);
@@ -1096,6 +1122,7 @@ async function pushRota(req, env, au, url) {
   if (p === '/api/push/resumo' && m === 'GET') { /* só o número agregado calculado no navegador do próprio usuário */
     const r = await db.prepare('SELECT n, em FROM push_resumo WHERE email=?').bind(au.user).first();
     const out = { ok: true, n: r ? r.n : null, em: r ? r.em : null };
+    const rr = await db.prepare('SELECT r, em FROM push_retornos WHERE email=?').bind(au.user).first(); if (rr) { out.r = rr.r; out.rem = rr.em; }
     if (au.user === String(env.PAINEL_ADMIN_EMAIL || 'renan.oscar@totvs.com.br').toLowerCase()) { /* só um sinal: o detalhe fica no painel */
       const al = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='push_alerta'").first(); let v = null; try { v = al && JSON.parse(al.valor); } catch { /* ignora */ }
       if (v && v.ts && Date.now() - Date.parse(v.ts) < 3 * 3600000) out.alerta = true;
@@ -1116,7 +1143,10 @@ async function pushRota(req, env, au, url) {
     const n = q.n; if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 999) return pushErro('requisicao_invalida', 'n deve ser um inteiro entre 0 e 999.', 400);
     const t = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
     if (!t || !t.n) return J({ ok: true, ignorado: true }); /* sem aparelho inscrito não guarda nada */
-    await db.prepare('INSERT INTO push_resumo(email,n,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET n=excluded.n, em=excluded.em').bind(au.user, n, new Date().toISOString()).run();
+    const r = q.r; if (r !== undefined && (typeof r !== 'number' || !Number.isInteger(r) || r < 0 || r > 999)) return pushErro('requisicao_invalida', 'r deve ser um inteiro entre 0 e 999.', 400);
+    const em = new Date().toISOString();
+    await db.prepare('INSERT INTO push_resumo(email,n,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET n=excluded.n, em=excluded.em').bind(au.user, n, em).run();
+    if (r !== undefined) await db.prepare('INSERT INTO push_retornos(email,r,em) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET r=excluded.r, em=excluded.em').bind(au.user, r, em).run();
     return J({ ok: true });
   }
   if (p === '/api/push/pausar') {
@@ -1133,7 +1163,7 @@ async function pushRota(req, env, au, url) {
     if (q.endpoint) await db.prepare('DELETE FROM push_subs WHERE endpoint=? AND email=?').bind(String(q.endpoint).slice(0, 1000), au.user).run();
     else await db.prepare('DELETE FROM push_subs WHERE email=?').bind(au.user).run();
     const r = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE email=?').bind(au.user).first();
-    if (!r || !r.n) { await db.prepare('DELETE FROM push_resumo WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pausa WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pref WHERE email=?').bind(au.user).run(); }
+    if (!r || !r.n) { await db.prepare('DELETE FROM push_resumo WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_retornos WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pausa WHERE email=?').bind(au.user).run(); await db.prepare('DELETE FROM push_pref WHERE email=?').bind(au.user).run(); }
     return J({ ok: true, aparelhos: r?.n || 0 });
   }
   if (p === '/api/push/teste') {
@@ -1167,7 +1197,7 @@ async function pushAgendado(env, quando) {
   const ts = new Date().toISOString();
   await db.prepare('INSERT INTO push_envios(dia,turno,aparelhos,enviados,pulados_uso,removidos,falhas,adiados,config_invalida,ts) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(dia,turno) DO UPDATE SET aparelhos=MAX(aparelhos,excluded.aparelhos), enviados=enviados+excluded.enviados, pulados_uso=MAX(pulados_uso,excluded.pulados_uso), removidos=removidos+excluded.removidos, falhas=falhas+excluded.falhas, adiados=excluded.adiados, config_invalida=MAX(config_invalida,excluded.config_invalida), ts=excluded.ts').bind(dia, turno, res.aparelhos, res.enviados, res.pulados_uso, res.removidos, res.falhas, res.adiados, res.config_invalida ? 1 : 0, ts).run();
   if (primeira) await db.prepare('DELETE FROM push_envios WHERE dia < ?').bind(new Date((quando || Date.now()) - 93 * 86400000).toISOString().slice(0, 10)).run();
-  await db.prepare('DELETE FROM push_resumo WHERE email NOT IN (SELECT email FROM push_subs)').run(); /* aparelho removido pelo envio: não deixa número órfão */
+  await db.prepare('DELETE FROM push_resumo WHERE email NOT IN (SELECT email FROM push_subs)').run(); await db.prepare('DELETE FROM push_retornos WHERE email NOT IN (SELECT email FROM push_subs)').run(); /* aparelho removido pelo envio: não deixa número órfão */
   await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('push_ultimo',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify({ ...res, ts })).run();
   return res;
 }

@@ -233,6 +233,8 @@ function briefBlocks(M) {
     ['45-55 min', 'Serviços e governança', `Rever serviços avulsos/suporte (${brBRL(N.avulso.v + (sv.rows.length ? sv.v : 0))}), responsáveis pela conta e rito de acompanhamento do consumo.`],
     ['55-60 min', 'Encerramento', 'Registrar decisões, responsáveis, prazos e data do próximo contato.']] });
   if (Qs.length) { H('Perguntas de descoberta (do cadastro do cliente)'); B.push({ k: 'list', items: Qs }); }
+  { const rt = typeof rtLista === 'function' ? rtLista(c) : [], rn = typeof rnvItens === 'function' ? rnvItens().filter(x => x.c === c && x.d >= 0) : [];
+    if (rt.length || rn.length) { H('Combinados em aberto e datas confirmadas'); B.push({ k: 'list', items: [...rt.slice(0, 8).map(r => `${r.texto}${r.prazo ? ` — prazo ${fmtD(r.prazo)}` : ''}${r.resp ? ` (${r.resp})` : ''}`), ...rn.slice(0, 4).map(x => `${x.kind} confirmada em ${fmtD(x.iso)} (${x.d} dia(s))`)] }); } }
   const pend = []; if (c.fstat?.why) pend.push(...[].concat(c.fstat.why).map(String).slice(0, 3)); if (M.textOnly) pend.push('Ficha sem colunas: reenviar em XLSX/CSV.');
   if (pend.length) { H('Pendências de dados'); B.push({ k: 'list', items: pend }); }
   B.push({ k: 'foot', t: `Fontes: ficha(s) de faturamento ${M.files.join('; ') || '—'}${M.comp ? ' · competência ' + M.comp.split('-').reverse().join('/') : ''}; cadastro e contratos da carteira. Gerado localmente em ${new Date().toLocaleDateString('pt-BR')}, sem IA e sem envio de dados. Não constitui proposta comercial.`, sig: [E.nome, E.contato].filter(Boolean).join(' · ') });
