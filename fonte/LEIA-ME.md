@@ -17,6 +17,12 @@ Fluxo: alterar aqui → rodar build → commitar `public/` e `src/` → o Cloudf
 - /sobre v1.5. Testes: `t70.py` (73), `t68_sw.mjs` (26).
 - **Não feito (Q2)**: xlsx ≥0.19.3 só em cdn.sheetjs.com (403 neste ambiente; baixe o `.tgz` e substitua `vendor/xlsx.full.min.js`); jspdf 2.5.1→4.x e pdfjs 3→6 são saltos de versão maior que exigem regressão visual dos PDFs.
 
+## Mapa de features — Onda 3 (branch `feat/mapa-ondas`)
+- R5 Resumo da semana (`semanaCard`, calculado dos registros atuais; sem histórico próprio; copiar como texto). P4 Roteiro de descoberta (aba Reunião; perguntas das oportunidades ativas e do cadastro, marcadas como hipóteses). Q8 Busca global (`buscaGlobal`, só no navegador: clientes, retornos, anotações, documentos, Base de Soluções, Mercado).
+- R6 Ditado (Web Speech, `dictOk`): só aparece se o navegador tem a API e no modo hospedado; pede confirmação na 1ª vez (o áudio vai ao serviço de voz do fabricante). **Não verificado em iPhone/Android reais** (teste com a API simulada).
+- Não feito: I5 (aplicar ajustes do motor) — `util.js` define que sugestões não alteram pesos/regras/resultados; mudar isso é decisão de produto, não técnica. I3 (radar agendado) fica fora: exigiria cron com busca na web e chave de IA no servidor (decisão I4).
+- Testes: `t71.py` (29).
+
 ## Segurança (rodada 16)
 - Testes: `t48a.py` (API: IDOR, catálogo, SSRF, OCR, cabeçalhos, CSP) e `t48b.py` (navegador: XSS por mutação, CSV, backup malicioso, arquivos inválidos). Requerem `wrangler dev --local` com `ALLOW_TEST_USER=1`.
 - Variante hospedada: bibliotecas em `public/vendor` (versões/SHA-256 em `fonte/vendor/VENDOR.md`) e cabeçalhos em `public/_headers`. A CSP completa está em *Report-Only*; violações aparecem no painel Administrador.

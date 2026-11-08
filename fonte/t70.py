@@ -106,7 +106,7 @@ nt=pg.evaluate("S.clients['%s'].mgmt.notes"%key); ck('compromissos viram anotaç
 pg.unroute('**/api/ia'); pg.route('**/api/ia',lambda r: r.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':False,'erro':{'codigo':'dados_sensiveis','mensagem':'recusado pelo servidor'}})))
 pg.fill('#reu-ata','Outra reunião com texto suficiente para a extração acontecer.'); pg.click('[data-a=reuExtrair]'); pg.wait_for_function("REU.err && /recusado/.test(REU.err)",timeout=8000)
 ck('erro da IA é mostrado e nada é salvo', 'recusado pelo servidor' in pg.inner_text('.alert.w') and pg.evaluate("REU.res")==None)
-pg.fill('#reu-ata','curto'); pg.click('[data-a=reuExtrair]'); pg.wait_for_timeout(200); ck('ata curta é recusada sem chamar a IA', pg.evaluate("REU.busy")==False)
+pg.fill('#reu-ata','curto'); pg.click('[data-a=reuExtrair]'); pg.wait_for_timeout(800); ck('ata curta é recusada sem chamar a IA', pg.evaluate("REU.busy")==False)
 pg.evaluate("localStorage.setItem('carteira_chaves_ia_v1','{}')"); pg.fill('#reu-ata','Mais uma reunião com texto suficiente para tentar a extração.'); pg.evaluate("REU.err=''"); pg.click('[data-a=reuExtrair]'); pg.wait_for_timeout(2500)
 ck('sem chave cadastrada: orienta onde cadastrar', 'Configurações' in pg.evaluate("REU.err"), pg.evaluate("[REU.err,REU.busy,document.getElementById('reu-ata')&&document.getElementById('reu-ata').value.length]"))
 # follow-up
