@@ -4275,7 +4275,7 @@ async function bkDireto(tipo, pedido, timeout = tipo === 'importar' ? 170000 : t
 /* Envia um pedido. Retorna {via:'direto', resp} ou {via:'manual'} (arquivo oferecido para download). Nunca finge sucesso. */
 async function bkChamar(tipo, pedido, arquivo) {
   if (pedido?.provedor === 'pagina') { if (tipo === 'ocr') return { via: 'direto', resp: await pgOcr(pedido) }; if (tipo === 'ia' || tipo === 'ia_teste') return { via: 'direto', resp: await pgIA(tipo, pedido) }; }
-  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Integrações → Minhas chaves de IA.`); }
+  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Configurações → IA e provedores → Minhas chaves de IA.`); }
   if (window.__HOSTED__ || (BK.direto !== false && bkPronto() && BK.token)) {
     try { return { via: 'direto', resp: await bkDireto(tipo, pedido) }; }
     catch (e) { BK.ultimoErro = e.message; if (window.__HOSTED__ || !['bloqueado_ambiente', 'rede'].includes(e.codigo)) throw e; }
@@ -4964,7 +4964,7 @@ function pendItems() {
       if (d.valid === 'validada' && d.sit === 'nao_iniciada' && dias(d.at || nowISO()) >= PD_DIAS_ACOMP) add('acomp', c, 'Validada sem avanço comercial', `${o.titulo || o.acao} • validada há ${dias(d.at)} dia(s), situação ainda "Não iniciada".`);
       else if (['descoberta', 'reuniao', 'negociacao'].includes(d.sit) && d.at && dias(d.at) >= PD_DIAS_ACOMP) add('acomp', c, `Parada em "${SIT_L[d.sit]}"`, `${o.titulo || o.acao} • sem registro há ${dias(d.at)} dia(s).`);
     });
-    Object.entries(c.act || {}).filter(([k, a]) => !k.startsWith('opp:') && a.prazo && !['Concluído', 'Descartado'].includes(a.status)).forEach(([k, a]) => { if (a.prazo < hoje) add('acao', c, 'Prazo vencido: tarefa do plano', `${k.startsWith('ins:') ? 'Ação de mercado' : 'Tarefa'} • prazo ${fmtD(a.prazo)}${a.resp ? ' • resp. ' + a.resp : ''}`, { prazo: a.prazo }); else if (a.prazo <= em7) add('prox', c, 'Prazo próximo: tarefa do plano', `prazo ${fmtD(a.prazo)}`, { prazo: a.prazo }); });
+    Object.entries(c.act || {}).filter(([k, a]) => !k.startsWith('opp:') && a.prazo && !['Concluído', 'Descartado'].includes(a.status)).forEach(([k, a]) => { if (a.prazo < hoje) add('acao', c, 'Prazo vencido: tarefa do plano', `${k.startsWith('ins:') ? 'Ação de mercado' : (a.texto || 'Tarefa')} • prazo ${fmtD(a.prazo)}${a.resp ? ' • resp. ' + a.resp : ''}`, { prazo: a.prazo }); else if (a.prazo <= em7) add('prox', c, 'Prazo próximo: tarefa do plano', `${a.texto ? a.texto + ' • ' : ''}prazo ${fmtD(a.prazo)}`, { prazo: a.prazo }); });
   });
   S.inbox.forEach(it => add('inbox', null, `${it.file}${it.loc ? ' • ' + it.loc : ''}`, it.note || 'Associar a um cliente.', { inbox: true }));
   const rp = refPending().length; if (rp) add('ref', null, `${rp} item(ns) de release/regulatório aguardando revisão`, 'Confirmar ou rejeitar antes de entrarem no diagnóstico.', { nav: 'refs' });
@@ -5682,10 +5682,10 @@ function icapLinhas() {
   return L;
 }
 function icapHtml() {
-  const L = icapLinhas(), est = o => o === true ? pill('Verificado em execução real', 'ok') : o === false ? pill('Com erro / não comprovado', 'bad') : pill('Não verificado', 'off');
+  const H = !!window.__HOSTED__, L = icapLinhas().filter(x => !(H && x.via === 'Claude desta página')).map(x => H ? { ...x, nota: /Claude desta página/.test(x.nota || '') ? '' : x.nota, ...(x.pend ? { pend: 'O servidor já está no ar: faça uma execução real pela tela correspondente (com sua chave em Configurações → IA e provedores) e o resultado fica registrado aqui.' } : {}) } : x), est = o => o === true ? pill('Verificado em execução real', 'ok') : o === false ? pill('Com erro / não comprovado', 'bad') : pill('Não verificado', 'off');
   return `<div class="card"><h3>Capacidades por tarefa</h3><p class="sm">Cada linha é uma capacidade distinta: <b>sucesso em texto não prova busca na web nem leitura de imagem</b>. “Verificado” significa que houve uma execução real bem-sucedida registrada aqui; simulações e testes de código não contam. Credenciais ficam só no backend e nunca são exibidas; o app registra resultado e hora, não o conteúdo enviado.</p>
   <div class="tw"><table class="chain"><thead><tr><th>Capacidade</th><th>Caminho</th><th>Estado</th><th>Última execução</th><th>Para onde os dados vão</th><th>Para ativar</th></tr></thead><tbody>${L.map(x => `<tr><td><b>${esc(x.cap)}</b>${x.nota ? `<div class="muted sm">${esc(x.nota)}</div>` : ''}</td><td>${esc(x.via)}</td><td>${est(x.ok)}</td><td class="sm">${x.det ? esc(x.det) : '<span class="muted">nunca executada</span>'}</td><td class="sm">${esc(x.dest)}</td><td class="sm">${x.ok === true ? '<span class="muted">—</span>' : esc(x.pend)}</td></tr>`).join('')}</tbody></table></div>
-  <div class="row"><button class="btn pri sm" data-a="pgTestarBtn">Testar Claude desta página (texto, JSON e imagem)</button><span class="muted sm">${S.meta.pgTeste ? 'Último teste: ' + esc(dtBR(S.meta.pgTeste.at)) : 'Ainda não testado.'}</span></div></div>`;
+  ${H ? '' : `<div class="row"><button class="btn pri sm" data-a="pgTestarBtn">Testar Claude desta página (texto, JSON e imagem)</button><span class="muted sm">${S.meta.pgTeste ? 'Último teste: ' + esc(dtBR(S.meta.pgTeste.at)) : 'Ainda não testado.'}</span></div>`}</div>`;
 }
 const ICAP_ACT = { pgTestarBtn: async () => { toast('Testando o Claude desta página…'); try { const R = await pgTestar(); toast(R.texto?.ok && R.json?.ok ? 'Teste concluído: texto e JSON OK' + (R.ocr?.ok ? ', imagem OK.' : '; imagem: ' + (R.ocr?.msg || 'falhou')) : 'Teste com falha: ' + (R.texto?.msg || R.json?.msg), R.texto?.ok && R.json?.ok ? 'ok' : 'bad'); } catch (e) { toast('Falha no teste: ' + pgErr(e).mensagem, 'bad'); } render(); } };
 
@@ -6140,7 +6140,7 @@ function vGeral(forExport) {
   const tipos = s.count(s.opps, o => o.tipo), prio = s.count(s.opps, o => o.prio), conf = s.count(s.opps, o => o.conf), segd = s.count(s.cs, c => segName(c.segInfo.id) || 'Sem segmento definido');
   const k = (v, l, n = '', c = '') => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div><div class="n">${n}</div></div>`;
   let h = `<div class="grid g4">${k(s.n, 'Clientes importados', 'FATO • planilha')}${k(s.withF, 'Com ficha confirmada', `${s.pct(s.withF, s.n)}% da carteira`, 'm')}${k(S.inbox.length + s.cs.filter(c => c.doc.k === 'sugerida').length, 'Fichas/docs pendentes', 'sugeridas ou sem cliente', 'w')}${k(s.need.length, 'Clientes a validar', 'conflito, vínculo sugerido ou segmento inferido', 'r')}${(() => { const R = radarData(); return k(R.ident.length, 'Oportunidades identificadas', `${R.hip.length} hipótese(s) de investigação (não contadas como oportunidade)`, 'm'); })()}</div>`;
-  h += (forExport ? '' : hojeCard() + radarCard()) + segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard() + dtCard());
+  h += (forExport ? '' : hojeCard() + radarCard()) + segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard() + dtCard() + rnvCard() + riscoCard() + semanaCard() + buscaCard());
   h += `<div class="grid g2" style="margin-top:14px"><div class="card"><h3>Qualidade dos dados</h3>${bars(s.dq.map(([l, v]) => [l, v, `${v}/${s.n} (${s.pct(v, s.n)}%)`]))}</div>
   <div class="card"><h3>Distribuição por segmento</h3>${bars(segd.map(([l, v]) => [l, v, `${v} (${s.pct(v, s.n)}%)`]))}<p class="muted sm">${s.cs.filter(c => c.segInfo.mode === 'inferido').length} cliente(s) com segmento ${chip('INFERÊNCIA')}.</p></div></div>
   <div class="card"><h3>Faturamento recorrente identificado em fichas</h3>`;
@@ -6151,7 +6151,7 @@ function vGeral(forExport) {
   h += `<div class="row sm muted">MRR informado na planilha: <b style="color:var(--pet)">${fmtBRL(s.mrrSum)}</b> em ${s.mrrN} de ${s.n} clientes ${chip('FATO')} (autodeclarado; competência de referência não informada — não comparar com fichas).</div></div>
   <div class="grid g3"><div class="card"><h3>Indicações por tipo <span class="muted sm">(identificadas + hipóteses)</span></h3>${bars(tipos.map(([l, v]) => [l, v]))}</div><div class="card"><h3>Por prioridade</h3>${bars(prio.map(([l, v]) => [l, v]), 'lr')}<p class="muted sm">Prioridade ≠ confiança da análise ≠ probabilidade de fechamento.</p></div><div class="card"><h3>Por confiança da análise</h3>${bars(conf.map(([l, v]) => [l, v]), 'rs')}</div></div>
   <div class="card"><h3>Clientes que precisam de validação <span class="pill p-bad">${s.need.length}</span></h3>${s.need.length ? `<div class="tw" style="max-height:300px"><table><thead><tr><th>Cliente</th><th>Motivos</th></tr></thead><tbody>${s.need.slice(0, 60).map(c => `<tr class="clk" ${forExport ? '' : `data-a="open" data-k="${esc(c.key)}"`}><td>${esc(c.name)}</td><td class="sm">${[c.conflicts.length ? pill('conflito ficha × planilha', 'bad') : '', c.doc.k === 'sugerida' ? pill('vínculo de ficha sugerido', 'warn') : '', c.fstat.k === 'revisao' ? pill('ficha: revisão necessária', 'bad') : '', c.segInfo.mode === 'inferido' ? pill('segmento inferido', 'warn') : '', c.segInfo.mode === 'ausente' ? pill('segmento ausente', 'off') : '', c.segInfo.mode === 'nao_mapeado' ? pill('segmento não mapeado', 'off') : ''].join(' ')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Nenhum.</p>'}</div>`;
-  if (!forExport) h += `<div class="card"><h3>Exportar</h3><div class="row"><button class="btn" data-a="expXLSX">Análise completa (XLSX)</button><button class="btn ghost" data-a="expCSV">Plano de ação (CSV)</button><button class="btn ghost" data-a="expInfo">Infográfico (HTML)</button></div>${fbBox()}</div>`;
+  if (!forExport) h += `<div class="card"><h3>Exportar</h3><div class="row"><button class="btn" data-a="expXLSX">Análise completa (XLSX)</button><button class="btn ghost" data-a="expCSV">Plano de ação (CSV)</button><button class="btn ghost" data-a="expInfo">Infográfico (HTML)</button><button class="btn ghost" data-a="crmExp">Para CRM / Mesa de Forecast (CSV)</button></div>${fbBox()}</div>`;
   return h;
 }
 
@@ -6492,7 +6492,7 @@ function vIA() {
 }
 
 /* ===== INTERFACE: GESTÃO CONSULTIVA (cliente em abas, releases e regulatório, painel) ===== */
-const CTABS = [['raiox', 'Raio-X'], ['resumo', 'Resumo'], ['cadastro', 'Cadastro e contratos'], ['fichas', 'Fichas'], ['contratacao', 'Contratação e licenciamento'], ['tecnologia', 'Tecnologia (release)'], ['regulatorio', 'Fiscal e regulatório'], ['roi', 'ROI'], ['ecossistema', 'Ecossistema e Techfin'], ['diagnostico', 'Diagnóstico executivo'], ['briefing', 'Briefing pré-reunião'], ['validacao', 'Validação']];
+const CTABS = [['raiox', 'Raio-X'], ['resumo', 'Resumo'], ['cadastro', 'Cadastro e contratos'], ['fichas', 'Fichas'], ['contratacao', 'Contratação e licenciamento'], ['tecnologia', 'Tecnologia (release)'], ['regulatorio', 'Fiscal e regulatório'], ['roi', 'ROI'], ['ecossistema', 'Ecossistema e Techfin'], ['diagnostico', 'Diagnóstico executivo'], ['briefing', 'Briefing pré-reunião'], ['reuniao', 'Reunião e retornos'], ['validacao', 'Validação']];
 const kk = c => esc(c.key);
 const stPill = st => pill({ confirmado: 'confirmado', candidato: 'a revisar', descartado: 'descartado', substituido: 'substituído' }[st] || st, { confirmado: 'ok', candidato: 'warn', descartado: 'off', substituido: 'off' }[st] || 'off');
 const clsSel = (attrs, cur, list = CLS5) => `<select ${attrs}>${list.map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('')}</select>`;
@@ -6538,7 +6538,7 @@ function vCliente(all) {
   let h = `<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" data-a="nav" data-v="clientes">← Clientes</button><h2>${esc(c.name)}</h2>${fPill(c)} ${docPill(c)}${shForaPill(c)}<span class="sp"></span><button class="btn ghost" data-a="pesqCli" data-k="${kk(c)}">Pesquisar soluções para este cliente</button><button class="btn ghost" data-a="expCli" data-k="${kk(c)}">Relatório do cliente (HTML)</button><button class="btn" data-a="briefOpen" data-k="${kk(c)}">Briefing pré-reunião</button><button class="btn pri" data-a="ctab" data-v="diagnostico">Gerar diagnóstico executivo</button></div>
   ${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
   if (!all) h += `<div class="ctabs">${CTABS.map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const T = { validacao: () => valTab(c), raiox: () => rxTab(c), resumo: () => resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c), briefing: () => tabBrief(c) };
+  const T = { validacao: () => valTab(c), raiox: () => rxTab(c), resumo: () => resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
   if (all) h += ['raiox', 'resumo', 'cadastro', 'fichas', 'contratacao', 'tecnologia', 'regulatorio', 'roi', 'ecossistema'].map(k => `<h2 style="margin:18px 0 6px">${CTABS.find(x => x[0] === k)[1]}</h2>` + T[k]()).join('');
   else h += T[tab]();
   return h;
@@ -7092,7 +7092,7 @@ const prImp = (c, id) => (c.prImp || []).find(i => i.id === id);
 /* ---------- configuração de OCR: sem ela, arquivos ficam guardados e a ação necessária é mostrada ---------- */
 function prOcrPronto() {
   if (aiTarefa('ocr').prov === 'pagina') return { ok: true };
-  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Integrações → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
+  if (window.__HOSTED__) return hkChave('gemini') ? { ok: true } : { ok: false, acao: 'Cadastre a sua chave do Google Gemini em Configurações → IA e provedores → Minhas chaves de IA (o OCR usa o Gemini).', nav: 'integra' };
   if (bkModo() === 'manual') return { ok: false, acao: 'Este ambiente não chama o backend de OCR diretamente. Configure o backend em Integrações ou escolha o provedor “Claude desta página” em Configurar IA.', nav: 'integra' };
   return { ok: true };
 }
@@ -7783,6 +7783,8 @@ function briefBlocks(M) {
     ['45-55 min', 'Serviços e governança', `Rever serviços avulsos/suporte (${brBRL(N.avulso.v + (sv.rows.length ? sv.v : 0))}), responsáveis pela conta e rito de acompanhamento do consumo.`],
     ['55-60 min', 'Encerramento', 'Registrar decisões, responsáveis, prazos e data do próximo contato.']] });
   if (Qs.length) { H('Perguntas de descoberta (do cadastro do cliente)'); B.push({ k: 'list', items: Qs }); }
+  { const rt = typeof rtLista === 'function' ? rtLista(c) : [], rn = typeof rnvItens === 'function' ? rnvItens().filter(x => x.c === c && x.d >= 0) : [];
+    if (rt.length || rn.length) { H('Combinados em aberto e datas confirmadas'); B.push({ k: 'list', items: [...rt.slice(0, 8).map(r => `${r.texto}${r.prazo ? ` — prazo ${fmtD(r.prazo)}` : ''}${r.resp ? ` (${r.resp})` : ''}`), ...rn.slice(0, 4).map(x => `${x.kind} confirmada em ${fmtD(x.iso)} (${x.d} dia(s))`)] }); } }
   const pend = []; if (c.fstat?.why) pend.push(...[].concat(c.fstat.why).map(String).slice(0, 3)); if (M.textOnly) pend.push('Ficha sem colunas: reenviar em XLSX/CSV.');
   if (pend.length) { H('Pendências de dados'); B.push({ k: 'list', items: pend }); }
   B.push({ k: 'foot', t: `Fontes: ficha(s) de faturamento ${M.files.join('; ') || '—'}${M.comp ? ' · competência ' + M.comp.split('-').reverse().join('/') : ''}; cadastro e contratos da carteira. Gerado localmente em ${new Date().toLocaleDateString('pt-BR')}, sem IA e sem envio de dados. Não constitui proposta comercial.`, sig: [E.nome, E.contato].filter(Boolean).join(' · ') });
@@ -8803,6 +8805,7 @@ async function admLoad() {
     const p = new URLSearchParams(); if (ADMV.de && ADMV.ate) { p.set('de', new Date(ADMV.de + 'T00:00:00').toISOString()); p.set('ate', new Date(ADMV.ate + 'T23:59:59').toISOString()); } else p.set('dias', String(ADMV.dias));
     if (ADMV.func) p.set('func', ADMV.func);
     ADMV.data = await admApi('/api/adm/resumo?' + p.toString());
+    try { ADMV.sug = await admApi('/api/adm/sugestoes'); } catch { ADMV.sug = { erro: true }; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -8863,7 +8866,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admLemCard(ADMV.lem);
+  h += admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -8878,6 +8881,14 @@ function admLemCard(l) {
     ${(l.historico || []).length ? `<details class="sm" style="margin-top:8px"><summary>Últimos turnos (${l.historico.length})</summary><div class="tw"><table><thead><tr><th>Dia</th><th>Turno</th><th class="r">Aparelhos</th><th class="r">Enviados</th><th class="r">Já abriram</th><th class="r">Removidos</th><th class="r">Falhas</th><th class="r">Adiados</th></tr></thead><tbody>${l.historico.map(x => `<tr><td>${esc(x.dia)}</td><td>${lt(x.turno)}</td><td class="r">${x.aparelhos}</td><td class="r">${x.enviados}</td><td class="r">${x.pulados_uso}</td><td class="r">${x.removidos}</td><td class="r">${x.falhas}${x.config_invalida ? ' ⚠' : ''}</td><td class="r">${x.adiados}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="sm muted" style="margin-top:8px">Nenhum turno registrado ainda.</div>'}
     <div class="sm muted" style="margin-top:6px">Mostra só contagens por turno; não há e-mails nem endereços de aparelho aqui. Envio é tentativa: entrega depende do navegador e do sistema do aparelho.</div></div>`;
 }
+function admConviteTxt() {
+  const u = location.origin;
+  return `Olá! A Gestão de Carteira ESN já está no ar: ${u}\n\nEntre com seu e-mail @totvs.com.br (o sistema envia um código por e-mail). Na tela inicial, o quadro "Primeiros passos" guia: importar sua carteira, conectar sua chave de IA, anexar uma ficha e ativar o lembrete das 9h e das 14h.\n\nSua carteira é privada: só você a vê. Termos e privacidade: ${u}/sobre/\n\nQualquer dúvida, é só me chamar.`;
+}
+function admConviteCard() {
+  return `<div class="card" id="adm-convite"><h3>Convite para novos executivos</h3><p class="sm muted">Texto pronto para enviar por e-mail ou chat. Edite à vontade antes de copiar. Quem entra precisa ter e-mail @totvs.com.br; o acesso é liberado pelo Cloudflare Access.</p>
+    <textarea id="adm-convite-txt" rows="7" style="width:100%">${esc(admConviteTxt())}</textarea><div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="admCopiarConvite">Copiar texto</button></div></div>`;
+}
 function admCsv(d) {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
   L.push(['Relatório administrativo', 'Período', d.periodo.de, d.periodo.ate, 'Cobertura desde', d.cobertura_inicio || ''].map(q).join(';'));
@@ -8890,7 +8901,16 @@ function admCsv(d) {
   return '﻿' + L.join('\r\n');
 }
 function admRosterParse(txt) { return String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[;,\t]/).map(x => x.trim()); return { email: p[0], nome: p[1] || '' }; }).filter(x => /@/.test(x.email)); }
+const SUG_L = { geral: 'Geral', lembrete: 'Lembrete diário', importacao: 'Importação', oportunidades: 'Oportunidades', briefing: 'Briefing', retornos: 'Retornos e reuniões', outro: 'Outro' };
+function admSugCard(s) {
+  if (!s || s.erro) return '';
+  return `<div class="card"><h3>Sugestões do time <span class="pill ${s.nao_lidas ? 'p-warn' : 'p-info'}">${s.nao_lidas || 0} nova(s)</span></h3>
+  <p class="muted sm">Texto livre enviado por cada executivo em Conta → Sugerir melhoria (sem CNPJ nem valores). Apagadas automaticamente após 180 dias.</p>
+  ${s.itens && s.itens.length ? `<div class="tw" style="max-height:320px"><table><thead><tr><th>Quando</th><th>Quem</th><th>Área</th><th>Sugestão</th><th></th></tr></thead><tbody>${s.itens.map(x => `<tr class="${x.lida ? 'muted' : ''}"><td class="nw">${esc(dtBR(x.em))}</td><td class="sm">${esc(x.email)}</td><td>${esc(SUG_L[x.area] || x.area)}</td><td class="sm">${esc(x.texto)}</td><td>${x.lida ? '' : `<button class="btn ghost sm" data-a="admSugLida" data-id="${esc(x.id)}">Marcar como lida</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhuma sugestão recebida.</p>'}</div>`;
+}
 const ADM_ACT = {
+  admSugLida: async t => { try { await admApi('/api/adm/sugestoes', { id: t.dataset.id }); ADMV.sug = await admApi('/api/adm/sugestoes'); } catch (e) { toast(e.message); } render(); },
+  admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
   admReload: () => { ADMV.data = null; ADMV.msg = ''; admLoad(); render(); },
   admExport: () => { if (!ADMV.data) return; TEL.mudo++; Promise.resolve(offer(`relatorio-administrativo-${new Date().toISOString().slice(0, 10)}.csv`, admCsv(ADMV.data))).finally(() => { TEL.mudo--; }); },
   admCfgSave: async () => {
@@ -8919,12 +8939,12 @@ async function admRosterFile(f) {
 }
 
 /* Lembretes 9h e 14h (seg-sex) por notificação do navegador (Web Push). Estado em memória; "agora não" fica em localStorage. */
-const LEM = { st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
+const LEM = { foco: false, st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
 try {
   LEM.sup = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   LEM.ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   LEM.app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); setTimeout(() => toast('Bom dia! Hora de olhar a carteira de hoje.'), 800); }
+  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); LEM.foco = true; setTimeout(() => toast('Hora de olhar a carteira de hoje.'), 800); }
 } catch { /* sem DOM */ }
 const lemB64 = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 async function lemApi(path, corpo) {
@@ -8936,11 +8956,12 @@ async function lemApi(path, corpo) {
   } catch { return { ok: false, status: 0, j: null }; } finally { clearTimeout(to); }
 }
 async function lemSubLocal() { try { const reg = await navigator.serviceWorker.getRegistration('/'); return reg ? await reg.pushManager.getSubscription() : null; } catch { return null; } }
+const lemSt = j => ({ cfg: true, aparelhos: j.aparelhos, pausa: j.pausa_ate || null, manha: j.manha !== false, tarde: j.tarde !== false });
 async function lemCarregar() {
   if (!LEM.sup && !LEM.ios) { LEM.st = { cfg: false }; return; }
   LEM.st = { cfg: false, carregando: true };
   const r = await lemApi('/api/push/status');
-  LEM.st = r.ok ? { cfg: true, aparelhos: r.j.aparelhos } : { cfg: false, erro: r.status !== 503 };
+  LEM.st = r.ok ? lemSt(r.j) : { cfg: false, erro: r.status !== 503 };
   if (LEM.sup) LEM.local = !!(await lemSubLocal()) && Notification.permission === 'granted';
   render();
 }
@@ -8959,7 +8980,14 @@ function lemCard() {
   if (!LEM.sup) h += `<p class="sm muted">${LEM.ios ? 'No iPhone/iPad (iOS 16.4 ou superior): toque em Compartilhar → Adicionar à Tela de Início, abra pelo ícone e ative aqui.' : 'Este navegador não oferece notificações.'}</p>`;
   else if (Notification.permission === 'denied') h += '<p class="sm muted">Notificações bloqueadas neste navegador. Libere nas configurações do site e volte aqui.</p>';
   else h += `<div class="row">${LEM.local ? `<span class="pill p-info">Ativo neste aparelho</span><span class="sp"></span><button class="btn ghost sm" data-a="lemTeste" ${LEM.busy ? 'disabled' : ''}>Enviar teste</button><button class="btn ghost sm" data-a="lemOff" ${LEM.busy ? 'disabled' : ''}>Desativar</button>` : `<button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar neste aparelho</button>`}</div>`;
-  if (LEM.st.aparelhos) h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+  if (LEM.st.aparelhos) {
+    h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+    const on = k => LEM.st[k] !== false, tg = (k, l) => `<button class="btn ${on(k) ? 'pri' : 'ghost'} sm" data-a="lemTurno" data-k="${k}" aria-pressed="${on(k)}" ${LEM.busy ? 'disabled' : ''}>${l}: ${on(k) ? 'ligado' : 'desligado'}</button>`;
+    h += `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Turnos:</span>${tg('manha', '9h')}${tg('tarde', '14h')}</div>`;
+    h += LEM.st.pausa ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill p-warn">Em pausa até ${esc(LEM.st.pausa.split('-').reverse().join('/'))}</span><button class="btn ghost sm" data-a="lemRetomar" ${LEM.busy ? 'disabled' : ''}>Retomar agora</button></div>`
+      : `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Pausar (férias, folga):</span>${[7, 15, 30].map(d => `<button class="btn ghost sm" data-a="lemPausa" data-d="${d}" ${LEM.busy ? 'disabled' : ''}>${d} dias</button>`).join('')}</div>`;
+    h += '<p class="sm muted">O lembrete não é enviado em feriados nacionais, Carnaval e Corpus Christi. Feriados estaduais e municipais não são tratados: use a pausa.</p>';
+  }
   if (LEM.msg) h += `<p class="sm" role="status">${esc(LEM.msg)}</p>`;
   return h + '</div>';
 }
@@ -8975,7 +9003,7 @@ const LEM_ACT = {
       const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: lemB64(k.j.chave) });
       const r = await lemApi('/api/push/inscrever', { endpoint: sub.endpoint });
       if (!r.ok) { try { await sub.unsubscribe(); } catch { /* ok */ } throw new Error('Não foi possível registrar este aparelho.'); }
-      LEM.local = true; LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
+      LEM.local = true; LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
     } catch (e) { LEM.msg = (e && e.message && !/^(Failed|Registration|Subscription|NotAllowed|Abort|Security|Type)/.test(e.name || '')) ? e.message : 'Não foi possível ativar neste aparelho.'; }
     LEM.busy = false; render();
   },
@@ -8985,8 +9013,25 @@ const LEM_ACT = {
       const sub = await lemSubLocal(), ep = sub && sub.endpoint;
       const r = ep ? await lemApi('/api/push/cancelar', { endpoint: ep }) : { ok: true, j: { aparelhos: LEM.st && LEM.st.aparelhos } };
       if (sub) { try { await sub.unsubscribe(); } catch { /* ok */ } }
-      LEM.local = false; if (r.ok) LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
+      LEM.local = false; if (r.ok) LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
     } catch { LEM.msg = 'Não foi possível desativar agora.'; }
+    LEM.busy = false; render();
+  },
+  lemTurno: async t => {
+    if (LEM.busy || !LEM.st) return; const k = t.dataset.k; if (k !== 'manha' && k !== 'tarde') return; LEM.busy = true; LEM.msg = ''; render();
+    const novo = { manha: LEM.st.manha !== false, tarde: LEM.st.tarde !== false }; novo[k] = !novo[k];
+    const r = await lemApi('/api/push/pref', novo); if (r.ok) { LEM.st = { ...LEM.st, manha: r.j.manha, tarde: r.j.tarde }; LEM.msg = 'Preferência salva.'; } else LEM.msg = 'Não foi possível salvar agora.';
+    LEM.busy = false; render();
+  },
+  lemPausa: async t => {
+    if (LEM.busy) return; const d = Math.min(90, Math.max(1, +t.dataset.d || 7)); LEM.busy = true; LEM.msg = ''; render();
+    const ate = new Date(Date.now() - 3 * 3600000 + d * 86400000).toISOString().slice(0, 10), r = await lemApi('/api/push/pausar', { ate });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: r.j.pausa_ate }; LEM.msg = 'Lembrete em pausa.'; } else LEM.msg = 'Não foi possível pausar agora.';
+    LEM.busy = false; render();
+  },
+  lemRetomar: async () => {
+    if (LEM.busy) return; LEM.busy = true; LEM.msg = ''; render(); const r = await lemApi('/api/push/pausar', { ate: null });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: null }; LEM.msg = 'Lembrete retomado.'; } else LEM.msg = 'Não foi possível retomar agora.';
     LEM.busy = false; render();
   },
   lemTeste: async () => {
@@ -8998,20 +9043,25 @@ const LEM_ACT = {
 };
 {
   const h = typeof hojeCard === 'function' ? hojeCard : null, c = typeof vConta === 'function' ? vConta : null;
-  if (h) globalThis.hojeCard = function () { return lemBanner() + h(); };
+  if (h) globalThis.hojeCard = function () { if (LEM.foco) lemIrParaHoje(6); return lemBanner() + h(); };
   if (c) globalThis.vConta = function () { return c() + lemCard(); };
 }
 
 /* Resumo para o texto do aviso: o navegador conta os clientes com motivo para aprofundar (mesma regra do card "Onde vale aprofundar hoje")
    e envia só esse inteiro. O servidor nunca lê a carteira. Só envia neste aparelho com lembrete ativo e com a carteira carregada. */
-const LEMR = { n: null, env: null, t: 0, busy: false, tm: 0 };
+/* Retornos que vencem hoje ou já venceram (prazos que o próprio usuário definiu); só o número sai do navegador. */
+function lemRetornos() {
+  try { const h = today(); return pendItems().filter(x => x.tipo === 'acao' || (x.tipo === 'prox' && x.prazo === h)).length; } catch { return null; }
+}
+const LEMR = { n: null, r: null, env: null, t: 0, busy: false, tm: 0 };
 function lemReportar() {
   clearTimeout(LEMR.tm);
   LEMR.tm = setTimeout(async () => {
     try {
       const n = LEMR.n; if (!LEM.local || LEMR.busy || !Number.isInteger(n) || n < 0 || n > 999) return;
-      if (n === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
-      LEMR.busy = true; const r = await lemApi('/api/push/resumo', { n }); if (r.ok) { LEMR.env = n; LEMR.t = Date.now(); }
+      const r = Number.isInteger(LEMR.r) && LEMR.r >= 0 && LEMR.r <= 999 ? LEMR.r : undefined, chave = n + '|' + r;
+      if (chave === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
+      LEMR.busy = true; const rs = await lemApi('/api/push/resumo', r === undefined ? { n } : { n, r }); if (rs.ok) { LEMR.env = chave; LEMR.t = Date.now(); }
     } catch { /* sem efeito: o aviso volta ao texto geral */ } finally { LEMR.busy = false; }
   }, 2500);
 }
@@ -9019,10 +9069,364 @@ function lemReportar() {
   const hi = typeof hojeItens === 'function' ? hojeItens : null;
   if (hi) globalThis.hojeItens = function () {
     const out = hi.apply(this, arguments);
-    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; lemReportar(); } } catch { /* sem efeito */ }
+    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; LEMR.r = lemRetornos(); lemReportar(); } } catch { /* sem efeito */ }
     return out;
   };
 }
+
+/* Aviso tocado: leva direto ao card "Onde vale aprofundar hoje" (com a app aberta ou não). */
+function lemIrParaHoje(tent) {
+  setTimeout(() => { const e = document.getElementById('hoje'); if (e) { LEM.foco = false; e.scrollIntoView({ block: 'start', behavior: 'smooth' }); } else if (tent > 1) lemIrParaHoje(tent - 1); else LEM.foco = false; }, 350);
+}
+try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.lembrete) { LEM.foco = true; try { UI.view = 'geral'; render(); } catch { /* sem efeito */ } } }); } catch { /* sem service worker */ }
+
+/* Primeiros passos (onboarding): lista curta na Visão da Carteira, calculada do estado real (nada é marcado à mão). Começa vazio: sem dados de exemplo. */
+function onbPassos() {
+  const cl = clients(), temChave = (() => { try { return Object.values(hkLer()).some(Boolean); } catch { return false; } })();
+  return [
+    { ok: cl.length > 0, t: 'Importar sua carteira', d: 'Planilha ou Planilha do Google, em Importar e fichas.', v: 'importar' },
+    { ok: temChave, t: 'Conectar sua chave de IA', d: 'Opcional para a análise por IA e o OCR. A chave fica só neste navegador.', v: 'ia' },
+    { ok: cl.some(c => c.fstat && c.fstat.k === 'disponivel'), t: 'Anexar uma ficha de faturamento', d: 'Sem ficha, o raio-X e o briefing ficam incompletos.', v: 'importar' },
+    { ok: !!(typeof LEM !== 'undefined' && LEM.local), t: 'Ativar o lembrete neste aparelho', d: 'Aviso às 9h e às 14h só se você ainda não abriu a ferramenta.', v: 'conta' }
+  ];
+}
+function onbCard() {
+  if (lsGet('onb.fim') === '1') return '';
+  const p = onbPassos(), n = p.filter(x => x.ok).length; if (n === p.length) return '';
+  return `<div class="card" id="onb"><div class="row"><h3>Primeiros passos</h3><span class="pill p-info">${n} de ${p.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="onbFim">Ocultar</button></div>
+  <ol class="sm" style="list-style:none;padding:0;margin:8px 0 0">${p.map(x => `<li class="row" style="gap:8px;padding:6px 0;border-top:1px solid var(--bd2)"><span aria-hidden="true">${x.ok ? '✔' : '○'}</span><div style="flex:1"><b>${esc(x.t)}</b>${x.ok ? ' <span class="muted">(feito)</span>' : ''}<div class="muted">${esc(x.d)}</div></div>${x.ok ? '' : `<button class="btn ghost sm" data-a="nav" data-v="${x.v}">Abrir</button>`}</li>`).join('')}</ol>
+  <p class="sm muted" style="margin-top:8px">Sua carteira é privada: só você a vê. Este quadro some quando os passos terminam, ou ao ocultar.</p></div>`;
+}
+const ONB_ACT = { onbFim: () => { lsSet('onb.fim', '1'); render(); } };
+{
+  const g = typeof vGeral === 'function' ? vGeral : null;
+  if (g) globalThis.vGeral = function (forExport) { const h = g.apply(this, arguments); return forExport ? h : onbCard() + h; };
+}
+
+/* ===== Onda 2: retornos com data, pós-reunião, follow-up, renovações, carteira em risco, exportação para CRM ===== */
+
+/* ---------- Retornos (tarefas livres do cliente, em c.act['ret:…']) ---------- */
+const RT_ABERTO = a => !['Concluído', 'Descartado'].includes(a.status || 'Pendente');
+const RT_DATA = /^\d{4}-\d{2}-\d{2}$/;
+const rtLista = (c, soAbertos = true) => Object.entries(c.act || {}).filter(([k, a]) => k.startsWith('ret:') && (!soAbertos || RT_ABERTO(a)))
+  .map(([id, a]) => ({ id, texto: a.texto || '', prazo: a.prazo || '', resp: a.resp || '', status: a.status || 'Pendente', origem: a.origem || '' }))
+  .sort((x, y) => (x.prazo || '9999').localeCompare(y.prazo || '9999'));
+function rtAdd(c, { texto, prazo, resp, origem }) {
+  texto = String(texto || '').replace(/\s+/g, ' ').trim().slice(0, 300); prazo = RT_DATA.test(prazo || '') ? prazo : '';
+  if (texto.length < 3) return false;
+  c.act ||= {}; c.act['ret:' + uid()] = { texto, prazo, resp: String(resp || '').trim().slice(0, 80), status: 'Pendente', origem: origem || 'manual', criado: today() };
+  touchC(c.key); return true;
+}
+function rtSet(c, id, patch) { if (!id.startsWith('ret:') || !c.act?.[id]) return; c.act[id] = { ...c.act[id], ...patch }; touchC(c.key); }
+function rtDel(c, id) { if (!id.startsWith('ret:') || !c.act?.[id]) return; delete c.act[id]; touchC(c.key); }
+const rtVenc = r => !!r.prazo && r.prazo < today(), rtHoje = r => r.prazo === today();
+
+/* ---------- Pós-reunião: barreira de dados sensíveis + extração com a chave do próprio usuário ---------- */
+const REU = { key: null, ata: '', mask: null, res: null, busy: false, err: '', nome: '', fu: '' };
+const REU_PAD = [
+  [/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, '[CNPJ]', 'CNPJ'],
+  [/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, '[CPF]', 'CPF'],
+  [/R\$\s*[\d.,]+|\b\d{1,3}(?:\.\d{3})+,\d{2}\b/g, '[valor]', 'valor monetário'],
+  [/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[e-mail]', 'e-mail'],
+  [/(?:\+?55\s?)?\(?\b\d{2}\)?\s?9?\d{4}[-\s]?\d{4}\b/g, '[telefone]', 'telefone']
+];
+function reuMascarar(t) {
+  let out = String(t || ''); const n = {};
+  REU_PAD.forEach(([re, rep, nome]) => { out = out.replace(re, () => { n[nome] = (n[nome] || 0) + 1; return rep; }); });
+  return { texto: out, n, total: Object.values(n).reduce((a, b) => a + b, 0) };
+}
+const REU_MAX = 9000;
+function reuPrompt(txt) {
+  return `Você é assistente de um executivo de contas de software de gestão. Abaixo está a ata (ou anotação) de uma reunião com um cliente; CNPJ, valores, e-mails e telefones foram removidos de propósito.
+Extraia SOMENTE o que está escrito no texto; não invente prazos, nomes ou compromissos. Se uma data não estiver explícita, deixe o prazo vazio. Hoje é ${today()}.
+Devolva apenas JSON: {"compromissos":["o que ficou combinado entre as partes"],"objecoes":["dúvidas, resistências ou riscos levantados pelo cliente"],"proximos_passos":[{"texto":"ação objetiva","prazo":"AAAA-MM-DD ou vazio","responsavel":"nome ou vazio"}]}. Máximo 8 itens por lista.
+ATA:
+${txt}`;
+}
+function reuLimpaRes(d) {
+  const L = (a, n = 8) => (Array.isArray(a) ? a : []).map(x => String(x?.texto ?? x ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)).filter(x => x.length >= 3).slice(0, n);
+  const passos = (Array.isArray(d?.proximos_passos) ? d.proximos_passos : []).slice(0, 8).map(x => ({ texto: String(x?.texto ?? x ?? '').replace(/\s+/g, ' ').trim().slice(0, 300), prazo: RT_DATA.test(x?.prazo || '') ? x.prazo : '', resp: String(x?.responsavel || '').trim().slice(0, 80) })).filter(x => x.texto.length >= 3);
+  return { compromissos: L(d?.compromissos), objecoes: L(d?.objecoes), passos };
+}
+async function reuExtrair(c) {
+  const ata = $('#reu-ata')?.value ?? REU.ata; REU.ata = ata;
+  if (ata.trim().length < 20) return toast('Cole a ata ou as anotações da reunião (mínimo 20 caracteres).');
+  const m = reuMascarar(ata); if (m.texto.length > REU_MAX) return toast(`Texto grande demais (${m.texto.length} caracteres). Envie no máximo ${REU_MAX}: resuma ou divida a ata.`);
+  REU.mask = m; REU.busy = true; REU.err = ''; REU.res = null; render();
+  try {
+    const T = aiTarefa('ata'), pedido = { versao: 2, pedidoId: 'r_' + uid(), provedor: T.prov, modelo: T.modelo, tarefa: 'estruturado', formato: 'json', buscaWeb: false, prompt: reuPrompt(m.texto) };
+    const r = await bkChamar('ia', pedido, `pedido-ata-${pedido.pedidoId}.json`);
+    if (r.via !== 'direto') throw new Error('A extração por arquivo não está disponível para a ata. Use a chave pessoal em Configurações → IA e provedores, ou registre os retornos manualmente.');
+    const j = r.resp; if (!j?.ok) throw new Error(`${j?.erro?.codigo || 'erro'}: ${j?.erro?.mensagem || 'falha na IA'}`);
+    if (!j.dados) throw new Error('A IA não devolveu um resultado estruturado. Tente de novo ou registre manualmente.');
+    REU.res = reuLimpaRes(j.dados); REU.res.sel = {};
+  } catch (e) { REU.err = e.message || 'Falha ao extrair.'; }
+  REU.busy = false; render();
+}
+function reuSalvar(c) {
+  const R = REU.res; if (!R) return; let nr = 0; const nota = [];
+  const marcados = pref => [...document.querySelectorAll(`input[data-reu^="${pref}"]:checked`)].map(x => +x.dataset.reu.split(':')[1]);
+  marcados('p').forEach(i => { const p = R.passos[i]; if (p && rtAdd(c, { ...p, origem: 'pos-reuniao' })) nr++; });
+  const cm = marcados('c').map(i => R.compromissos[i]).filter(Boolean), ob = marcados('o').map(i => R.objecoes[i]).filter(Boolean);
+  if (cm.length) nota.push('Compromissos: ' + cm.join(' | ')); if (ob.length) nota.push('Objeções: ' + ob.join(' | '));
+  if (nota.length) { c.mgmt ||= {}; c.mgmt.notes = [c.mgmt.notes, `[${fmtD(today())} • pós-reunião] ` + nota.join(' • ')].filter(Boolean).join('\n'); touchC(c.key); }
+  if (!nr && !nota.length) return toast('Marque ao menos um item para salvar.');
+  REU.res = null; REU.mask = null; REU.ata = ''; toast(`Salvo: ${nr} retorno(s)${nota.length ? ' e anotação no cliente' : ''}.`); render();
+}
+
+/* ---------- Rascunho de follow-up (sem envio: o texto só é copiado) ---------- */
+function fuTexto(c, nome) {
+  const ab = rtLista(c).filter(r => r.status !== 'Descartado'), n = String(nome || '').trim().split(/\s+/)[0];
+  const itens = ab.slice(0, 6).map(r => `• ${r.texto}${r.prazo ? ` (até ${fmtD(r.prazo)})` : ''}${r.resp ? ` — ${r.resp}` : ''}`);
+  return `${n ? 'Olá, ' + n + '!' : 'Olá!'}\n\nObrigado pelo tempo na nossa conversa. Registrando o que combinamos:\n\n${itens.length ? itens.join('\n') : '• (inclua aqui os combinados)'}\n\nSe eu entendi algo diferente, me avise para ajustarmos. Fico à disposição.\n\nAbraço,\n${S.meta.exec?.nome || ''}`.trim();
+}
+
+/* ---------- Aba "Reunião e retornos" ---------- */
+function tabReuniao(c) {
+  if (REU.key !== c.key) Object.assign(REU, { key: c.key, ata: '', mask: null, res: null, busy: false, err: '', nome: '', fu: '' });
+  const rs = rtLista(c, false), ab = rs.filter(r => RT_ABERTO(r));
+  const linha = r => `<tr><td>${esc(r.texto)}${r.origem === 'pos-reuniao' ? ' <span class="muted sm">(da ata)</span>' : ''}</td><td>${r.prazo ? esc(fmtD(r.prazo)) + (RT_ABERTO(r) && rtVenc(r) ? ' ' + pill('vencido', 'bad') : RT_ABERTO(r) && rtHoje(r) ? ' ' + pill('hoje', 'warn') : '') : '<span class="muted">sem data</span>'}</td><td>${esc(r.resp || '—')}</td><td>${esc(r.status)}</td>
+    <td class="nw">${RT_ABERTO(r) ? `<button class="btn ghost sm" data-a="rtOk" data-k="${kk(c)}" data-id="${esc(r.id)}">Concluir</button>` : `<button class="btn ghost sm" data-a="rtReabrir" data-k="${kk(c)}" data-id="${esc(r.id)}">Reabrir</button>`} <button class="btn ghost sm" data-a="rtDel" data-k="${kk(c)}" data-id="${esc(r.id)}">Remover</button></td></tr>`;
+  let h = `<div class="card"><h3>Retornos <span class="pill p-info">${ab.length} em aberto</span></h3>
+  <p class="muted sm">Combinados com este cliente, com a data que você definir. Retornos vencidos ou que vencem hoje entram na Central de Pendências e, se o lembrete diário estiver ativo, no número do aviso (só o número).</p>
+  ${rs.length ? `<div class="tw"><table><thead><tr><th>Retorno</th><th>Prazo</th><th>Responsável</th><th>Situação</th><th></th></tr></thead><tbody>${rs.map(linha).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhum retorno registrado.</p>'}
+  <div class="row" style="margin-top:8px"><input type="text" id="rt-texto" placeholder="O que ficou combinado (ex.: enviar proposta revisada)" style="min-width:280px;flex:1" maxlength="300"><input type="date" id="rt-prazo"><input type="text" id="rt-resp" placeholder="Responsável" style="min-width:120px" maxlength="80"><button class="btn" data-a="rtAdd" data-k="${kk(c)}">Adicionar retorno</button></div></div>`;
+  h += `<div class="card"><h3>Pós-reunião: ata → retornos</h3>
+  <p class="muted sm">Cole a ata ou suas anotações. <b>Antes de qualquer envio, CNPJ, CPF, valores em reais, e-mails e telefones são trocados por marcadores</b> e você vê o texto exato que será enviado. A leitura usa a sua chave de IA (Configurações → IA e provedores); nada é salvo sem a sua revisão.</p>
+  <textarea id="reu-ata" rows="6" style="width:100%" placeholder="Cole aqui a ata da reunião…">${esc(REU.ata)}</textarea>
+  <div class="row"><button class="btn" data-a="reuExtrair" data-k="${kk(c)}" ${REU.busy ? 'disabled' : ''}>${REU.busy ? 'Lendo a ata…' : 'Extrair compromissos, objeções e próximos passos'}</button><button class="btn ghost" data-a="reuPrevia" data-k="${kk(c)}">Ver o que será enviado</button></div>`;
+  if (REU.mask) h += `<details ${REU.res ? '' : 'open'}><summary class="sm">Texto que ${REU.res ? 'foi' : 'será'} enviado${REU.mask.total ? ` — ${REU.mask.total} dado(s) sensível(is) trocado(s) por marcador (${Object.entries(REU.mask.n).map(([k, v]) => v + ' ' + k).join(', ')})` : ' — nenhum dado sensível detectado'}</summary><pre class="sm" style="white-space:pre-wrap;max-height:220px;overflow:auto">${esc(REU.mask.texto)}</pre></details>`;
+  if (REU.err) h += `<div class="alert w sm">${esc(REU.err)}</div>`;
+  if (REU.res) {
+    const R = REU.res, bloco = (tit, pref, arr, fmt) => arr.length ? `<h4>${tit}</h4><ul class="sm" style="list-style:none;padding-left:0">${arr.map((x, i) => `<li><label><input type="checkbox" data-reu="${pref}:${i}" checked> ${fmt(x)}</label></li>`).join('')}</ul>` : '';
+    h += `<div class="alert i sm"><b>Revise antes de salvar.</b> É a leitura de uma IA sobre o texto que você colou: confira, desmarque o que não vale e só então salve. Próximos passos viram retornos; compromissos e objeções viram uma anotação datada no cliente.</div>
+    ${bloco('Próximos passos', 'p', R.passos, x => `${esc(x.texto)}${x.prazo ? ` <span class="muted">— prazo ${esc(fmtD(x.prazo))}</span>` : ' <span class="muted">— sem data</span>'}${x.resp ? ` <span class="muted">— ${esc(x.resp)}</span>` : ''}`)}
+    ${bloco('Compromissos', 'c', R.compromissos, esc)}${bloco('Objeções e riscos levantados', 'o', R.objecoes, esc)}
+    ${R.passos.length + R.compromissos.length + R.objecoes.length ? `<div class="row"><button class="btn pri" data-a="reuSalvar" data-k="${kk(c)}">Salvar itens marcados</button><button class="btn ghost" data-a="reuDescartar">Descartar</button></div>` : '<p class="muted sm">A IA não encontrou itens no texto.</p>'}`;
+  }
+  h += `</div><div class="card"><h3>Rascunho de follow-up</h3><p class="muted sm">Monta um texto com os retornos em aberto deste cliente. <b>O aplicativo não envia nada</b>: você copia, ajusta e envia pelo seu e-mail.</p>
+  <div class="row"><input type="text" id="fu-nome" placeholder="Nome do contato (opcional)" value="${esc(REU.nome)}" style="min-width:220px"><button class="btn" data-a="fuGerar" data-k="${kk(c)}">Gerar rascunho</button></div>
+  ${REU.fu ? `<textarea id="fu-txt" rows="9" style="width:100%;margin-top:8px">${esc(REU.fu)}</textarea><div class="row"><button class="btn ghost" data-a="fuCopiar">Copiar texto</button></div>` : ''}</div>`;
+  return h;
+}
+document.addEventListener('input', e => { const t = e.target; if (t?.id === 'reu-ata') REU.ata = t.value; else if (t?.id === 'fu-nome') REU.nome = t.value; });
+
+/* ---------- Linha do tempo de renovações (I2) ---------- */
+function rnvItens() {
+  const out = [], vistos = new Set();
+  clients().forEach(c => {
+    const v = (() => { try { return mrrOf(c).v; } catch { return null; } })();
+    const push = (kind, iso, d, fonte, conf) => { if (d == null || d > 180) return; const id = `${c.key}|${iso}|${kind}`; if (vistos.has(id)) return; vistos.add(id); out.push({ c, kind, iso, d, fonte, mrr: v, conf }); };
+    (c.dtList || []).filter(g => g.st === 'confirmada').forEach(g => push(DT_K[g.kind]?.[0] || g.kind, g.isoF, g.d, `${g.origem}: ${g.arq}`, true));
+    try { ctReminders(c).filter(x => x.nivel === 'alerta' || x.nivel === 'passada').forEach(x => push(x.l, x.data, x.d, 'contrato (data confirmada)', true)); } catch { /* sem contratos */ }
+  });
+  return out.sort((a, b) => a.d - b.d);
+}
+const RNV_FX = [['Já passou — confirmar a nova data', x => x.d < 0, 'bad'], ['Em até 30 dias', x => x.d >= 0 && x.d <= 30, 'bad'], ['De 31 a 90 dias', x => x.d > 30 && x.d <= 90, 'warn'], ['De 91 a 180 dias', x => x.d > 90 && x.d <= 180, 'info']];
+function rnvCard() {
+  const it = rnvItens(); if (!it.length) return '';
+  const blocos = RNV_FX.map(([t, f, tom]) => {
+    const L = it.filter(f); if (!L.length) return '';
+    const soma = L.reduce((a, x) => a + (x.mrr || 0), 0), sem = L.filter(x => x.mrr == null).length;
+    return `<h4>${pill(t, tom)} <span class="muted sm">${L.length} data(s)${soma ? ` • MRR identificado ${fmtBRL(soma)}${sem ? ` (${sem} sem MRR)` : ''}` : ''}</span></h4>
+    <ul>${L.map(x => `<li class="sm"><b>${esc(x.c.name)}</b> • ${esc(x.kind)} • ${esc(fmtD(x.iso))} (${x.d < 0 ? 'há ' + (-x.d) : x.d} dia(s))${x.mrr != null ? ` • ${fmtBRL(x.mrr)}` : ''}<div class="muted">${esc(x.fonte)}</div></li>`).join('')}</ul>`;
+  }).join('');
+  return `<div class="card"><h3>Renovações nos próximos 180 dias <span class="pill p-info">${it.length}</span></h3>
+  <p class="muted sm">Só entram datas <b>confirmadas por você</b> (gatilhos de data e contratos). Datas apenas encontradas em documentos aguardam confirmação nos Gatilhos de data. MRR é o valor identificado hoje, não previsão de renovação.</p>${blocos}</div>`;
+}
+
+/* ---------- Carteira em risco (I1): somente sinais documentados ---------- */
+function riscoItens() {
+  const pend = (() => { try { return pendItems(); } catch { return []; } })(), venc = new Map();
+  pend.filter(x => x.tipo === 'acao' && x.key).forEach(x => venc.set(x.key, (venc.get(x.key) || 0) + 1));
+  const out = [];
+  clients().forEach(c => {
+    const s = []; let pts = 0; const add = (p, t) => { pts += p; s.push(t); };
+    const datas = [];
+    (c.dtList || []).filter(g => g.st === 'confirmada' && g.d != null && g.d <= 180).forEach(g => datas.push(g.d));
+    try { ctReminders(c).filter(x => x.nivel === 'alerta' || x.nivel === 'passada').forEach(x => datas.push(x.d)); } catch { /* sem contratos */ }
+    if (datas.length) { const d = Math.min(...datas); add(d < 0 ? 2 : d <= 30 ? 3 : d <= 90 ? 2 : 1, d < 0 ? 'Data de vigência/renovação confirmada já passou' : `Vigência/renovação confirmada em ${d} dia(s)`); }
+    try { if (fichasOk(c).length) { const n = fsLinhas(c).filter(r => r.st === 'Cancelado').length; if (n) add(2, `${n} item(ns) cancelado(s)/legado(s) na ficha`); } } catch { /* sem ficha */ }
+    const fk = c.fstat?.k; if (['desatualizada', 'nao_carregada'].includes(fk)) add(1, fk === 'desatualizada' ? 'Ficha desatualizada (pouca visibilidade)' : 'Sem ficha de faturamento (pouca visibilidade)');
+    const v = venc.get(c.key) || 0; if (v) add(Math.min(v, 2), `${v} retorno(s)/prazo(s) vencido(s)`);
+    if (pts) out.push({ c, pts, s, mrr: (() => { try { return mrrOf(c).v; } catch { return null; } })() });
+  });
+  return out.sort((a, b) => b.pts - a.pts || (b.mrr || 0) - (a.mrr || 0));
+}
+function riscoCard() {
+  const L = riscoItens(); if (!L.length) return '';
+  const top = L.slice(0, 10), soma = L.reduce((a, x) => a + (x.mrr || 0), 0);
+  return `<div class="card"><h3>Carteira: onde há sinal de risco <span class="pill p-warn">${L.length}</span></h3>
+  <p class="muted sm"><b>Sinais documentados, não previsão de perda.</b> Reúne datas confirmadas, itens cancelados em ficha, ficha ausente/desatualizada e prazos vencidos. Cada linha mostra o motivo; a ordem é por quantidade de sinais e, no empate, por MRR identificado.${soma ? ` MRR identificado nos clientes listados: <b>${fmtBRL(soma)}</b>.` : ''}</p>
+  <div class="tw"><table><thead><tr><th>Cliente</th><th>Sinais</th><th>MRR</th></tr></thead><tbody>${top.map(x => `<tr><td><a href="#" data-a="open" data-k="${kk(x.c)}"><b>${esc(x.c.name)}</b></a></td><td class="sm"><ul style="margin:0;padding-left:16px">${x.s.map(t => `<li>${esc(t)}</li>`).join('')}</ul></td><td class="nw">${x.mrr != null ? fmtBRL(x.mrr) : '—'}</td></tr>`).join('')}</tbody></table></div>
+  ${L.length > top.length ? `<p class="muted sm">+ ${L.length - top.length} cliente(s) com sinais.</p>` : ''}</div>`;
+}
+
+/* ---------- Exportação para CRM / Mesa de Forecast (D2): layout genérico ---------- */
+const CRM_HEAD = ['Cliente', 'Código', 'CNPJ', 'Segmento', 'MRR identificado', 'Origem do MRR', 'Competência', 'Oportunidade', 'Tipo', 'Prioridade', 'Confiança', 'Validação', 'Situação comercial', 'Responsável', 'Prazo', 'Próxima ação', 'Próxima renovação confirmada', 'Retornos em aberto'];
+function crmLinhas() {
+  const rn = new Map(); rnvItens().forEach(x => { if (x.d >= 0 && !rn.has(x.c.key)) rn.set(x.c.key, x.iso); });
+  const rows = [];
+  clients().forEach(c => {
+    let m = { v: null, origem: '', comp: '' }; try { m = mrrOf(c); } catch { /* sem MRR */ }
+    const seg = c.segInfo?.id ? segName(c.segInfo.id) : '', nret = rtLista(c).length;
+    const base = [c.name, c.code || '', c.cnpj || '', seg || '', m.v ?? '', m.v != null ? (m.origem || '') : '', m.v != null ? (m.comp || '') : ''];
+    const fim = [rn.get(c.key) ? fmtD(rn.get(c.key)) : '', nret];
+    const ativas = c.opps.filter(o => oppAtiva(c, o));
+    if (!ativas.length) rows.push([...base, '', '', '', '', '', '', '', '', '', ...fim]);
+    ativas.forEach(o => { const d = decGet(c, o.ruleId); rows.push([...base, o.titulo || o.nome || o.ruleId, o.tipo, o.prio, o.conf, VALID_L[d.valid] || d.valid, SIT_L[d.sit] || d.sit, d.resp || '', d.prazo ? fmtD(d.prazo) : '', o.acao || '', ...fim]); });
+  });
+  return rows;
+}
+const crmExportar = () => offer('carteira-para-crm-forecast.csv', toCSV(CRM_HEAD, crmLinhas()));
+
+/* ---------- Sugerir melhoria (G5): vai para o painel do administrador ---------- */
+function sugCard() {
+  const op = Object.entries(typeof SUG_L === 'object' ? SUG_L : { geral: 'Geral' }).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('');
+  return `<div class="card" id="sug"><h3>Sugerir melhoria</h3><p class="muted sm">O que falta, atrapalha ou poderia ser mais simples? O texto vai para o administrador desta ferramenta. <b>Não inclua CNPJ, valores nem dados de clientes.</b></p>
+  <div class="row"><select id="sug-area">${op}</select><input type="text" id="sug-txt" maxlength="1000" placeholder="Descreva a sugestão (10 a 1000 caracteres)" style="min-width:320px;flex:1"><button class="btn" data-a="sugEnviar">Enviar</button></div></div>`;
+}
+async function sugEnviar() {
+  const area = $('#sug-area')?.value, texto = $('#sug-txt')?.value || '';
+  try {
+    const r = await fetch('/api/sug', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ area, texto }), credentials: 'same-origin', redirect: 'manual' });
+    let j = null; try { j = await r.json(); } catch { /* sem corpo */ }
+    if (!j || !j.ok) return toast(j?.erro?.mensagem || 'Não foi possível enviar agora.');
+    const t = $('#sug-txt'); if (t) t.value = ''; toast('Sugestão enviada. Obrigado!');
+  } catch { toast('Não foi possível enviar agora.'); }
+}
+{ const c = typeof vConta === 'function' ? vConta : null; if (c) globalThis.vConta = function () { return c.apply(this, arguments) + (window.__HOSTED__ ? sugCard() : ''); }; }
+
+/* ---------- Ações ---------- */
+const ONDA2_ACT = {
+  rtAdd: t => { const c = S.clients[t.dataset.k]; if (!c) return; if (!rtAdd(c, { texto: $('#rt-texto').value, prazo: $('#rt-prazo').value, resp: $('#rt-resp').value })) return toast('Descreva o retorno (mínimo 3 caracteres).'); render(); },
+  rtOk: t => { const c = S.clients[t.dataset.k]; if (c) { rtSet(c, t.dataset.id, { status: 'Concluído', concluido: today() }); render(); } },
+  rtReabrir: t => { const c = S.clients[t.dataset.k]; if (c) { rtSet(c, t.dataset.id, { status: 'Pendente' }); render(); } },
+  rtDel: t => { const c = S.clients[t.dataset.k]; if (c) { rtDel(c, t.dataset.id); render(); } },
+  reuPrevia: t => { REU.ata = $('#reu-ata')?.value ?? REU.ata; REU.mask = reuMascarar(REU.ata); render(); },
+  reuExtrair: t => { const c = S.clients[t.dataset.k]; if (c) reuExtrair(c); },
+  reuSalvar: t => { const c = S.clients[t.dataset.k]; if (c) reuSalvar(c); },
+  reuDescartar: () => { REU.res = null; REU.mask = null; REU.err = ''; render(); },
+  fuGerar: t => { const c = S.clients[t.dataset.k]; if (!c) return; REU.nome = $('#fu-nome')?.value ?? REU.nome; REU.fu = fuTexto(c, REU.nome); render(); },
+  fuCopiar: async () => { const v = $('#fu-txt')?.value || REU.fu; try { await navigator.clipboard.writeText(v); toast('Texto copiado.'); } catch { $('#fu-txt')?.select(); toast('Selecione e copie o texto (Ctrl+C).'); } },
+  sugEnviar,
+  crmExp: crmExportar
+};
+
+/* ===== Onda 3: resumo semanal, roteiro de descoberta, ditado, busca global ===== */
+
+/* ---------- R5 Resumo da semana (dentro do app; calculado dos dados atuais) ---------- */
+const SEM_DIAS = 7;
+function semanaDados() {
+  const h = today(), lim = new Date(Date.now() - SEM_DIAS * 864e5).toISOString().slice(0, 10), em7 = new Date(Date.now() + SEM_DIAS * 864e5).toISOString().slice(0, 10);
+  const D = { feitos: [], criados: 0, vencidos: [], proximos: [], validadas: 0, ren30: [], clientes: clients().length };
+  clients().forEach(c => {
+    rtLista(c, false).forEach(r => {
+      const a = c.act[r.id];
+      if (a.status === 'Concluído' && a.concluido && a.concluido >= lim) D.feitos.push({ c, r });
+      if (a.criado && a.criado >= lim) D.criados++;
+      if (RT_ABERTO(r) && r.prazo) { if (r.prazo < h) D.vencidos.push({ c, r }); else if (r.prazo <= em7) D.proximos.push({ c, r }); }
+    });
+    (c.opps || []).forEach(o => { const d = decGet(c, o.ruleId); if (d.valid === 'validada' && d.at && d.at.slice(0, 10) >= lim) D.validadas++; });
+  });
+  try { D.ren30 = rnvItens().filter(x => x.d >= 0 && x.d <= 30); } catch { /* sem datas */ }
+  return D;
+}
+function semanaTexto(D) {
+  const L = [`Resumo da semana (${fmtD(new Date(Date.now() - SEM_DIAS * 864e5).toISOString().slice(0, 10))} a ${fmtD(today())})`, ''];
+  L.push(`• Retornos concluídos: ${D.feitos.length}`); L.push(`• Retornos registrados: ${D.criados}`); L.push(`• Oportunidades validadas: ${D.validadas}`);
+  L.push(`• Retornos atrasados: ${D.vencidos.length}`); if (D.vencidos.length) D.vencidos.slice(0, 8).forEach(x => L.push(`   – ${x.c.name}: ${x.r.texto} (prazo ${fmtD(x.r.prazo)})`));
+  L.push(`• Retornos nos próximos ${SEM_DIAS} dias: ${D.proximos.length}`); D.proximos.slice(0, 8).forEach(x => L.push(`   – ${x.c.name}: ${x.r.texto} (${fmtD(x.r.prazo)})`));
+  L.push(`• Renovações confirmadas em até 30 dias: ${D.ren30.length}`); D.ren30.slice(0, 8).forEach(x => L.push(`   – ${x.c.name}: ${x.kind} em ${fmtD(x.iso)}`));
+  return L.join('\n');
+}
+function semanaCard() {
+  if (!clients().length) return '';
+  const D = semanaDados(), k = (v, l, tom = '') => `<div class="kpi ${tom}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  return `<details class="card" id="semana" ${UI.semAberto ? 'open' : ''}><summary><b>Resumo da semana</b> <span class="muted sm">últimos ${SEM_DIAS} dias e próximos ${SEM_DIAS}</span></summary>
+  <div class="grid g4" style="margin-top:8px">${k(D.feitos.length, 'retornos concluídos')}${k(D.validadas, 'oportunidades validadas')}${k(D.vencidos.length, 'retornos atrasados', D.vencidos.length ? 'a' : '')}${k(D.proximos.length, `retornos nos próximos ${SEM_DIAS} dias`)}</div>
+  <p class="muted sm">Calculado dos registros atuais (retornos com data, decisões e datas confirmadas); não guarda histórico próprio. ${D.ren30.length ? `Renovações confirmadas em até 30 dias: <b>${D.ren30.length}</b>.` : ''}</p>
+  <div class="row"><button class="btn ghost" data-a="semCopiar">Copiar resumo (texto)</button></div></details>`;
+}
+
+/* ---------- P4 Roteiro de descoberta (modelo de conversa; copiável) ---------- */
+function roteiroTexto(c) {
+  const ops = (c.opps || []).filter(o => oppAtiva(c, o)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 3);
+  let Q = []; try { Q = (cadRules(c).Q || []).slice(0, 4); } catch { /* sem regras */ }
+  const L = [`Roteiro de descoberta — ${c.name}`, '', '1. Abertura (5 min)', '   • Objetivo da conversa e o que o cliente espera dela.', '   • Mudanças recentes na empresa (estrutura, sistemas, regulatório).', ''];
+  let n = 2;
+  ops.forEach(o => { const p = (Array.isArray(o.perg) ? o.perg : o.perg ? [o.perg] : []).slice(0, 3); L.push(`${n++}. ${o.nome || o.titulo || o.tipo} (hipótese a validar, não confirmada)`); (p.length ? p : ['Como isso é feito hoje e quem decide?']).forEach(q => L.push(`   • ${q}`)); L.push(''); });
+  if (Q.length) { L.push(`${n++}. Perguntas do cadastro do cliente`); Q.forEach(q => L.push(`   • ${q}`)); L.push(''); }
+  L.push(`${n}. Encerramento`, '   • Resumir o que foi entendido e o que ficou combinado.', '   • Definir próximo passo, responsável e data (registrar em Retornos).');
+  return L.join('\n');
+}
+{ const t = typeof tabReuniao === 'function' ? tabReuniao : null; if (t) globalThis.tabReuniao = function (c) {
+  const base = t.apply(this, arguments), vz = typeof dictOk === 'function' && dictOk() ? '<div class="row"><button class="btn ghost sm" data-a="ditar" data-alvo="reu-ata">🎙 Ditar na ata (experimental)</button><span class="muted sm">O navegador envia o áudio ao serviço de voz do fabricante; não dite CNPJ nem valores.</span></div>' : '';
+  const rot = `<div class="card"><h3>Roteiro de descoberta</h3><p class="muted sm">Monta um roteiro de conversa com as perguntas das oportunidades ativas e do cadastro do cliente. São <b>hipóteses a validar</b>, não fatos; o app não envia nada.</p>
+  <div class="row"><button class="btn" data-a="rotGerar" data-k="${kk(c)}">Gerar roteiro</button></div>
+  ${UI.rot && UI.rot.k === c.key ? `<textarea id="rot-txt" rows="14" style="width:100%;margin-top:8px">${esc(UI.rot.t)}</textarea><div class="row"><button class="btn ghost" data-a="rotCopiar">Copiar roteiro</button></div>` : ''}</div>`;
+  return base.replace('<textarea id="reu-ata"', vz + '<textarea id="reu-ata"') + rot;
+}; }
+
+/* ---------- R6 Ditado (Web Speech do navegador; experimental, não verificado em aparelhos reais) ---------- */
+const dictApi = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const dictOk = () => !!dictApi() && !!window.__HOSTED__;
+const DICT = { rec: null, ativo: null };
+function dictParar() { try { DICT.rec && DICT.rec.stop(); } catch { /* já parado */ } DICT.rec = null; DICT.ativo = null; }
+function dictIniciar(alvoId) {
+  const A = dictApi(); const el = document.getElementById(alvoId); if (!A || !el) return;
+  if (DICT.ativo) { dictParar(); return toast('Ditado encerrado.'); }
+  let ok = false; try { ok = localStorage.getItem('ditado.ok') === '1'; } catch { /* sem storage */ }
+  if (!ok) { if (!window.confirm('O ditado usa o serviço de voz do seu navegador (Google no Chrome/Android, Apple no Safari/iPhone), que recebe o áudio para transcrever. Não dite CNPJ, valores nem dados pessoais. Continuar?')) return; try { localStorage.setItem('ditado.ok', '1'); } catch { /* sem storage */ } }
+  const r = new A(); r.lang = 'pt-BR'; r.interimResults = false; r.continuous = true; DICT.rec = r; DICT.ativo = alvoId;
+  r.onresult = ev => { let t = ''; for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) t += ev.results[i][0].transcript + ' '; if (t) { el.value = (el.value ? el.value.replace(/\s*$/, ' ') : '') + t.trim(); el.dispatchEvent(new Event('input', { bubbles: true })); } };
+  r.onerror = e => { toast(e.error === 'not-allowed' ? 'Permissão do microfone negada.' : 'O ditado não está disponível agora.'); DICT.rec = null; DICT.ativo = null; };
+  r.onend = () => { DICT.rec = null; DICT.ativo = null; };
+  try { r.start(); toast('Ouvindo… toque de novo para encerrar.'); } catch { toast('Não foi possível iniciar o ditado.'); DICT.rec = null; DICT.ativo = null; }
+}
+
+/* ---------- Q8 Busca global de conteúdo (no navegador; nada vai ao servidor) ---------- */
+const BUSCA_MIN = 3, BUSCA_MAX = 40;
+function buscaTrecho(txt, q) {
+  const t = String(txt || '').replace(/\s+/g, ' '), i = norm(t).indexOf(q); if (i < 0) return null;
+  const a = Math.max(0, i - 50), b = Math.min(t.length, i + q.length + 80);
+  return (a ? '…' : '') + t.slice(a, b) + (b < t.length ? '…' : '');
+}
+function buscaGlobal(termo) {
+  const q = norm(String(termo || '').trim()); if (q.length < BUSCA_MIN) return { q, hits: [], erro: `Digite ao menos ${BUSCA_MIN} letras.` };
+  const hits = [], add = h => { if (hits.length < BUSCA_MAX) hits.push(h); };
+  clients().forEach(c => {
+    if (norm(c.name + ' ' + (c.code || '')).includes(q)) add({ g: 'Clientes', t: c.name, s: c.code ? 'Código ' + c.code : '', k: c.key });
+    rtLista(c, false).forEach(r => { const s = buscaTrecho(r.texto, q); if (s) add({ g: 'Retornos', t: c.name, s, k: c.key, tab: 'reuniao' }); });
+    const sn = buscaTrecho(c.mgmt?.notes, q); if (sn) add({ g: 'Anotações do cliente', t: c.name, s: sn, k: c.key, tab: 'reuniao' });
+    const so = buscaTrecho(c.notes, q); if (so) add({ g: 'Observações da planilha', t: c.name, s: so, k: c.key });
+    [...(c.cdocs || []), ...(c.docs || [])].forEach(d => { const s = buscaTrecho(d.text, q); if (s) add({ g: 'Documentos do cliente', t: `${c.name} • ${d.name || 'documento'}`, s, k: c.key }); });
+  });
+  (S.solutions || []).filter(r => !r.arquivado).forEach(r => { const s = buscaTrecho([r.nome, r.finalidade, ...(r.funcionalidades || []).map(x => x.t || x)].join(' • '), q); if (s) add({ g: 'Base de Soluções', t: r.nome, s, nav: 'solucoes' }); });
+  (S.insights || []).forEach(i => { const s = buscaTrecho([i.acontecimento, i.titulo, i.impacto].filter(Boolean).join(' — '), q); if (s) add({ g: 'Inteligência de Mercado', t: i.acontecimento || i.titulo || 'Insight', s, nav: 'mercado' }); });
+  return { q, hits };
+}
+function buscaCard() {
+  if (!clients().length) return '';
+  const B = UI.busca || {}, R = B.res;
+  const grupos = R ? [...new Set(R.hits.map(h => h.g))] : [];
+  return `<div class="card" id="busca"><h3>Buscar em tudo</h3><p class="muted sm">Procura em clientes, retornos, anotações, documentos dos clientes, Base de Soluções e Inteligência de Mercado. A busca roda no seu navegador.</p>
+  <div class="row"><input type="text" id="busca-q" value="${esc(B.q || '')}" placeholder="Ex.: reforma tributária, retenção, integração…" style="min-width:280px;flex:1" maxlength="80"><button class="btn" data-a="buscaIr">Buscar</button>${R ? '<button class="btn ghost" data-a="buscaLimpa">Limpar</button>' : ''}</div>
+  ${R ? (R.erro ? `<p class="muted sm">${esc(R.erro)}</p>` : R.hits.length ? `<p class="muted sm">${R.hits.length}${R.hits.length >= BUSCA_MAX ? '+' : ''} resultado(s)</p>${grupos.map(g => `<h4>${esc(g)}</h4><ul>${R.hits.filter(h => h.g === g).map(h => `<li class="sm">${h.k ? `<a href="#" data-a="buscaAbrir" data-k="${esc(h.k)}" data-tab="${esc(h.tab || '')}"><b>${esc(h.t)}</b></a>` : h.nav ? `<a href="#" data-a="nav" data-v="${esc(h.nav)}"><b>${esc(h.t)}</b></a>` : `<b>${esc(h.t)}</b>`}${h.s ? `<div class="muted">${esc(h.s)}</div>` : ''}</li>`).join('')}</ul>`).join('')}` : '<p class="muted sm">Nada encontrado.</p>') : ''}</div>`;
+}
+
+/* ---------- Ações ---------- */
+const ONDA3_ACT = {
+  semCopiar: async () => { const v = semanaTexto(semanaDados()); try { await navigator.clipboard.writeText(v); toast('Resumo copiado.'); } catch { toast('Não foi possível copiar automaticamente.'); } },
+  rotGerar: t => { const c = S.clients[t.dataset.k]; if (!c) return; UI.rot = { k: c.key, t: roteiroTexto(c) }; render(); },
+  rotCopiar: async () => { const v = $('#rot-txt')?.value || UI.rot?.t || ''; try { await navigator.clipboard.writeText(v); toast('Roteiro copiado.'); } catch { toast('Selecione e copie o texto (Ctrl+C).'); } },
+  ditar: t => dictIniciar(t.dataset.alvo),
+  buscaIr: () => { const q = $('#busca-q')?.value || ''; UI.busca = { q, res: buscaGlobal(q) }; render(); },
+  buscaLimpa: () => { UI.busca = null; render(); },
+  buscaAbrir: (t, e) => { e.preventDefault(); UI.sel = t.dataset.k; UI.view = 'cliente'; if (t.dataset.tab) UI.ctab = t.dataset.tab; render(); window.scrollTo(0, 0); }
+};
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target?.id === 'busca-q') { e.preventDefault(); ONDA3_ACT.buscaIr(); } });
+document.addEventListener('toggle', e => { if (e.target?.id === 'semana') UI.semAberto = e.target.open; }, true);
 
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
 const ACT = {
@@ -9105,7 +9509,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;

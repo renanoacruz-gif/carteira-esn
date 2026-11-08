@@ -21,7 +21,7 @@ ACCESS_AUD = "6adb058f7cefc1043743382577cf95aa70a156b6d6ed7d9455ba8b8856eadcb2" 
 
 # Lembretes 09:00 e 14:00 de Brasília (UTC-3, sem horário de verão), seg-sex. Só envia se VAPID_PUBLIC e VAPID_PRIVATE estiverem definidos.
 [triggers]
-crons = ["0 12 * * MON-FRI", "0 17 * * MON-FRI"]
+crons = ["0 12 * * MON-FRI", "0 17 * * MON-FRI", "10,20 12,17 * * MON-FRI", "40 12,17 * * MON-FRI"]
 
 # Segredos (NÃO coloque valores aqui). Chaves de IA ficam com cada executivo, no navegador dele.
 #   wrangler secret put VAPID_PUBLIC     # lembrete diário: gerar o par com `node fonte/gerar_vapid.mjs`

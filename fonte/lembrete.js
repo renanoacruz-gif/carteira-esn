@@ -1,10 +1,10 @@
 /* Lembretes 9h e 14h (seg-sex) por notificação do navegador (Web Push). Estado em memória; "agora não" fica em localStorage. */
-const LEM = { st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
+const LEM = { foco: false, st: null, local: false, busy: false, msg: '', sup: false, ios: false, app: false };
 try {
   LEM.sup = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   LEM.ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   LEM.app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); setTimeout(() => toast('Bom dia! Hora de olhar a carteira de hoje.'), 800); }
+  if (/[?&]lembrete=1/.test(location.search)) { history.replaceState(null, '', location.pathname + location.hash); LEM.foco = true; setTimeout(() => toast('Hora de olhar a carteira de hoje.'), 800); }
 } catch { /* sem DOM */ }
 const lemB64 = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 async function lemApi(path, corpo) {
@@ -16,11 +16,12 @@ async function lemApi(path, corpo) {
   } catch { return { ok: false, status: 0, j: null }; } finally { clearTimeout(to); }
 }
 async function lemSubLocal() { try { const reg = await navigator.serviceWorker.getRegistration('/'); return reg ? await reg.pushManager.getSubscription() : null; } catch { return null; } }
+const lemSt = j => ({ cfg: true, aparelhos: j.aparelhos, pausa: j.pausa_ate || null, manha: j.manha !== false, tarde: j.tarde !== false });
 async function lemCarregar() {
   if (!LEM.sup && !LEM.ios) { LEM.st = { cfg: false }; return; }
   LEM.st = { cfg: false, carregando: true };
   const r = await lemApi('/api/push/status');
-  LEM.st = r.ok ? { cfg: true, aparelhos: r.j.aparelhos } : { cfg: false, erro: r.status !== 503 };
+  LEM.st = r.ok ? lemSt(r.j) : { cfg: false, erro: r.status !== 503 };
   if (LEM.sup) LEM.local = !!(await lemSubLocal()) && Notification.permission === 'granted';
   render();
 }
@@ -39,7 +40,14 @@ function lemCard() {
   if (!LEM.sup) h += `<p class="sm muted">${LEM.ios ? 'No iPhone/iPad (iOS 16.4 ou superior): toque em Compartilhar → Adicionar à Tela de Início, abra pelo ícone e ative aqui.' : 'Este navegador não oferece notificações.'}</p>`;
   else if (Notification.permission === 'denied') h += '<p class="sm muted">Notificações bloqueadas neste navegador. Libere nas configurações do site e volte aqui.</p>';
   else h += `<div class="row">${LEM.local ? `<span class="pill p-info">Ativo neste aparelho</span><span class="sp"></span><button class="btn ghost sm" data-a="lemTeste" ${LEM.busy ? 'disabled' : ''}>Enviar teste</button><button class="btn ghost sm" data-a="lemOff" ${LEM.busy ? 'disabled' : ''}>Desativar</button>` : `<button class="btn pri" data-a="lemOn" ${LEM.busy ? 'disabled' : ''}>Ativar neste aparelho</button>`}</div>`;
-  if (LEM.st.aparelhos) h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+  if (LEM.st.aparelhos) {
+    h += `<p class="sm muted">Aparelhos com lembrete na sua conta: ${LEM.st.aparelhos}.</p>`;
+    const on = k => LEM.st[k] !== false, tg = (k, l) => `<button class="btn ${on(k) ? 'pri' : 'ghost'} sm" data-a="lemTurno" data-k="${k}" aria-pressed="${on(k)}" ${LEM.busy ? 'disabled' : ''}>${l}: ${on(k) ? 'ligado' : 'desligado'}</button>`;
+    h += `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Turnos:</span>${tg('manha', '9h')}${tg('tarde', '14h')}</div>`;
+    h += LEM.st.pausa ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill p-warn">Em pausa até ${esc(LEM.st.pausa.split('-').reverse().join('/'))}</span><button class="btn ghost sm" data-a="lemRetomar" ${LEM.busy ? 'disabled' : ''}>Retomar agora</button></div>`
+      : `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><span class="sm">Pausar (férias, folga):</span>${[7, 15, 30].map(d => `<button class="btn ghost sm" data-a="lemPausa" data-d="${d}" ${LEM.busy ? 'disabled' : ''}>${d} dias</button>`).join('')}</div>`;
+    h += '<p class="sm muted">O lembrete não é enviado em feriados nacionais, Carnaval e Corpus Christi. Feriados estaduais e municipais não são tratados: use a pausa.</p>';
+  }
   if (LEM.msg) h += `<p class="sm" role="status">${esc(LEM.msg)}</p>`;
   return h + '</div>';
 }
@@ -55,7 +63,7 @@ const LEM_ACT = {
       const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: lemB64(k.j.chave) });
       const r = await lemApi('/api/push/inscrever', { endpoint: sub.endpoint });
       if (!r.ok) { try { await sub.unsubscribe(); } catch { /* ok */ } throw new Error('Não foi possível registrar este aparelho.'); }
-      LEM.local = true; LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
+      LEM.local = true; LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete ativado. Use "Enviar teste" para conferir.';
     } catch (e) { LEM.msg = (e && e.message && !/^(Failed|Registration|Subscription|NotAllowed|Abort|Security|Type)/.test(e.name || '')) ? e.message : 'Não foi possível ativar neste aparelho.'; }
     LEM.busy = false; render();
   },
@@ -65,8 +73,25 @@ const LEM_ACT = {
       const sub = await lemSubLocal(), ep = sub && sub.endpoint;
       const r = ep ? await lemApi('/api/push/cancelar', { endpoint: ep }) : { ok: true, j: { aparelhos: LEM.st && LEM.st.aparelhos } };
       if (sub) { try { await sub.unsubscribe(); } catch { /* ok */ } }
-      LEM.local = false; if (r.ok) LEM.st = { cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
+      LEM.local = false; if (r.ok) LEM.st = { ...LEM.st, cfg: true, aparelhos: r.j.aparelhos }; LEM.msg = 'Lembrete desativado neste aparelho.';
     } catch { LEM.msg = 'Não foi possível desativar agora.'; }
+    LEM.busy = false; render();
+  },
+  lemTurno: async t => {
+    if (LEM.busy || !LEM.st) return; const k = t.dataset.k; if (k !== 'manha' && k !== 'tarde') return; LEM.busy = true; LEM.msg = ''; render();
+    const novo = { manha: LEM.st.manha !== false, tarde: LEM.st.tarde !== false }; novo[k] = !novo[k];
+    const r = await lemApi('/api/push/pref', novo); if (r.ok) { LEM.st = { ...LEM.st, manha: r.j.manha, tarde: r.j.tarde }; LEM.msg = 'Preferência salva.'; } else LEM.msg = 'Não foi possível salvar agora.';
+    LEM.busy = false; render();
+  },
+  lemPausa: async t => {
+    if (LEM.busy) return; const d = Math.min(90, Math.max(1, +t.dataset.d || 7)); LEM.busy = true; LEM.msg = ''; render();
+    const ate = new Date(Date.now() - 3 * 3600000 + d * 86400000).toISOString().slice(0, 10), r = await lemApi('/api/push/pausar', { ate });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: r.j.pausa_ate }; LEM.msg = 'Lembrete em pausa.'; } else LEM.msg = 'Não foi possível pausar agora.';
+    LEM.busy = false; render();
+  },
+  lemRetomar: async () => {
+    if (LEM.busy) return; LEM.busy = true; LEM.msg = ''; render(); const r = await lemApi('/api/push/pausar', { ate: null });
+    if (r.ok) { LEM.st = { ...LEM.st, pausa: null }; LEM.msg = 'Lembrete retomado.'; } else LEM.msg = 'Não foi possível retomar agora.';
     LEM.busy = false; render();
   },
   lemTeste: async () => {
@@ -78,20 +103,25 @@ const LEM_ACT = {
 };
 {
   const h = typeof hojeCard === 'function' ? hojeCard : null, c = typeof vConta === 'function' ? vConta : null;
-  if (h) globalThis.hojeCard = function () { return lemBanner() + h(); };
+  if (h) globalThis.hojeCard = function () { if (LEM.foco) lemIrParaHoje(6); return lemBanner() + h(); };
   if (c) globalThis.vConta = function () { return c() + lemCard(); };
 }
 
 /* Resumo para o texto do aviso: o navegador conta os clientes com motivo para aprofundar (mesma regra do card "Onde vale aprofundar hoje")
    e envia só esse inteiro. O servidor nunca lê a carteira. Só envia neste aparelho com lembrete ativo e com a carteira carregada. */
-const LEMR = { n: null, env: null, t: 0, busy: false, tm: 0 };
+/* Retornos que vencem hoje ou já venceram (prazos que o próprio usuário definiu); só o número sai do navegador. */
+function lemRetornos() {
+  try { const h = today(); return pendItems().filter(x => x.tipo === 'acao' || (x.tipo === 'prox' && x.prazo === h)).length; } catch { return null; }
+}
+const LEMR = { n: null, r: null, env: null, t: 0, busy: false, tm: 0 };
 function lemReportar() {
   clearTimeout(LEMR.tm);
   LEMR.tm = setTimeout(async () => {
     try {
       const n = LEMR.n; if (!LEM.local || LEMR.busy || !Number.isInteger(n) || n < 0 || n > 999) return;
-      if (n === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
-      LEMR.busy = true; const r = await lemApi('/api/push/resumo', { n }); if (r.ok) { LEMR.env = n; LEMR.t = Date.now(); }
+      const r = Number.isInteger(LEMR.r) && LEMR.r >= 0 && LEMR.r <= 999 ? LEMR.r : undefined, chave = n + '|' + r;
+      if (chave === LEMR.env && Date.now() - LEMR.t < 3 * 3600 * 1000) return;
+      LEMR.busy = true; const rs = await lemApi('/api/push/resumo', r === undefined ? { n } : { n, r }); if (rs.ok) { LEMR.env = chave; LEMR.t = Date.now(); }
     } catch { /* sem efeito: o aviso volta ao texto geral */ } finally { LEMR.busy = false; }
   }, 2500);
 }
@@ -99,7 +129,13 @@ function lemReportar() {
   const hi = typeof hojeItens === 'function' ? hojeItens : null;
   if (hi) globalThis.hojeItens = function () {
     const out = hi.apply(this, arguments);
-    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; lemReportar(); } } catch { /* sem efeito */ }
+    try { if (Array.isArray(out) && typeof clients === 'function' && clients().length) { LEMR.n = out.length; LEMR.r = lemRetornos(); lemReportar(); } } catch { /* sem efeito */ }
     return out;
   };
 }
+
+/* Aviso tocado: leva direto ao card "Onde vale aprofundar hoje" (com a app aberta ou não). */
+function lemIrParaHoje(tent) {
+  setTimeout(() => { const e = document.getElementById('hoje'); if (e) { LEM.foco = false; e.scrollIntoView({ block: 'start', behavior: 'smooth' }); } else if (tent > 1) lemIrParaHoje(tent - 1); else LEM.foco = false; }, 350);
+}
+try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.lembrete) { LEM.foco = true; try { UI.view = 'geral'; render(); } catch { /* sem efeito */ } } }); } catch { /* sem service worker */ }

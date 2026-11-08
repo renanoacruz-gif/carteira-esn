@@ -38,6 +38,7 @@ const ADM_DDL = [
   'CREATE INDEX IF NOT EXISTS eventos_ts ON eventos(ts)', 'CREATE INDEX IF NOT EXISTS eventos_usr ON eventos(usuario, ts)',
   'CREATE TABLE IF NOT EXISTS adm_cfg (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)',
+  'CREATE TABLE IF NOT EXISTS sugestoes (id TEXT PRIMARY KEY, email TEXT NOT NULL, em TEXT NOT NULL, area TEXT NOT NULL, texto TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0)',
   'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)'
 ];
 const admDb = env => env && env.DB && typeof env.DB.prepare === 'function' ? env.DB : null;
@@ -111,6 +112,7 @@ async function admGravar(env, linhas) {
 async function admPurgar(env, forcar) {
   const db = admDb(env); if (!db) return { eventos: 0, tentativas: 0 }; await admInit(env); const { cfg } = await admCfgLer(db), lim = new Date(Date.now() - cfg.retencao_dias * 864e5).toISOString();
   const a = await db.prepare('DELETE FROM eventos WHERE ts<?').bind(lim).run(), b = await db.prepare('DELETE FROM adm_tentativas WHERE ts<?').bind(new Date(Date.now() - 90 * 864e5).toISOString()).run();
+  await db.prepare('DELETE FROM sugestoes WHERE em<?').bind(new Date(Date.now() - 180 * 864e5).toISOString()).run();
   await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('ultima_purga', JSON.stringify(new Date().toISOString())).run();
   return { eventos: a.meta?.changes ?? 0, tentativas: b.meta?.changes ?? 0 };
 }
@@ -234,6 +236,28 @@ async function admResumo(env, url) {
   try { out.csp = ((await db.prepare('SELECT diretiva,alvo,n,ultimo FROM csp_obs ORDER BY n DESC LIMIT 30').all()).results || []); } catch { out.csp = []; }
   out.geradoEm = agora; return out;
 }
+const SUG_AREAS = ['geral', 'lembrete', 'importacao', 'oportunidades', 'briefing', 'retornos', 'outro'];
+const SUG_DADOS = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b|R\$\s*\d|\b\d{1,3}(\.\d{3})+,\d{2}\b/;
+/* POST /api/sug {area,texto} — qualquer executivo autenticado; texto livre curto, sem dados de cliente */
+async function admSugerir(req, env, au) {
+  const db = admDb(env); if (!db || !au.user) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'Indisponível no momento.' } }, 503);
+  let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
+  const area = SUG_AREAS.includes(q && q.area) ? q.area : null, texto = typeof (q && q.texto) === 'string' ? q.texto.replace(/\s+/g, ' ').trim() : '';
+  if (!area) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Escolha a área da sugestão.' } }, 400);
+  if (texto.length < 10 || texto.length > 1000) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Descreva a sugestão em 10 a 1000 caracteres.' } }, 400);
+  if (SUG_DADOS.test(texto)) return J({ ok: false, erro: { codigo: 'dados_sensiveis', mensagem: 'Não inclua CNPJ nem valores: descreva a ideia sem dados de clientes.' } }, 400);
+  await admInit(env);
+  const n = await db.prepare('SELECT COUNT(*) n FROM sugestoes WHERE email=? AND em>=?').bind(au.user, new Date(Date.now() - 864e5).toISOString()).first();
+  if (n && n.n >= 5) return J({ ok: false, erro: { codigo: 'limite', mensagem: 'Limite de 5 sugestões por dia. Tente amanhã.' } }, 429);
+  await db.prepare('INSERT INTO sugestoes(id,email,em,area,texto,lida) VALUES(?,?,?,?,?,0)').bind(crypto.randomUUID(), au.user, new Date().toISOString(), area, texto).run();
+  return J({ ok: true });
+}
+async function admSugestoes(req, env, url) {
+  const db = admDb(env); await admInit(env);
+  if (req.method === 'POST') { let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); } if (typeof (q && q.id) !== 'string' || q.id.length > 60) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'id inválido.' } }, 400); await db.prepare('UPDATE sugestoes SET lida=? WHERE id=?').bind(q.lida === false ? 0 : 1, q.id).run(); return J({ ok: true }); }
+  const r = await db.prepare('SELECT id,email,em,area,texto,lida FROM sugestoes ORDER BY lida ASC, em DESC LIMIT 100').all(), nl = await db.prepare('SELECT COUNT(*) n FROM sugestoes WHERE lida=0').first();
+  return J({ ok: true, itens: r.results || [], nao_lidas: nl ? nl.n : 0 });
+}
 async function admRoster(req, env, au) {
   const db = admDb(env); await admInit(env); let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
   const dom = '@' + DOMAIN_OK(env), agora = new Date().toISOString(); const lim = (await db.prepare('SELECT COUNT(*) c FROM adm_roster').first())?.c || 0;
@@ -259,10 +283,11 @@ async function admRota(req, env, au, url) {
   try {
     if (url.pathname === '/api/adm/resumo' && req.method === 'GET') return J({ ok: true, ...(await admResumo(env, url)) });
     if (url.pathname === '/api/adm/lembrete' && req.method === 'GET') return J({ ok: true, ...(await pushAdocao(env)) });
+    if (url.pathname === '/api/adm/sugestoes' && /^(GET|POST)$/.test(req.method)) return admSugestoes(req, env, url);
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS };

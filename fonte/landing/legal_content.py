@@ -1,7 +1,7 @@
 # Conteúdo das páginas legais. Fatos técnicos conferidos no código (worker.js, adm.js, schema, wrangler.toml, README).
 CONTATO = 'renan.oscar@totvs.com.br'
-DATA = '07/11/2026'
-VERSAO = '1.3'
+DATA = '09/11/2026'
+VERSAO = '1.5'
 
 def tb(head, rows):
     h = ''.join(f'<th>{c}</th>' for c in head)
@@ -76,13 +76,15 @@ PAGES['privacidade'] = dict(
     ['<b>Registro de uso</b>: recurso usado, data e hora, resultado, tempo de processamento, e-mail do usuário e medidas de desempenho da abertura (tempos do navegador e quantidade de clientes)','Acompanhar adoção e funcionamento, e medir desempenho','Nunca grava conteúdo de fichas, prints, pesquisas, contratos ou respostas de IA, nem nomes de clientes, CNPJs ou valores'],
     ['<b>Tentativas de acesso negadas</b>: data, e-mail informado, motivo e rota','Segurança','Guardadas por 90 dias'],
     ['<b>Observações de segurança do navegador</b>: regra de segurança acionada e destino bloqueado, com contagem','Segurança e correção de falhas','Sem identificação de usuário'],
-    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro, contagem de falhas de envio e um único número inteiro (quantos clientes têm motivo para aprofundar), calculado no seu navegador, com a data em que foi calculado','Avisar às 9h e às 14h dos dias úteis, só se você ainda não abriu o sistema no período, e informar esse número no texto do aviso','Só existe se você ativar. O servidor não lê nem guarda sua carteira, nomes de clientes ou valores: só esse número. Pode desativar a qualquer momento em Conta, o que apaga o cadastro e o número'],
+    ['<b>Lembrete diário (opcional)</b>: e-mail, endereço de notificação do aparelho que você ativou, data de cadastro, contagem de falhas de envio e dois números inteiros (quantos clientes têm motivo para aprofundar e quantos retornos que você marcou vencem hoje ou estão atrasados), calculados no seu navegador, com a data em que foram calculados; se você usar, também a data até a qual pausou os avisos e a sua escolha de receber (ou não) o aviso das 9h e o das 14h','Avisar às 9h e às 14h dos dias úteis, só se você ainda não abriu o sistema no período, e informar esse número no texto do aviso','Só existe se você ativar. O servidor não lê nem guarda sua carteira, nomes de clientes, textos dos retornos ou valores: só esses números. Pode desativar a qualquer momento em Conta, o que apaga o cadastro e o número'],
+    ['<b>Sugestões de melhoria</b>: e-mail, data, área escolhida e o texto livre que você escrever (sem CNPJ nem valores; o sistema recusa)','Receber ideias do time para melhorar a ferramenta','Visíveis ao administrador; apagadas após 180 dias'],
     ['<b>Preferências locais</b>: chave de IA, avisos já vistos e configurações, no armazenamento do seu navegador','Funcionamento do sistema','Ficam no seu navegador; a chave de IA não é gravada pelo servidor'],
   ])+'''<p>As páginas públicas (landing e documentos) não usam cookies de rastreamento nem ferramentas de análise de audiência.</p>'''),
   ('Base legal', '''<p>O tratamento tem como base, em regra, o <b>legítimo interesse</b> da TOTVS na gestão da sua operação comercial e na segurança do ambiente (LGPD, art. 7º, IX) e, quando aplicável, a execução das atividades decorrentes da relação de trabalho e de contratos com clientes (art. 7º, V). As bases são definidas e validadas pelo controlador e pelo Encarregado.</p>'''),
   ('Com quem os dados são compartilhados', '''<ul><li><b>Cloudflare:</b> hospeda o aplicativo e o banco, e controla o acesso. Quem administra a conta do Cloudflare tem acesso técnico ao banco.</li>
-<li><b>Provedores de IA</b> (Google Gemini, OpenAI, Anthropic, Groq): só quando você aciona um recurso de IA ou OCR com a sua chave e autoriza o envio. Vai apenas o conteúdo necessário àquela tarefa.</li>
-<li><b>Serviços de notificação do navegador</b> (Google, Apple, Mozilla, Microsoft): se você ativar o lembrete, recebem o endereço de notificação do seu aparelho e um aviso vazio, sem conteúdo, para entregá-lo. O texto da notificação é montado no seu aparelho; o número de clientes nele vem do seu próprio cadastro no sistema e não passa por esses serviços.</li>
+<li><b>Provedores de IA</b> (Google Gemini, OpenAI, Anthropic, Groq): só quando você aciona um recurso de IA ou OCR com a sua chave e autoriza o envio. Vai apenas o conteúdo necessário àquela tarefa. No registro pós-reunião, o texto da ata que você colar é enviado ao provedor que você escolheu, depois de o sistema trocar CNPJ, CPF, valores, e-mails e telefones por marcadores, e nada é salvo sem a sua revisão.</li>
+<li><b>Serviços de notificação do navegador</b> (Google, Apple, Mozilla, Microsoft): se você ativar o lembrete, recebem o endereço de notificação do seu aparelho e um aviso vazio, sem conteúdo, para entregá-lo. O texto da notificação é montado no seu aparelho; os números nele vêm do seu próprio cadastro no sistema e não passa por esses serviços.</li>
+<li><b>Serviço de voz do navegador</b> (Google no Chrome e Android, Apple no Safari e iPhone): só se você tocar em “Ditar”, depois de uma confirmação. O navegador envia o áudio ao serviço para transcrevê-lo; o aplicativo recebe apenas o texto. Não dite CNPJ, valores nem dados pessoais.</li>
 <li><b>Fontes externas consultadas por você</b> (por exemplo, consultas públicas de CNPJ, TDN e Planilhas Google): vai só o necessário para a consulta, como o identificador ou o link informado.</li>
 <li>Os dados não são vendidos nem usados para publicidade.</li></ul>'''),
   ('Transferência internacional', '''<p>O banco de dados fica na região <b>ENAM</b> do Cloudflare D1 (leste da América do Norte), e a rede do Cloudflare e os provedores de IA podem processar dados fora do Brasil. Essas transferências ocorrem com os mecanismos previstos no art. 33 da LGPD, conforme os contratos de cada fornecedor.</p>'''),
@@ -90,7 +92,8 @@ PAGES['privacidade'] = dict(
     ['Carteira (clientes, fichas, imagens)','Até você apagar, usando as funções de gerenciamento de dados, ou até o encerramento do seu acesso, conforme as regras internas da TOTVS'],
     ['Registro de uso','180 dias, prazo que o administrador pode ajustar entre 30 e 730 dias. Eventos mais antigos são apagados automaticamente'],
     ['Tentativas de acesso negadas','90 dias'],
-    ['Lembrete diário','Até você desativar, ou até o serviço de notificação informar que o aparelho não existe mais, ou após 5 falhas seguidas de envio. O número de clientes é substituído a cada atualização e apagado junto com o cadastro'],
+    ['Lembrete diário','Até você desativar, ou até o serviço de notificação informar que o aparelho não existe mais, ou após 5 falhas seguidas de envio. Os números são substituídos a cada atualização; pausa e escolha de turnos são apagadas junto com o cadastro'],
+    ['Sugestões de melhoria','180 dias, ou antes se o administrador as apagar'],
     ['Contagens de envio dos lembretes (por dia e turno, sem e-mail nem aparelho)','90 dias'],
     ['Backups exportados por você','Ficam com você, fora do sistema. Proteja-os e apague quando não forem mais necessários'],
   ])),

@@ -689,6 +689,7 @@ async function handleInner(req, env0, ctx) {
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
+  if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
   if (url.pathname.startsWith('/api/push/')) return pushRota(req, env0, au, url);
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
@@ -741,7 +742,7 @@ async function processar(q, env, base, t0) {
 
 /*__ADM__*/
 /*__PUSH__*/
-export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { ctx.waitUntil(pushAgendado(env, ev && ev.scheduledTime).catch(e => console.error('push_agendado', e && e.name))); } };
+export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
 
 /* Página mínima servida em "/": cola o pedido (JSON baixado do aplicativo), envia, baixa a resposta. A senha (APP_TOKEN) fica só na memória da página. */
 const PAGE = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Backend Gemini — Gestão de Carteira TOTVS ESN</title><meta name="viewport" content="width=device-width,initial-scale=1">

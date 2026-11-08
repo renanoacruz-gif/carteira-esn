@@ -25,7 +25,7 @@ async function bkDireto(tipo, pedido, timeout = tipo === 'importar' ? 170000 : t
 /* Envia um pedido. Retorna {via:'direto', resp} ou {via:'manual'} (arquivo oferecido para download). Nunca finge sucesso. */
 async function bkChamar(tipo, pedido, arquivo) {
   if (pedido?.provedor === 'pagina') { if (tipo === 'ocr') return { via: 'direto', resp: await pgOcr(pedido) }; if (tipo === 'ia' || tipo === 'ia_teste') return { via: 'direto', resp: await pgIA(tipo, pedido) }; }
-  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Integrações → Minhas chaves de IA.`); }
+  if (window.__HOSTED__ && (tipo === 'ia' || tipo === 'ia_teste' || tipo === 'ocr')) { const pv = tipo === 'ocr' ? 'gemini' : pedido?.provedor; if (!hkChave(pv)) throw bkErr('sem_chave', `Cadastre sua chave de ${AI_PROV[pv]?.nome || pv} em Configurações → IA e provedores → Minhas chaves de IA.`); }
   if (window.__HOSTED__ || (BK.direto !== false && bkPronto() && BK.token)) {
     try { return { via: 'direto', resp: await bkDireto(tipo, pedido) }; }
     catch (e) { BK.ultimoErro = e.message; if (window.__HOSTED__ || !['bloqueado_ambiente', 'rede'].includes(e.codigo)) throw e; }

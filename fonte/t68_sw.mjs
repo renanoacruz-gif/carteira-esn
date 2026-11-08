@@ -26,4 +26,28 @@ r = await roda(() => Promise.resolve({ ok: true, json: async () => { throw new E
 const t0 = Date.now(); r = await roda(o => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('abort'))))); const dt = Date.now() - t0;
 ck('sem resposta: cancela em ~4 s e mostra o texto geral', dt >= 3500 && dt < 6000 && geral(r.shown[0][1].body), dt);
 ck('opções da notificação preservadas (tag/renotify/ícone)', r.shown[0][1].tag === 'lembrete-diario' && r.shown[0][1].renotify === true && /icon-192/.test(r.shown[0][1].icon));
+r = await roda(ok({ ok: true, n: 3, em: iso(agora), alerta: true })); b = r.shown[0][1].body;
+ck('alerta ao administrador: texto fixo, sem detalhes', /^Atenção: o lembrete diário teve um problema hoje\. Abra o painel Administrador/.test(b), b);
+{
+  const L = {}; const msgs = []; let focado = 0, aberto = null;
+  const self = { addEventListener: (t, f) => { L[t] = f; }, skipWaiting() {}, clients: { claim() {}, matchAll: async () => [{ focus: () => { focado++; return Promise.resolve(); }, postMessage: m => msgs.push(m) }], openWindow: u => { aberto = u; return Promise.resolve(); } }, registration: {} };
+  vm.runInNewContext(src, { self, fetch: () => Promise.reject(new Error('x')), Date, AbortController, setTimeout, clearTimeout, console, Number, JSON, String });
+  let p; L.notificationclick({ notification: { close() {} }, waitUntil: x => { p = x; } }); await p;
+  ck('clique com app aberto: foca a janela e avisa para ir ao card de hoje', focado === 1 && msgs.length === 1 && msgs[0].lembrete === 1 && aberto === null, JSON.stringify([focado, msgs, aberto]));
+  const self2 = { addEventListener: (t, f) => { L[t] = f; }, skipWaiting() {}, clients: { claim() {}, matchAll: async () => [], openWindow: u => { aberto = u; return Promise.resolve(); } }, registration: {} };
+  vm.runInNewContext(src, { self: self2, fetch: () => Promise.reject(new Error('x')), Date, AbortController, setTimeout, clearTimeout, console, Number, JSON, String });
+  L.notificationclick({ notification: { close() {} }, waitUntil: x => { p = x; } }); await p;
+  ck('clique com app fechado: abre /?lembrete=1', aberto === '/?lembrete=1', aberto);
+}
+// Onda 2: retornos (r) no texto do aviso
+{
+  const hoje = iso(agora - 60000), velho = iso(agora - 2 * 86400000);
+  r = await roda(ok({ ok: true, n: 3, em: hoje, r: 2, rem: hoje })); b = r.shown[0][1].body; ck('n e r: texto com clientes e retornos hoje', /^3 clientes com motivo para aprofundar e 2 retornos vencendo hoje/.test(b), b);
+  r = await roda(ok({ ok: true, n: 0, em: hoje, r: 1, rem: hoje })); b = r.shown[0][1].body; ck('só retorno: singular', /^1 retorno vencendo hoje/.test(b), b);
+  r = await roda(ok({ ok: true, n: 2, em: hoje, r: 0, rem: hoje })); b = r.shown[0][1].body; ck('r=0: texto de antes', /^2 clientes com motivo para aprofundar hoje/.test(b) && !/retorno/.test(b), b);
+  r = await roda(ok({ ok: true, n: 2, em: velho, r: 3, rem: velho })); b = r.shown[0][1].body; ck('dias atrás: cita a última visita', /última visita \(\d\d\/\d\d\)/.test(b) && /3 retornos/.test(b), b);
+  r = await roda(ok({ ok: true, n: 0, em: hoje, r: 0, rem: hoje })); ck('n=0 e r=0: texto geral', geral(r.shown[0][1].body));
+  r = await roda(ok({ ok: true, n: 2, em: hoje, r: 'x', rem: hoje })); b = r.shown[0][1].body; ck('r inválido é ignorado', /^2 clientes com motivo para aprofundar hoje/.test(b), b);
+  r = await roda(ok({ ok: true, n: 2, em: hoje, r: 4, rem: iso(agora - 6 * 86400000) })); b = r.shown[0][1].body; ck('r antigo (6 dias) é ignorado', !/retorno/.test(b), b);
+}
 console.log(F.length ? 'FALHAS: ' + JSON.stringify(F) : 'TUDO OK'); process.exit(F.length ? 1 : 0);
