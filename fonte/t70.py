@@ -53,6 +53,13 @@ A('/api/adm/sugestoes',{'id':mine[0]['id']}); st,j=A('/api/adm/sugestoes'); ck('
 ck('id inválido recusado', A('/api/adm/sugestoes',{'id':123})[0]==400)
 d1("UPDATE sugestoes SET em='2025-01-01T00:00:00.000Z' WHERE email='%s'"%USR); A('/api/adm/purgar',{})
 ck('retenção: sugestões com mais de 180 dias são apagadas', not d1("SELECT id FROM sugestoes WHERE email='%s'"%USR))
+# ---------- Purga diária no cron do vigia (manhã) ----------
+import time
+d1("DELETE FROM adm_cfg WHERE chave='ultima_purga'; INSERT INTO sugestoes(id,email,em,area,texto,lida) VALUES('old-o2','velho@totvs.com.br','2025-01-01T00:00:00.000Z','geral','sugestão antiga para a purga',0)")
+urllib.request.urlopen(H+'/cdn-cgi/handler/scheduled?cron=40+17+*+*+MON-FRI&time=1794142800000').read(); time.sleep(1.5)
+ck('vigia da tarde não dispara a purga', not d1("SELECT 1 FROM adm_cfg WHERE chave='ultima_purga'"))
+urllib.request.urlopen(H+'/cdn-cgi/handler/scheduled?cron=40+12+*+*+MON-FRI&time=1794141600000').read(); time.sleep(2)
+ck('vigia da manhã executa a purga diária', bool(d1("SELECT 1 FROM adm_cfg WHERE chave='ultima_purga'")) and not d1("SELECT id FROM sugestoes WHERE id='old-o2'"))
 # ---------- UI ----------
 ctx=b.new_context(viewport={'width':1400,'height':900},extra_http_headers={'x-test-user':ADM,'x-test-sub':ASUB}); pg=ctx.new_page(); errs=[]
 pg.on('pageerror',lambda e: errs.append(str(e))); ctx.grant_permissions(['clipboard-read','clipboard-write'])
