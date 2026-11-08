@@ -127,3 +127,10 @@ Regra central: **"não identificado nos documentos" ≠ "cliente não possui"**.
 - Item 27 · `build.py`: URLs de `/vendor` (inclui o worker do pdf.js) levam `?v=<sha1 do arquivo>`; `_headers`: `/vendor/*` com `max-age=31536000, immutable`. `bld.sh` passou a copiar `_headers` (antes a mudança de header não chegava ao build).
 - Teste novo `t61.py` (30 checks): debounce (estado imediato, ≤2 renders, cursor/foco, Enter imediato), retentativa só em leitura, escrita não repetida, requisição pendurada (escrita e leitura) com tempo limite, imagens lazy, `/vendor` versionado e imutável.
 - Reverter: restaurar `hosted.js`, `main.js`, `shell.js`, `prints.js`, `ocr.js`, `build.py`, `_headers` (e a linha de status em `store.js`) da branch do Lote 2.
+
+## Design refresh (branch feat/design-refresh)
+Somente apresentação; nenhuma lógica, id, classe ou data-* existente foi alterado.
+- **Fase 1 (style.css):** tokens novos (`--fs-*`, `--r-md/--r-pill`, `--t-md/--t-slow`, `--z-*`, tons suaves `--c-soft*`, `--ok-*`, `--warn-*`, `--bad-*`, alfas `--wa*/--pa*/--ca*`), cores soltas → tokens (exceto o documento Briefing, paleta própria), foco 3px, `tabular-nums`, alvos de toque ≥40px (≤900px ou ponteiro grosso), toast compacto e sem capturar clique, tabelas com zebra, breakpoints 1040/900/680 (JS só usa 900), correção de overflow em Releases.
+- **Fase 2 (style.css, CSS puro):** ícones por máscara SVG (`--i-*`) em pills de status, alertas e KPIs; estado vazio com ícone; elevação de cartões.
+- **Fase 3 (`refresh.js`, aditivo):** paleta Ctrl/⌘+K (reusa `data-a="nav"` e `gsOpen`), atalhos `?`, glossário, navegação interna com scroll-spy (≥1200px, telas longas), botão de topo com anel de progresso, CSS de impressão. Teste: `t72.py`.
+- Não feito (exigiria mexer em lógica): count-up nos KPIs, View Transitions (render é síncrono), destaque de linha vencida (falta classe no markup), tema escuro, WebGL/3D.
