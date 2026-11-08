@@ -20,7 +20,7 @@ Cabeçalho executivo (cliente, contrato, proposta, segmento, tags de status).
 07 Roteiro e Agenda da Reunião.
 
 VISUAL
-Fundo off-white #FAFAF7; azul-marinho #0E1F30 (títulos e banners); verde-petróleo #0E6E62 (destaques/OK); terracota #B5502A (alertas/excedentes). Tabelas limpas com cabeçalho destacado; valores em R$ alinhados à direita. Rodapé executivo com fontes dos dados e assinatura profissional.
+Paleta TOTVS via tokens do style.css: --pet (títulos e banners), --link (destaques), --ok-tx (OK), --warn-tx (alertas/excedentes). Tabelas limpas com cabeçalho destacado; valores em R$ alinhados à direita. Rodapé executivo com fontes dos dados e assinatura profissional.
 
 REGRA DA FERRAMENTA
 O briefing só é gerado a partir da ficha de faturamento anexada ao cliente. Sem ficha, a ferramenta lembra o usuário de anexá-la.`;
