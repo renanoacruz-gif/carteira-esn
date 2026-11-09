@@ -547,3 +547,25 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 #app .btn:active{transform:translateY(1px)}
 #app .btn.pri:hover,#app .btn.primary:hover{box-shadow:0 6px 16px -6px rgba(0,169,199,.55)}
 @media print{#app .kpi,#app .seg-card{background:var(--w)}}
+
+/* ===== Mobile: barra inferior, passos compactos, KPIs em faixa (feat/mobile-visao) ===== */
+#tabbar{display:none}
+@media(max-width:900px){
+#tabbar:not([hidden]){--tb-h:56px;display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:var(--z-top);background:var(--w);border-top:1px solid var(--bd3);box-shadow:0 -4px 16px rgba(0,34,51,.06);padding-bottom:env(safe-area-inset-bottom,0px)}
+#tabbar .tb-i{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:var(--tb-h);padding:var(--s1) 0;border:0;background:none;color:var(--txt3);font:inherit;font-size:var(--fs-2xs);cursor:pointer;position:relative;transition:color var(--t)}
+#tabbar .tb-i span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tabbar .tb-i.on{color:var(--pet);font-weight:700}
+#tabbar .tb-i.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 var(--r-sm) var(--r-sm);background:var(--ciano)}
+#tabbar .tb-i:active{background:var(--n2)}
+.main-col{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+.toast{bottom:calc(56px + var(--s3) + env(safe-area-inset-bottom,0px))}
+#app #onb.onb-c ol,#app #onb.onb-c>p.muted:not(.onb-nx){display:none}
+#app #onb.onb-c.open ol,#app #onb.onb-c.open>p.muted:not(.onb-nx){display:block}
+#app #onb.onb-c .onb-nx{margin:var(--s1) 0 0}#app #onb.onb-c.open .onb-nx{display:none}
+#app #onb.onb-c{padding-block:var(--s3)}
+#app #onb.onb-c:not(.open) [data-a=onbFim]{display:none}
+#app .grid.g4.kpi-strip{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scroll-padding-inline:var(--s3);scrollbar-width:none;margin-inline:calc(-1*var(--s3));padding:var(--s1) var(--s3) var(--s2)}
+#app .grid.g4.kpi-strip::-webkit-scrollbar{display:none}
+#app .grid.g4.kpi-strip>.kpi{flex:0 0 min(44vw,168px);scroll-snap-align:start}
+}
+@media print{#tabbar{display:none!important}}

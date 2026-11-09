@@ -162,3 +162,12 @@ Filtros da lista de Clientes: 176 px de altura e primeira linha em 717 px (já n
 
 ## Adoção: tempo até o primeiro valor (frente D)
 `t76.py` cronometra usuário novo → importa a carteira → abre cliente a partir de "Onde vale aprofundar hoje": 4 ações (arquivo, Prévia, Importar, abrir cliente), ~1,5 s técnico no ambiente de teste (orçamento de produto: < 5 min). A Prévia antes de gravar é revisão deliberada e foi mantida. Achado aberto: no celular (390×844) o card "Onde vale aprofundar hoje" fica a ~1,6 telas do topo (cartão "Primeiros passos" e avisos acima); candidato a ajuste futuro, não alterado.
+
+## Mobile: barra inferior e Visão compacta (`tabbar.js`)
+Só ≤900px; desktop inalterado. Revisão pelas diretrizes de produto (padrões familiares, lugar esperado):
+| Desvio | Ajuste |
+|---|---|
+| Só menu hambúrguer, sem barra inferior | Barra inferior: Visão, Clientes, Oportunidades, Mercado, Menu (abre o menu completo). Reusa `nav`/`sbOpen`; alvo ≥ 56 px |
+| "Primeiros passos" ocupava 394 px antes dos KPIs | Compacto: título, progresso e "Próximo: …"; "Ver passos" expande; "Ocultar" aparece ao expandir |
+| KPIs em grade 2×N (487 px) | Faixa deslizante com card seguinte à vista (197 px) |
+Resultado (390×844): "Onde vale aprofundar hoje" 1374 → ~775 px (dentro da primeira tela). Sem item central de destaque: o produto não tem ação principal de criar. Teste: `t77.py`.
