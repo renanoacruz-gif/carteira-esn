@@ -144,3 +144,12 @@ WebGL escrito à mão (sem biblioteca, sem rede, sem dados de exemplo). Só adic
 
 ## Polimento leve (branch feat/polish-leve)
 Só CSS (bloco final de `style.css`, escopo `#app`/chrome; exportações não mudam): sombras em camadas e bordas suaves, cor dos KPIs/segmentos como traço curto (sem faixa), avisos sem listra lateral, pílulas e cabeçalhos de tabela em caixa normal, filtros em grade ordenada (≥901px), medida de texto 84ch, toc/botão de topo mais discretos, feedback tátil nos botões. Sem mudança de HTML/JS.
+
+## Tempo até o valor (frente C)
+Mapa 3D da Visão da Carteira agora entra depois de "Onde vale aprofundar hoje" (antes ficava antes dos KPIs). `jornada_med.py <tag>` mede posições (px) de KPIs, "Onde vale aprofundar", mapa 3D e filtros em 1440×900 e 390×844 com a planilha de teste (4 clientes).
+| Desktop 1440×900 (Visão) | antes | depois |
+|---|---|---|
+| KPIs (topo) | 875 | 477 |
+| "Onde vale aprofundar hoje" (título) | 1256 | 860 |
+| Mapa 3D | 479 | 1093 |
+Filtros da lista de Clientes: 176 px de altura e primeira linha em 717 px (já na dobra) — não recolhidos. Mobile inalterado (KPIs 669, "aprofundar" 1399). Teste: `t75.py`.
