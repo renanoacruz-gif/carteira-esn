@@ -1,0 +1,173 @@
+{
+ "meta": {
+  "rotulo": "SINTÉTICO — valida o harness e detecta regressões do motor; NÃO mede acerto real com clientes",
+  "versao": 1,
+  "como_usar_com_dados_reais": "Copie este arquivo para calib_gold.real.json (fora do git: está no .gitignore), substitua os casos por clientes reais anonimizados e preencha 'esperado' com o que VOCÊ sabe estar correto.",
+  "nota": "Casos sem produto isolam o sinal de texto/NPS/churn; S02 e S03 trazem Protheus porque o motor só emite regra com produto-base (need) e a reforma é baseline de Protheus. Divergências S02/S03/S05 são achados registrados, não defeitos corrigidos."
+ },
+ "casos": [
+  {
+   "id": "S01",
+   "nome": "Metalúrgica Sintética 01",
+   "produtos": "",
+   "nps": "4",
+   "churn": "",
+   "notas": "Cliente relatou queda de satisfação e risco de perda de contrato.",
+   "esperado": {
+    "prioridade": [
+     "retencao"
+    ],
+    "investigar": []
+   }
+  },
+  {
+   "id": "S02",
+   "nome": "Indústria Sintética 02",
+   "produtos": "TOTVS Backoffice – Linha Protheus",
+   "nps": "",
+   "churn": "",
+   "notas": "Apontamento de produção feito em planilha, com retrabalho e atraso no fechamento de ordens de produção.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "producao",
+     "reforma"
+    ]
+   }
+  },
+  {
+   "id": "S03",
+   "nome": "Comércio Sintético 03",
+   "produtos": "TOTVS Backoffice – Linha Protheus",
+   "nps": "",
+   "churn": "",
+   "notas": "Precisa se adequar à reforma tributária com IBS e CBS até 2027.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "reforma"
+    ]
+   }
+  },
+  {
+   "id": "S04",
+   "nome": "Serviços Sintéticos 04",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "A empresa emite NF-e pelo módulo atual, sem problemas.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": []
+   }
+  },
+  {
+   "id": "S05",
+   "nome": "Distribuidora Sintética 05",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Os relatórios são feitos manualmente em planilha e demoram dois dias para a diretoria.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "analytics"
+    ]
+   }
+  },
+  {
+   "id": "S06",
+   "nome": "Construtora Sintética 06",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Medições de obra e controle de empreiteiros são feitos fora do ERP, com conferência manual.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "obras"
+    ]
+   }
+  },
+  {
+   "id": "S07",
+   "nome": "Atacado Sintético 07",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Hospedagem do ambiente em nuvem com backup diário contratada.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": []
+   }
+  },
+  {
+   "id": "S08",
+   "nome": "Indústria Sintética 08",
+   "produtos": "",
+   "nps": "9",
+   "churn": "",
+   "notas": "Cliente satisfeito, sem pendências abertas.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": []
+   }
+  },
+  {
+   "id": "S09",
+   "nome": "Logística Sintética 09",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Roteirização e custo de frete controlados em planilha, com divergências frequentes nas entregas.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "logistica"
+    ]
+   }
+  },
+  {
+   "id": "S10",
+   "nome": "Serviços Sintéticos 10",
+   "produtos": "",
+   "nps": "",
+   "churn": "sim",
+   "notas": "Sem observações.",
+   "esperado": {
+    "prioridade": [
+     "retencao"
+    ],
+    "investigar": []
+   }
+  },
+  {
+   "id": "S11",
+   "nome": "Indústria Sintética 11",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Aprovação de pagamentos por e-mail e documentos em papel, processo manual e lento.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "fluig"
+    ]
+   }
+  },
+  {
+   "id": "S12",
+   "nome": "Comércio Sintético 12",
+   "produtos": "",
+   "nps": "",
+   "churn": "",
+   "notas": "Ambiente em versão antiga, sem atualização há três anos e com lentidão frequente.",
+   "esperado": {
+    "prioridade": [],
+    "investigar": [
+     "sustentacao"
+    ]
+   }
+  }
+ ]
+}

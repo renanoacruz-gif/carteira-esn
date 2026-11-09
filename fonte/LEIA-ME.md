@@ -144,3 +144,10 @@ WebGL escrito à mão (sem biblioteca, sem rede, sem dados de exemplo). Só adic
 
 ## Polimento leve (branch feat/polish-leve)
 Só CSS (bloco final de `style.css`, escopo `#app`/chrome; exportações não mudam): sombras em camadas e bordas suaves, cor dos KPIs/segmentos como traço curto (sem faixa), avisos sem listra lateral, pílulas e cabeçalhos de tabela em caixa normal, filtros em grade ordenada (≥901px), medida de texto 84ch, toc/botão de topo mais discretos, feedback tátil nos botões. Sem mudança de HTML/JS.
+
+## Calibração do motor (frente A)
+`calib.py` roda o motor real (`analyzeClient` + `rxClass`) sobre um conjunto-ouro e compara com o esperado (mundo fechado: o que não está em `esperado` e é emitido conta como ruído). Não escreve em `S` nem no banco.
+- Servidor local em :8790 (`/tmp/restart.sh`), depois: `PYTHONPATH=<dir do t40_lib> python3 calib.py [gold.json] --html rel.html --json rel.json`
+- `calib_gold.sample.json` é SINTÉTICO: valida o harness e trava regressões do motor; não mede acerto real. Para medir de verdade: copie para `calib_gold.real.json` (ignorado pelo git), troque por clientes reais anonimizados e preencha `esperado` com o que você sabe estar correto.
+- Percentuais só com n ≥ 8 por regra. O motor só emite regra com produto-base; reforma é baseline de Protheus.
+- Divergências são achados para decisão humana; o harness não altera regras. Teste: `t74.py`.
