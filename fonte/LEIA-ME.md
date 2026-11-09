@@ -171,3 +171,12 @@ Só ≤900px; desktop inalterado. Revisão pelas diretrizes de produto (padrões
 | "Primeiros passos" ocupava 394 px antes dos KPIs | Compacto: título, progresso e "Próximo: …"; "Ver passos" expande; "Ocultar" aparece ao expandir |
 | KPIs em grade 2×N (487 px) | Faixa deslizante com card seguinte à vista (197 px) |
 Resultado (390×844): "Onde vale aprofundar hoje" 1374 → ~775 px (dentro da primeira tela). Sem item central de destaque: o produto não tem ação principal de criar. Teste: `t77.py`.
+
+## Redesign mobile (`mobile.js` + bloco "Mobile (≤900px): camada visual" em `style.css`)
+Só ≤900px, sem alterar lógica, ids, `data-*`, dados, cálculos ou exportações; identidade TOTVS (petróleo, ciano, Space Grotesk).
+- Cabeçalho: faixa petróleo com brilho ciano, marca TOTVS, busca translúcida (44 px), botões de 44 px.
+- Visão: hero "Sua carteira" (MRR informado, prioridades e a investigar, com atalho para Oportunidades); ordem resumo → aviso → passos → "Onde vale aprofundar hoje" → KPIs.
+- Dock inferior flutuante (vidro fosco), aba ativa em pílula petróleo.
+- Oportunidades: acordeão ("Ver evidências e detalhes"); a cadeia de evidência vira blocos (sem rolagem lateral); botões de leitura sempre visíveis.
+- Planilha do Google recolhida ("Configurar"); aviso de IA em linha compacta; modais como folha inferior.
+Testes: `t77.py` (dock) e `t78.py` (redesign). O hero lê `clients()`/`rxClass` apenas para contar.

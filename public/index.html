@@ -552,27 +552,85 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 #app .btn.pri:hover,#app .btn.primary:hover{box-shadow:0 6px 16px -6px rgba(0,169,199,.55)}
 @media print{#app .kpi,#app .seg-card{background:var(--w)}}
 
-/* ===== Mobile: barra inferior, passos compactos, KPIs em faixa (feat/mobile-visao) ===== */
+/* ===== Mobile (≤900px): camada visual — cabeçalho petróleo, hero, dock inferior, cards, acordeões (feat/mobile-redesign) ===== */
 #tabbar{display:none}
+.mhero{display:none}
 @media(max-width:900px){
-#tabbar:not([hidden]){--tb-h:56px;display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:var(--z-top);background:var(--w);border-top:1px solid var(--bd3);box-shadow:0 -4px 16px rgba(0,34,51,.06);padding-bottom:env(safe-area-inset-bottom,0px)}
-#tabbar .tb-i{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:var(--tb-h);padding:var(--s1) 0;border:0;background:none;color:var(--txt3);font:inherit;font-size:var(--fs-2xs);cursor:pointer;position:relative;transition:color var(--t)}
+:root{--m-r:20px}
+/* Cabeçalho: faixa petróleo com brilho ciano, marca TOTVS, busca translúcida */
+.top{position:relative;z-index:var(--z-base);display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"mn t a" "q q q";align-items:center;gap:var(--s3);min-height:0;margin:calc(-1*var(--s3)) calc(-1*var(--s3)) var(--s4);padding:calc(var(--s3) + env(safe-area-inset-top,0px)) var(--s4) var(--s5);color:var(--w);border-radius:0 0 28px 28px;box-shadow:var(--sh2);background:radial-gradient(110% 150% at 100% 0,color-mix(in srgb,var(--ciano) 30%,transparent),transparent 58%),linear-gradient(165deg,var(--pet),var(--pet-hover))}
+.top .top-mn{grid-area:mn}.top-t{grid-area:t}.top-a{grid-area:a;margin:0}.top-q{grid-area:q;max-width:none;flex:none;margin:0}
+.top .btn.ghost{background:color-mix(in srgb,var(--w) 14%,transparent);color:var(--w);border-color:color-mix(in srgb,var(--w) 24%,transparent);min-width:44px;min-height:44px;justify-content:center;border-radius:14px}
+.top .btn.ghost:hover,.top .btn.ghost:active{background:color-mix(in srgb,var(--w) 24%,transparent)}
+.top-t h1{color:var(--w);font-size:var(--fs-3xl);max-width:none;display:flex;align-items:center;gap:var(--s2)}
+.top-t h1::before{content:"";flex:0 0 18px;height:20px;background:var(--logo-s,none) center/contain no-repeat;filter:brightness(0) invert(1)}
+.top-q input{height:44px;border-radius:14px;color:var(--w);background:color-mix(in srgb,var(--w) 12%,transparent);border-color:color-mix(in srgb,var(--w) 22%,transparent);box-shadow:none;padding-left:40px}
+.top-q input::placeholder{color:color-mix(in srgb,var(--w) 66%,transparent)}
+.top-q input:focus{background:color-mix(in srgb,var(--w) 20%,transparent);border-color:var(--ciano);box-shadow:0 0 0 3px color-mix(in srgb,var(--ciano) 30%,transparent)}
+.top-q>.ic{left:14px;color:color-mix(in srgb,var(--w) 80%,transparent)}
+/* Hero da carteira (Visão) */
+#app .mhero{display:block;position:relative;overflow:hidden;margin:0 0 var(--s4);padding:var(--s5) var(--s4) var(--s4);border-radius:var(--m-r);color:var(--w);background:radial-gradient(90% 130% at 100% 0,color-mix(in srgb,var(--ciano) 60%,transparent),transparent 62%),linear-gradient(160deg,var(--pet),var(--pet-hover) 75%);box-shadow:var(--sh3)}
+.mhero::after{content:"";position:absolute;right:-34px;bottom:-40px;width:150px;height:150px;border-radius:50%;border:20px solid color-mix(in srgb,var(--ciano) 22%,transparent);pointer-events:none}
+.mh-eb{font:600 var(--fs-xs)/1 var(--fh);letter-spacing:.14em;text-transform:uppercase;color:var(--ciano)}
+.mh-v{font:700 34px/1.1 var(--fh);margin:10px 0 4px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.mh-s{font-size:var(--fs-sm);color:color-mix(in srgb,var(--w) 74%,transparent)}
+.mh-chips{display:flex;gap:var(--s2);margin-top:var(--s4);position:relative;z-index:1;flex-wrap:wrap}
+.mh-chip{display:inline-flex;align-items:center;gap:var(--s2);min-height:44px;padding:0 var(--s4);border-radius:var(--r-pill);border:1px solid color-mix(in srgb,var(--w) 26%,transparent);background:color-mix(in srgb,var(--w) 12%,transparent);color:var(--w);font:inherit;cursor:pointer;transition:transform var(--t),background var(--t)}
+.mh-chip b{font:700 var(--fs-2xl)/1 var(--fh)}.mh-chip span{font-size:var(--fs-sm)}
+.mh-chip.pri{background:var(--ciano);border-color:var(--ciano);color:var(--pet)}
+.mh-chip:active{transform:scale(.97)}
+/* Ordem na Visão: resumo → aviso → passos → o que fazer hoje */
+#app.m-geral{display:flex;flex-direction:column}
+#app.m-geral>.mhero{order:-5}#app.m-geral>.alert{order:-4}#app.m-geral>#onb{order:-3}#app.m-geral>#hoje{order:-2}
+/* Aviso de IA: uma linha de leitura, ação ao lado */
+#app .alert.hkbar{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s3) var(--s3) calc(var(--s4) + 26px);font-size:var(--fs-sm);line-height:1.4;border-radius:16px}
+#app .alert.hkbar>span{flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#app .alert.hkbar .btn{flex:0 0 auto;min-height:44px}
+/* Cards, KPIs e títulos */
+#app .card{border-radius:var(--m-r);border-color:var(--bd-soft);padding:var(--s4);box-shadow:var(--sh1)}
+#app .card h3{font-size:var(--fs-2xl)}
+#app .kpi,#app .seg-card{border-radius:var(--m-r)}
+#app .kpi .v{font-size:32px}
+#app .grid.g4.kpi-strip>.kpi{flex-basis:min(46vw,176px)}
+/* Dock inferior flutuante */
+#tabbar:not([hidden]){--tb-h:60px;display:grid;grid-template-columns:1fr 1fr 1.34fr 1fr 1fr;gap:2px;position:fixed;left:var(--s3);right:var(--s3);bottom:calc(var(--s3) + env(safe-area-inset-bottom,0px));z-index:var(--z-top);padding:6px;border-radius:26px;background:color-mix(in srgb,var(--w) 88%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid var(--bd-soft);box-shadow:var(--sh3)}
+#tabbar .tb-i{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;padding:var(--s1) 0;border:0;border-radius:20px;background:none;color:var(--txt3);font:inherit;font-size:var(--fs-2xs);cursor:pointer;transition:background var(--t),color var(--t),transform var(--t)}
 #tabbar .tb-i span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#tabbar .tb-i.on{color:var(--pet);font-weight:700}
-#tabbar .tb-i.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 var(--r-sm) var(--r-sm);background:var(--ciano)}
-#tabbar .tb-i:active{background:var(--n2)}
-.main-col{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
-.toast{bottom:calc(56px + var(--s3) + env(safe-area-inset-bottom,0px))}
+#tabbar .tb-i.on{background:var(--pet);color:var(--w);font-weight:700}
+#tabbar .tb-i:active{transform:scale(.94)}
+.main-col{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+.toast{bottom:calc(84px + var(--s3) + env(safe-area-inset-bottom,0px))}
+#rf-top{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+/* Passos compactos */
 #app #onb.onb-c ol,#app #onb.onb-c>p.muted:not(.onb-nx){display:none}
 #app #onb.onb-c.open ol,#app #onb.onb-c.open>p.muted:not(.onb-nx){display:block}
 #app #onb.onb-c .onb-nx{margin:var(--s1) 0 0}#app #onb.onb-c.open .onb-nx{display:none}
 #app #onb.onb-c{padding-block:var(--s3)}
 #app #onb.onb-c:not(.open) [data-a=onbFim]{display:none}
+/* KPIs em faixa */
 #app .grid.g4.kpi-strip{display:flex;gap:var(--s3);overflow-x:auto;scroll-snap-type:x proximity;scroll-padding-inline:var(--s3);scrollbar-width:none;margin-inline:calc(-1*var(--s3));padding:var(--s1) var(--s3) var(--s2)}
 #app .grid.g4.kpi-strip::-webkit-scrollbar{display:none}
-#app .grid.g4.kpi-strip>.kpi{flex:0 0 min(44vw,168px);scroll-snap-align:start}
+#app .grid.g4.kpi-strip>.kpi{flex:0 0 min(46vw,176px);scroll-snap-align:start}
+/* Oportunidades: acordeão e cadeia de evidência em blocos (sem rolagem lateral) */
+#app .card.opc{padding:var(--s4)}
+#app .opp{border-radius:16px;padding:var(--s3) var(--s3)}
+#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg){display:none}
+#app .opp .mo-tg{margin:var(--s2) 0;min-height:44px;width:100%;justify-content:center}
+#app .opp .jd .btn{min-height:44px}
+#app .opp table.chain,#app .opp table.chain>tbody,#app .opp table.chain>tbody>tr,#app .opp table.chain>tbody>tr>th,#app .opp table.chain>tbody>tr>td{display:block;width:100%}
+#app .opp table.chain>tbody>tr{padding:var(--s2) 0;border-bottom:1px solid var(--bd-soft)}
+#app .opp table.chain>tbody>tr>th{font:600 var(--fs-xs)/1.3 var(--fh);letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);padding:0 0 var(--s1)}
+#app .opp table.chain>tbody>tr>td{padding:0}
+#app .opp table.chain td>table{display:block;overflow-x:auto}
+/* Planilha do Google recolhida */
+#app #shcard.shc-c:not(.open)>*:not(:first-child){display:none}
+#app #shcard .shc-tg{margin-left:auto;min-height:44px}
+/* Modais como folha inferior */
+.mdl-bg{place-items:end center;padding:0}
+.mdl-box{width:100%;max-width:none;border-radius:var(--m-r) var(--m-r) 0 0;padding:var(--s5) var(--s4) calc(var(--s5) + env(safe-area-inset-bottom,0px));animation:sheet var(--t-md) var(--ease)}
+@keyframes sheet{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 }
-@media print{#tabbar{display:none!important}}
+@media print{#tabbar,.mhero{display:none!important}}
 </style>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head><body>
@@ -10153,6 +10211,43 @@ document.addEventListener('toggle', e => { if (e.target?.id === 'semana') UI.sem
   const run = () => { try { paintBar(); compact(); } catch { /* shell ainda não montado */ } };
   const app = $1('#app'); if (app) new MutationObserver(run).observe(app, { childList: true });
   mq.addEventListener?.('change', run); run();
+})();
+
+/* Mobile (≤900px): camada visual — hero da carteira, oportunidades em acordeão, planilha do Google recolhida, marca no cabeçalho.
+   Aditivo e idempotente: só cria elementos/classes novos; reutiliza as ações existentes (nav). Desktop não muda. */
+(function () {
+  const mq = window.matchMedia('(max-width: 900px)'), $1 = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const mrrFmt = v => (typeof fmtBRL === 'function' ? fmtBRL(v) : 'R$ ' + Math.round(v).toLocaleString('pt-BR'));
+  function logo() { const i = $1('.sb-sym'); if (i && i.src) document.documentElement.style.setProperty('--logo-s', 'url("' + i.src + '")'); }
+  function hero(app) {
+    const on = UI.view === 'geral' && typeof clients === 'function' && clients().length > 0; app.classList.toggle('m-geral', on);
+    if (!on || app.querySelector('.mhero')) return;
+    const cs = clients(); let mrr = 0, com = 0, pr = 0, iv = 0;
+    cs.forEach(c => { if (c.mrr > 0) { mrr += c.mrr; com++; } (c.opps || []).forEach(o => { try { const k = rxClass(c, o).cl; if (k === 'prioridade') pr++; else if (k === 'investigar') iv++; } catch { /* regra sem classe */ } }); });
+    const chip = (n, l, cls) => `<button type="button" class="mh-chip ${cls}" data-a="nav" data-v="oport"><b>${n}</b><span>${l}</span></button>`;
+    app.insertAdjacentHTML('afterbegin', `<section class="mhero" aria-label="Resumo da carteira"><div class="mh-eb">Sua carteira</div><div class="mh-v">${mrrFmt(mrr)}</div><div class="mh-s">MRR informado na planilha · ${com} de ${cs.length} cliente(s)</div><div class="mh-chips">${chip(pr, pr === 1 ? 'prioridade' : 'prioridades', 'pri')}${chip(iv, 'a investigar', 'inv')}</div></section>`);
+  }
+  function opps(app) {
+    app.querySelectorAll('.card.opc .opp:not([data-mc])').forEach(o => {
+      o.dataset.mc = '1'; o.classList.add('mo-c');
+      const jd = o.querySelector(':scope > .jd'), b = '<button type="button" class="btn ghost sm mo-tg" aria-expanded="false">Ver evidências e detalhes</button>';
+      if (jd) jd.insertAdjacentHTML('afterend', b); else o.querySelector(':scope > .row')?.insertAdjacentHTML('afterend', b);
+    });
+  }
+  function sheet(app) {
+    const s = app.querySelector('#shcard'); if (!s || s.querySelector('.shc-tg')) return;
+    s.classList.add('shc-c'); s.querySelector('h3')?.insertAdjacentHTML('afterend', '<button type="button" class="btn ghost sm shc-tg" aria-expanded="false">Configurar</button>');
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('.mo-tg, .shc-tg'); if (!t) return;
+    const box = t.classList.contains('mo-tg') ? t.closest('.opp') : t.closest('#shcard'), on = box.classList.toggle('open'); t.setAttribute('aria-expanded', String(on));
+    t.textContent = t.classList.contains('mo-tg') ? (on ? 'Recolher detalhes' : 'Ver evidências e detalhes') : (on ? 'Recolher' : 'Configurar');
+  });
+  let q = 0;
+  const run = () => { q = 0; try { logo(); const app = $1('#app'); if (!app) return; if (!mq.matches) { app.classList.remove('m-geral'); return; } hero(app); opps(app); sheet(app); } catch { /* shell ainda não montado */ } };
+  const sched = () => { if (!q) q = requestAnimationFrame(run); };
+  const app = $1('#app'); if (app) new MutationObserver(sched).observe(app, { childList: true, subtree: true });
+  mq.addEventListener?.('change', sched); sched();
 })();
 
 /* ===== EVENTOS E INICIALIZAÇÃO ===== */
