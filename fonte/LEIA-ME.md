@@ -153,3 +153,6 @@ Mapa 3D da Visão da Carteira agora entra depois de "Onde vale aprofundar hoje" 
 | "Onde vale aprofundar hoje" (título) | 1256 | 860 |
 | Mapa 3D | 479 | 1093 |
 Filtros da lista de Clientes: 176 px de altura e primeira linha em 717 px (já na dobra) — não recolhidos. Mobile inalterado (KPIs 669, "aprofundar" 1399). Teste: `t75.py`.
+
+## Adoção: tempo até o primeiro valor (frente D)
+`t76.py` cronometra usuário novo → importa a carteira → abre cliente a partir de "Onde vale aprofundar hoje": 4 ações (arquivo, Prévia, Importar, abrir cliente), ~1,5 s técnico no ambiente de teste (orçamento de produto: < 5 min). A Prévia antes de gravar é revisão deliberada e foi mantida. Achado aberto: no celular (390×844) o card "Onde vale aprofundar hoje" fica a ~1,6 telas do topo (cartão "Primeiros passos" e avisos acima); candidato a ajuste futuro, não alterado.
