@@ -151,3 +151,14 @@ Só CSS (bloco final de `style.css`, escopo `#app`/chrome; exportações não mu
 - `calib_gold.sample.json` é SINTÉTICO: valida o harness e trava regressões do motor; não mede acerto real. Para medir de verdade: copie para `calib_gold.real.json` (ignorado pelo git), troque por clientes reais anonimizados e preencha `esperado` com o que você sabe estar correto.
 - Percentuais só com n ≥ 8 por regra. O motor só emite regra com produto-base; reforma é baseline de Protheus.
 - Divergências são achados para decisão humana; o harness não altera regras. Teste: `t74.py`.
+## Tempo até o valor (frente C)
+Mapa 3D da Visão da Carteira agora entra depois de "Onde vale aprofundar hoje" (antes ficava antes dos KPIs). `jornada_med.py <tag>` mede posições (px) de KPIs, "Onde vale aprofundar", mapa 3D e filtros em 1440×900 e 390×844 com a planilha de teste (4 clientes).
+| Desktop 1440×900 (Visão) | antes | depois |
+|---|---|---|
+| KPIs (topo) | 875 | 477 |
+| "Onde vale aprofundar hoje" (título) | 1256 | 860 |
+| Mapa 3D | 479 | 1093 |
+Filtros da lista de Clientes: 176 px de altura e primeira linha em 717 px (já na dobra) — não recolhidos. Mobile inalterado (KPIs 669, "aprofundar" 1399). Teste: `t75.py`.
+
+## Adoção: tempo até o primeiro valor (frente D)
+`t76.py` cronometra usuário novo → importa a carteira → abre cliente a partir de "Onde vale aprofundar hoje": 4 ações (arquivo, Prévia, Importar, abrir cliente), ~1,5 s técnico no ambiente de teste (orçamento de produto: < 5 min). A Prévia antes de gravar é revisão deliberada e foi mantida. Achado aberto: no celular (390×844) o card "Onde vale aprofundar hoje" fica a ~1,6 telas do topo (cartão "Primeiros passos" e avisos acima); candidato a ajuste futuro, não alterado.

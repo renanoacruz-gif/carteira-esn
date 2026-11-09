@@ -10075,9 +10075,9 @@ document.addEventListener('toggle', e => { if (e.target?.id === 'semana') UI.sem
     const view = typeof UI !== 'undefined' ? UI.view : ''; const root = $1('#app');
     if (!root || view !== 'geral' || !WIDE.matches || !(typeof clients === 'function' && clients().length)) { ST.vis = false; return; }
     if (root.querySelector('#rf3d')) return;
-    const anchor = root.querySelector('.grid.g4'); if (!anchor) return;
+    if (!root.querySelector('.grid.g4')) return; const anchor = root.querySelector('#hoje') || root.querySelector('.grid.g4'); /* o valor vem primeiro: o mapa 3D entra depois de "Onde vale aprofundar hoje" */
     const s = clients().map(c => c.key + c.mrr + c.topScore).join('|'); if (!nodes.length || s !== ST.s) { ST.s = s; build(); ST.grow = performance.now(); }
-    anchor.insertAdjacentHTML('beforebegin', hud()); ST.vis = true; ST.last = 0; mountView();
+    anchor.insertAdjacentHTML('afterend', hud()); ST.vis = true; ST.last = 0; mountView();
     observe();
   }
   let q = 0; const sched = () => { if (!q) q = requestAnimationFrame(() => { q = 0; mount(); }); };

@@ -10,7 +10,8 @@ def abre(w=1440,h=900,reduce=False):
 PIX="""()=>{const c=document.querySelector('#rf3d-stage canvas'); if(!c) return -1; const t=document.createElement('canvas'); t.width=c.width; t.height=c.height; const x=t.getContext('2d'); x.drawImage(c,0,0); const d=x.getImageData(0,0,t.width,t.height).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return n}"""
 ctx,pg,errs=abre()
 nc=pg.evaluate("clients().length")
-ck('cartão 3D antes dos KPIs na Visão', pg.locator('#rf3d').count()==1 and pg.evaluate("document.querySelector('#rf3d').nextElementSibling.classList.contains('g4')"))
+ck('cartão 3D depois de "Onde vale aprofundar hoje" (valor primeiro)', pg.locator('#rf3d').count()==1 and pg.evaluate("document.querySelector('#rf3d').previousElementSibling.id==='hoje'"))
+ck('KPIs acima do cartão 3D', pg.evaluate("document.querySelector('.grid.g4').getBoundingClientRect().top<document.querySelector('#rf3d').getBoundingClientRect().top"))
 ck('WebGL ativo com canvas desenhado', pg.evaluate("!!document.querySelector('#rf3d-stage canvas').getContext('webgl')") and pg.evaluate(PIX)>2000, pg.evaluate(PIX))
 tx=pg.inner_text('#rf3d .rf3d-t'); ck('HUD usa os dados reais (nº de clientes)', str(nc) in tx, tx)
 ck('HUD mostra MRR da planilha formatado', 'R$' in pg.inner_text('#rf3d .rf3d-s'))
@@ -42,6 +43,7 @@ ctx.close()
 # reduced-motion: quadro estático + hover/click determinísticos
 ctx,pg,errs2=abre(reduce=True)
 p0=pg.evaluate(PIX); pg.wait_for_timeout(700); ck('reduced-motion: desenha e não anima (mesmos pixels)', p0>2000 and pg.evaluate(PIX)==p0, (p0,))
+pg.locator('#rf3d-stage').scroll_into_view_if_needed(); pg.evaluate("document.querySelector('#rf3d-stage').scrollIntoView({block:'center'})"); pg.wait_for_timeout(400)
 bx=pg.locator('#rf3d-stage').bounding_box(); found=None
 for yy in range(int(bx['y'])+30,int(bx['y']+bx['height'])-30,10):
     for xx in range(int(bx['x'])+30,int(bx['x']+bx['width'])-30,10):
