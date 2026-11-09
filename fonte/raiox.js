@@ -139,7 +139,7 @@ function rxRecHtml(c, r) {
   const o = r.o, sols = o.sols || [], ct = sols.map(s => ({ s, e: contratEstado(c, s.id) })), ind = o.evInd || [], k = RX_CL[r.cl];
   const aderTxt = sols.length ? sols.map(s => `${s.nome}: ${s.integraProtheus === true ? 'integração com Protheus documentada na fonte' : s.integraProtheus === false ? 'NÃO integra com Protheus segundo a fonte' : 'compatibilidade com Protheus não verificada'}`).join('; ') : 'ação de relacionamento (sem solução de produto)';
   return `<div class="opp ${o.modo === 'investigacao' ? 'inv' : ''}"><div class="row"><h4>${esc(o.nome)}</h4>${pill(OP_CL[opClasse(r)][0], OP_CL[opClasse(r)][1])}${jdPill(c, o)}${['ajuste', 'generica', 'incorreta'].includes((avGet(c, o.ruleId) || {}).classe) ? avPill(c, o) : ''}<span class="sp"></span><button class="btn pri sm" data-a="dxOpen" data-k="${esc(c.key)}" data-id="${esc(o.id)}">Ver Diagnóstico Completo</button></div>
-  ${jdBar(c, o)}<table class="chain"><tbody>
+  ${solStrip(c, o)}${jdBar(c, o)}<table class="chain"><tbody>
   <tr><th>Solução/serviço</th><td>${sols.length ? sols.map(s => esc(s.nome)).join(', ') : '<span class="muted">—</span>'}</td></tr>
   <tr><th>Necessidade atendida</th><td>${chip(o.modo === 'evidencia' ? 'INFERÊNCIA' : 'HIPÓTESE')} ${esc(o.problema || '')}</td></tr>
   <tr><th>Evidência do cliente</th><td>${ind.length ? ind.slice(0, 3).map(e => `${chip(e.cls)} ${esc(String(e.text).slice(0, 240))} <span class="muted sm">— ${esc(e.src || '')}</span>`).join('<br>') : '<span class="muted">Sem evidência individual.</span>'}</td></tr>

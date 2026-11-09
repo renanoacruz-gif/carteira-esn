@@ -610,7 +610,7 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 /* Oportunidades: acordeão e cadeia de evidência em blocos (sem rolagem lateral) */
 #app .card.opc{padding:var(--s4)}
 #app .opp{border-radius:16px;padding:var(--s3) var(--s3)}
-#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg){display:none}
+#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg):not(.solstrip){display:none}
 #app .opp .mo-tg{margin:var(--s2) 0;min-height:44px;width:100%;justify-content:center}
 #app .opp .jd .btn{min-height:44px}
 #app .opp table.chain,#app .opp table.chain>tbody,#app .opp table.chain>tbody>tr,#app .opp table.chain>tbody>tr>th,#app .opp table.chain>tbody>tr>td{display:block;width:100%}
@@ -627,3 +627,27 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 @keyframes sheet{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 }
 @media print{#tabbar,.mhero{display:none!important}}
+
+/* ===== Oportunidade por solução: produto TOTVS em destaque + aprofundamento individual ===== */
+.solstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s3);margin:var(--s3) 0}
+.sol-eb{grid-column:1/-1;font:600 var(--fs-xs)/1 var(--fh);letter-spacing:.12em;text-transform:uppercase;color:var(--txt2)}
+.sol-card{display:flex;flex-direction:column;gap:6px;padding:var(--s3) var(--s4);border:1px solid var(--bd);border-left:4px solid var(--ciano);border-radius:var(--r);background:linear-gradient(180deg,var(--w),var(--n1))}
+.sol-card:has(details[open]){grid-column:1/-1}
+.sol-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.sol-cat{font:600 var(--fs-xs)/1 var(--fh);letter-spacing:.08em;text-transform:uppercase;color:var(--c-pilltx);background:var(--c-pill);padding:4px 8px;border-radius:var(--r-pill)}
+.sol-n{font:700 var(--fs-3xl)/1.2 var(--fh);color:var(--pet);margin:0}
+.sol-f{font-size:var(--fs-md);color:var(--txt2);margin:0;line-height:1.45}
+.sol-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sol-none{border-left-color:var(--bd3);background:var(--n2)}.sol-none .sol-n{font-size:var(--fs-xl);color:var(--txt2)}
+.sol-more{margin-top:var(--s1)}
+.sol-more>summary{cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:600 var(--fs-md)/1 var(--fh);color:var(--pet);padding:10px 14px;min-height:44px;border:1px solid var(--bd);border-radius:var(--r-md);background:var(--w);list-style:none;transition:border-color var(--t),background var(--t)}
+.sol-more>summary::-webkit-details-marker{display:none}
+.sol-more>summary::after{content:"+";font-size:var(--fs-2xl);line-height:1;color:var(--ciano2)}
+.sol-more[open]>summary::after{content:"–"}
+.sol-more>summary:hover{border-color:var(--ciano2);background:var(--c-soft)}
+.sol-body{margin-top:var(--s3);padding-top:var(--s3);border-top:1px dashed var(--bd3)}
+.sol-body h6{font:600 var(--fs-xs)/1.3 var(--fh);letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin:var(--s3) 0 var(--s1)}
+.sol-body h6:first-child{margin-top:0}
+.sol-body ul{margin:2px 0 6px;padding-left:18px}
+@media(max-width:900px){.solstrip{grid-template-columns:1fr}.sol-n{font-size:var(--fs-2xl)}.sol-f{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sol-more[open] .sol-f{display:block}}
+@media print{.sol-more>summary{display:none}.sol-body{display:block!important}}

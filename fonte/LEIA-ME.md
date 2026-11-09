@@ -180,3 +180,6 @@ Só ≤900px, sem alterar lógica, ids, `data-*`, dados, cálculos ou exportaç�
 - Oportunidades: acordeão ("Ver evidências e detalhes"); a cadeia de evidência vira blocos (sem rolagem lateral); botões de leitura sempre visíveis.
 - Planilha do Google recolhida ("Configurar"); aviso de IA em linha compacta; modais como folha inferior.
 Testes: `t77.py` (dock) e `t78.py` (redesign). O hero lê `clients()`/`rxClass` apenas para contar.
+
+## Oportunidade por solução (`oppsol.js`)
+O card de oportunidade (Oportunidades, Raio-X do cliente e mobile) abre com a faixa "Soluções TOTVS": um card por produto, com o nome em destaque, categoria, estado de contratação, finalidade e situação de integração com Protheus. "Aprofundar esta solução" (por produto) abre: por que aparece para o cliente, dores, funcionalidades, pré-requisitos, integrações, limitações, o que validar e perguntas; "Abrir na Base de Soluções" leva ao registro. Só usa o que a Base documenta: lacunas aparecem como "ainda não detalha…" e oportunidades de relacionamento mostram "Sem solução de produto associada". "Onde vale aprofundar hoje" passa a citar o produto principal. Motor e regras não mudaram. Teste: `t79.py`.

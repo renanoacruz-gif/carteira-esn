@@ -614,7 +614,7 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 /* Oportunidades: acordeão e cadeia de evidência em blocos (sem rolagem lateral) */
 #app .card.opc{padding:var(--s4)}
 #app .opp{border-radius:16px;padding:var(--s3) var(--s3)}
-#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg){display:none}
+#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg):not(.solstrip){display:none}
 #app .opp .mo-tg{margin:var(--s2) 0;min-height:44px;width:100%;justify-content:center}
 #app .opp .jd .btn{min-height:44px}
 #app .opp table.chain,#app .opp table.chain>tbody,#app .opp table.chain>tbody>tr,#app .opp table.chain>tbody>tr>th,#app .opp table.chain>tbody>tr>td{display:block;width:100%}
@@ -631,6 +631,30 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 @keyframes sheet{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 }
 @media print{#tabbar,.mhero{display:none!important}}
+
+/* ===== Oportunidade por solução: produto TOTVS em destaque + aprofundamento individual ===== */
+.solstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s3);margin:var(--s3) 0}
+.sol-eb{grid-column:1/-1;font:600 var(--fs-xs)/1 var(--fh);letter-spacing:.12em;text-transform:uppercase;color:var(--txt2)}
+.sol-card{display:flex;flex-direction:column;gap:6px;padding:var(--s3) var(--s4);border:1px solid var(--bd);border-left:4px solid var(--ciano);border-radius:var(--r);background:linear-gradient(180deg,var(--w),var(--n1))}
+.sol-card:has(details[open]){grid-column:1/-1}
+.sol-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.sol-cat{font:600 var(--fs-xs)/1 var(--fh);letter-spacing:.08em;text-transform:uppercase;color:var(--c-pilltx);background:var(--c-pill);padding:4px 8px;border-radius:var(--r-pill)}
+.sol-n{font:700 var(--fs-3xl)/1.2 var(--fh);color:var(--pet);margin:0}
+.sol-f{font-size:var(--fs-md);color:var(--txt2);margin:0;line-height:1.45}
+.sol-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sol-none{border-left-color:var(--bd3);background:var(--n2)}.sol-none .sol-n{font-size:var(--fs-xl);color:var(--txt2)}
+.sol-more{margin-top:var(--s1)}
+.sol-more>summary{cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:600 var(--fs-md)/1 var(--fh);color:var(--pet);padding:10px 14px;min-height:44px;border:1px solid var(--bd);border-radius:var(--r-md);background:var(--w);list-style:none;transition:border-color var(--t),background var(--t)}
+.sol-more>summary::-webkit-details-marker{display:none}
+.sol-more>summary::after{content:"+";font-size:var(--fs-2xl);line-height:1;color:var(--ciano2)}
+.sol-more[open]>summary::after{content:"–"}
+.sol-more>summary:hover{border-color:var(--ciano2);background:var(--c-soft)}
+.sol-body{margin-top:var(--s3);padding-top:var(--s3);border-top:1px dashed var(--bd3)}
+.sol-body h6{font:600 var(--fs-xs)/1.3 var(--fh);letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin:var(--s3) 0 var(--s1)}
+.sol-body h6:first-child{margin-top:0}
+.sol-body ul{margin:2px 0 6px;padding-left:18px}
+@media(max-width:900px){.solstrip{grid-template-columns:1fr}.sol-n{font-size:var(--fs-2xl)}.sol-f{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sol-more[open] .sol-f{display:block}}
+@media print{.sol-more>summary{display:none}.sol-body{display:block!important}}
 </style>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head><body>
@@ -6334,7 +6358,7 @@ function rxRecHtml(c, r) {
   const o = r.o, sols = o.sols || [], ct = sols.map(s => ({ s, e: contratEstado(c, s.id) })), ind = o.evInd || [], k = RX_CL[r.cl];
   const aderTxt = sols.length ? sols.map(s => `${s.nome}: ${s.integraProtheus === true ? 'integração com Protheus documentada na fonte' : s.integraProtheus === false ? 'NÃO integra com Protheus segundo a fonte' : 'compatibilidade com Protheus não verificada'}`).join('; ') : 'ação de relacionamento (sem solução de produto)';
   return `<div class="opp ${o.modo === 'investigacao' ? 'inv' : ''}"><div class="row"><h4>${esc(o.nome)}</h4>${pill(OP_CL[opClasse(r)][0], OP_CL[opClasse(r)][1])}${jdPill(c, o)}${['ajuste', 'generica', 'incorreta'].includes((avGet(c, o.ruleId) || {}).classe) ? avPill(c, o) : ''}<span class="sp"></span><button class="btn pri sm" data-a="dxOpen" data-k="${esc(c.key)}" data-id="${esc(o.id)}">Ver Diagnóstico Completo</button></div>
-  ${jdBar(c, o)}<table class="chain"><tbody>
+  ${solStrip(c, o)}${jdBar(c, o)}<table class="chain"><tbody>
   <tr><th>Solução/serviço</th><td>${sols.length ? sols.map(s => esc(s.nome)).join(', ') : '<span class="muted">—</span>'}</td></tr>
   <tr><th>Necessidade atendida</th><td>${chip(o.modo === 'evidencia' ? 'INFERÊNCIA' : 'HIPÓTESE')} ${esc(o.problema || '')}</td></tr>
   <tr><th>Evidência do cliente</th><td>${ind.length ? ind.slice(0, 3).map(e => `${chip(e.cls)} ${esc(String(e.text).slice(0, 240))} <span class="muted sm">— ${esc(e.src || '')}</span>`).join('<br>') : '<span class="muted">Sem evidência individual.</span>'}</td></tr>
@@ -7398,7 +7422,7 @@ function hojeCard() {
   const all = hojeItens(), top = all.slice(0, 5);
   const h = `<div class="row"><h3>Onde vale aprofundar hoje</h3>${top.length ? `<span class="pill p-info">${top.length} de ${all.length}</span>` : ''}</div><p class="sm muted">Seleção por motivo objetivo nos dados atuais (nova evidência, mercado, pergunta decisiva, documento que falta). Não é uma agenda de tarefas.</p>`;
   if (!top.length) return `<div class="card" id="hoje">${h}<p class="muted sm">Nenhum gatilho novo agora. Para gerar motivos de abordagem: anexe fichas e materiais, registre fatos de mercado em <a href="#" data-a="nav" data-v="mercado">Inteligência de Mercado</a> ou abra <a href="#" data-a="nav" data-v="oport">Oportunidades TOTVS</a>.</p></div>`;
-  return `<div class="card" id="hoje">${h}${top.map(x => `<div class="hj"><div class="row"><b><a href="#" data-a="open" data-k="${esc(x.c.key)}">${esc(x.c.name)}</a></b><span class="muted sm">${esc(x.top.o.nome)}</span>${pill(OP_CL[opClasse(x.top)][0], OP_CL[opClasse(x.top)][1])}<span class="sp"></span><button class="btn ghost sm" data-a="radar" data-k="cli" data-c="${esc(x.c.key)}">Ver oportunidades</button><button class="btn pri sm" data-a="openTab" data-k="${esc(x.c.key)}" data-v="raiox">Abrir raio-X</button>${x.semFicha ? upBtn(x.c) : ''}</div><ul class="sm hjw">${x.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`).join('')}</div>`;
+  return `<div class="card" id="hoje">${h}${top.map(x => `<div class="hj"><div class="row"><b><a href="#" data-a="open" data-k="${esc(x.c.key)}">${esc(x.c.name)}</a></b><span class="muted sm">${esc(x.top.o.nome)}${solTag(x.top.o)}</span>${pill(OP_CL[opClasse(x.top)][0], OP_CL[opClasse(x.top)][1])}<span class="sp"></span><button class="btn ghost sm" data-a="radar" data-k="cli" data-c="${esc(x.c.key)}">Ver oportunidades</button><button class="btn pri sm" data-a="openTab" data-k="${esc(x.c.key)}" data-v="raiox">Abrir raio-X</button>${x.semFicha ? upBtn(x.c) : ''}</div><ul class="sm hjw">${x.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`).join('')}</div>`;
 }
 
 const OP_ACT = {
@@ -9916,6 +9940,33 @@ document.addEventListener('toggle', e => { if (e.target?.id === 'semana') UI.sem
   rebuild();
 })();
 
+/* Oportunidade por solução: o nome do produto TOTVS é o destaque do card e cada solução tem aprofundamento próprio.
+   Só apresenta o que a Base de Soluções documenta; o que não está documentado aparece como "não documentado" (nunca inventado). */
+const SOLX_ACT = { solAprof: t => { UI.view = 'solucoes'; UI.solSel = t.dataset.id; UI.solEdit = null; render(); window.scrollTo(0, 0); } };
+const solRec = s => { try { return activeSols().find(r => r.id === s.id) || s; } catch { return s; } };
+const solTag = o => { const n = (o.sols || []).map(s => s.nome); return n.length ? ` — <b>${esc(n[0])}</b>${n.length > 1 ? ` <span class="muted">+${n.length - 1}</span>` : ''}` : ''; };
+function solLi(a, h, fn) { return (a || []).length ? `<h6>${h}</h6><ul class="sm">${a.slice(0, 6).map(fn).join('')}</ul>` : ''; }
+function solCard(c, o, s) {
+  const r = solRec(s), est = contratEstado(c, s.id), cat = r.categoria || r.cat || s.cat || '';
+  const prot = s.integraProtheus === true ? pill('Integra com Protheus (documentado)', 'ok') : s.integraProtheus === false ? pill('Não integra com Protheus (segundo a fonte)', 'bad') : pill('Compatibilidade com Protheus não verificada', 'off');
+  const dores = solLi(r.dores, 'Dores que resolve', x => `<li>${esc(typeof x === 'string' ? x : x.t || '')}</li>`), fun = solLi(r.funcionalidades, 'Funcionalidades documentadas', x => `<li>${esc(typeof x === 'string' ? x : x.t || '')}</li>`);
+  const pre = solLi(r.prerequisitos, 'Pré-requisitos', p => `<li>${esc(p.t || '')}</li>`), ing = solLi(r.integracoes, 'Integrações declaradas', i => `<li><b>${esc(i.sistema || '')}</b>: ${i.estado === 'confirmada' ? 'integra (fonte)' : i.estado === 'nao_integra' ? 'NÃO integra (fonte)' : 'não verificada'}</li>`);
+  const vazio = !(dores || fun || pre || ing) ? '<p class="muted sm">A Base de Soluções ainda não detalha dores, funcionalidades, pré-requisitos ou integrações desta solução. Enriqueça o registro para aprofundar aqui.</p>' : '';
+  const perg = (o.perg || []).slice(0, 2).map(p => `<li>${esc(p)}</li>`).join('');
+  return `<div class="sol-card"><div class="sol-h">${cat ? `<span class="sol-cat">${esc(cat)}</span>` : ''}${pill(CT_EST[est], CT_EST_K[est])}${r.oficial ? pill('Oferta oficial TOTVS', 'ok') : ''}</div>
+  <h5 class="sol-n">${esc(s.nome)}</h5>${s.finalidade ? `<p class="sol-f">${esc(s.finalidade)}</p>` : ''}<div class="sol-chips">${prot}</div>
+  <details class="sol-more"><summary>Aprofundar esta solução</summary><div class="sol-body">
+    <h6>Por que aparece para este cliente</h6><p class="sm">${esc(rxMotivo(c, o).replace(/\.{2,}$/, '.'))}</p>
+    ${dores}${fun}${pre}${ing}${vazio}
+    ${s.limites ? `<h6>Limitações</h6><p class="sm">${esc(s.limites)}</p>` : ''}
+    <h6>O que validar com o cliente</h6><p class="sm">${esc(rxValidar(c, o))}</p>${perg ? `<ul class="sm">${perg}</ul>` : ''}
+    <div class="row"><button type="button" class="btn ghost sm" data-a="solAprof" data-id="${esc(s.id)}">Abrir na Base de Soluções</button><span class="muted sm">Hipótese a validar; não é proposta nem promessa de aderência.</span></div></div></details></div>`;
+}
+function solStrip(c, o) {
+  const L = o.sols || [];
+  return `<div class="solstrip" aria-label="Soluções TOTVS desta oportunidade"><div class="sol-eb">${L.length ? (L.length === 1 ? 'Solução TOTVS' : `${L.length} soluções TOTVS possíveis`) : 'Solução TOTVS'}</div>${L.length ? L.map(s => solCard(c, o, s)).join('') : '<div class="sol-card sol-none"><h5 class="sol-n">Sem solução de produto associada</h5><p class="sol-f">Ação de relacionamento ou serviço: não há produto a apresentar nesta oportunidade.</p></div>'}</div>`;
+}
+
 /* Camada 3D (fase 4) — WebGL escrito à mão, sem biblioteca, sem rede, sem dados de exemplo.
    Só ADICIONA um cartão antes dos KPIs da Visão da Carteira e efeito de inclinação nos KPIs.
    Dados: clients() (c.mrr, c.topScore, c.segInfo). Abrir ficha reutiliza data-a="gsOpen".
@@ -10331,7 +10382,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;
