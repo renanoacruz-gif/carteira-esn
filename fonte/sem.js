@@ -17,6 +17,7 @@ const SEM_GEN = {
   producao: /^(produ|capacidade|programa|perda|manuten|apontamento|parada)/i, analytics: /^(relat|indicador|funil|pipeline|forecast|comiss)/i,
   logistica: /^(entrega|rota|frota|expedi|armaz|cd$|estoque|separa|agendamento|transporte|frete)/i, sustentacao: /^(chamado|upgrade|release|vers|atualiza|banco de dados|backup|homologa|infra)/i,
   treinamento: /^(treinamento|capacita|ado|uso do sistema|parametriza|customiza)/i, nfse: /^(nfs|nota de servi|iss|munic)/i, obras: /^(obra|empreendimento|engenharia)/i,
+  qualidade: /^(qualidade|inspe|rastreab|controle de qualidade)/i,
   pdv: /^(frente de loja|pdv|ponto de venda|autoatendimento|self-?checkout|omni-?channel|omnichannel|multicanal|marketplace|loja virtual)/i
 };
 const _L = '(?<![\\wÀ-ÿ])', _R = '(?![\\wÀ-ÿ])';

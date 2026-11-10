@@ -6,7 +6,7 @@ A, errs = open_h(em)
 A.wait_for_timeout(500)
 
 tot = ev(A, "KB.solutions.length")
-ck('base inicial (kb.js) = 61 soluções (59 da rodada 26 + equals + totvs_pay)', tot == 61, tot)
+ck('base inicial (kb.js) >= 61 soluções (rodada 27; rodadas seguintes só crescem)', tot >= 61, tot)
 
 seg = ev(A, "KB.segments.find(s=>s.id=='varejo')")
 ck('segmento varejo: estudo=true', seg['estudo'] == True)
@@ -44,7 +44,7 @@ ck('cliente Varejo com evidência gera oportunidade varejo_pagamentos', 'varejo_
 # regressão: segmentos/regras pré-existentes não mudaram de contagem
 nseg = ev(A, "KB.segments.length"); nrul = ev(A, "RULES.length")
 ck('12 segmentos (nenhum criado/removido)', nseg == 12, nseg)
-ck('14 RULES (12 originais + 2 novas)', nrul == 14, nrul)
+ck('>= 14 RULES (rodada 27; rodadas seguintes só crescem)', nrul >= 14, nrul)
 
 ck('sem erros de página', not errs, errs)
 print('FAILS', F)
