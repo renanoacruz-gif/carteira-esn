@@ -1915,8 +1915,8 @@ function diffSnap(a, b) {
 }
 function analyzeClient(c, st) {
   c.segInfo = classifySeg(c, st.meta.segOv);
-  /* rodada 31: item que ficou 'outro' por inferência é reavaliado quando as regras ganham termos (ex.: SMS = manutenção recorrente); escolha manual nunca é alterada */
-  (c.fichas || []).forEach(f => (f.items || []).forEach(it => { if (it.kind === 'outro' && it.kindMode !== 'manual') it.kind = classifyItem(it.desc || ''); }));
+  /* rodadas 31/32: natureza do item pela identidade do produto (fnat.js); escolha manual nunca é alterada */
+  fnApply(c);
   markDuplicates(c);
   c.productsIdent = identifiedProducts(c);
   consInit(c); cadInit(c); migrateDecl(c); relSync(c); fisSync(c);
@@ -6969,7 +6969,7 @@ function fichaBlock(c, f) {
   <label class="sm">${f.comp ? 'Corrigir' : 'Informar'} competência <input type="month" value="${esc(f.comp || '')}" data-c="fcomp" data-k="${k}" data-id="${f.id}"></label><span class="muted">• Carregada em <b>${dtBR(f.at)}</b> (data de upload ≠ competência)</span></div>
   <div class="sm" style="margin-bottom:6px">Modalidade: ${f.modalidade ? `${esc(f.modalidade.term)} ${chip('FATO')} <span class="muted">"…${esc(f.modalidade.snip)}…"</span>` : '<span class="muted">não identificada (não deduzida)</span>'}${f.splitFromBatch ? ` • ${chip('INFERÊNCIA')} dividida de arquivo em lote${f.inferredLines ? ` (${f.inferredLines} linhas sem identificador atribuídas ao bloco anterior)` : ''}` : ''}${f.itemsTrunc ? ` • ${pill('exibindo 150 de ' + f.itemsTrunc + ' itens', 'warn')}` : ''}</div>
   <details><summary>Ver conteúdo extraído (${(f.items || []).length} itens)</summary><p class="muted sm">O arquivo original não é armazenado (limite do banco do artefato): ficam os itens e o trecho de texto lido abaixo. Para ver o original, reenvie o arquivo.</p>
-  <div class="tw" style="max-height:300px"><table><thead><tr><th>Local</th><th>Descrição</th><th>Competência</th><th>Classe (inferida — editável)</th><th class="r">Valor</th></tr></thead><tbody>${(f.items || []).map(i => `<tr style="${i.kind === 'total' || i.kind === 'imposto' || i.dup ? 'opacity:.55' : ''}"><td class="sm nw">${esc(i.loc)}</td><td>${esc(i.desc)}${i.dup ? ' ' + pill('duplicado em outro arquivo', 'warn') : ''}</td><td class="sm nw">${esc(i.comp || '—')}</td><td><select data-c="kind" data-k="${k}" data-f="${f.id}" data-i="${i.id}">${kopts(i.kind)}</select> <span class="chip ${i.kindMode === 'manual' ? 'c-fato' : 'c-inf'}">${i.kindMode === 'manual' ? 'MANUAL' : 'INFERÊNCIA'}</span></td><td class="r nw">${i.vals.length > 1 ? `<select data-c="vi" data-k="${k}" data-f="${f.id}" data-i="${i.id}">${i.vals.map((v, n) => `<option value="${n}" ${n === i.vi ? 'selected' : ''}>${fmtBRL(v)}</option>`).join('')}</select>` : fmtBRL(i.vals[0])}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item monetário identificado nesta ficha.</td></tr>'}</tbody></table></div>
+  <div class="tw" style="max-height:300px"><table><thead><tr><th>Local</th><th>Descrição</th><th>Competência</th><th>Classe (inferida — editável)</th><th class="r">Valor</th></tr></thead><tbody>${(f.items || []).map(i => `<tr style="${i.kind === 'total' || i.kind === 'imposto' || i.dup ? 'opacity:.55' : ''}"><td class="sm nw">${esc(i.loc)}</td><td>${esc(i.desc)}${i.dup ? ' ' + pill('duplicado em outro arquivo', 'warn') : ''}</td><td class="sm nw">${esc(i.comp || '—')}</td><td><select data-c="kind" data-k="${k}" data-f="${f.id}" data-i="${i.id}">${kopts(i.kind)}</select> <span class="chip ${i.kindMode === 'manual' ? 'c-fato' : 'c-inf'}">${i.kindMode === 'manual' ? 'MANUAL' : i.kindMode === 'codigo' ? 'CÓDIGO' : i.kindMode === 'produto' ? 'PRODUTO' : 'INFERÊNCIA'}</span></td><td class="r nw">${i.vals.length > 1 ? `<select data-c="vi" data-k="${k}" data-f="${f.id}" data-i="${i.id}">${i.vals.map((v, n) => `<option value="${n}" ${n === i.vi ? 'selected' : ''}>${fmtBRL(v)}</option>`).join('')}</select>` : fmtBRL(i.vals[0])}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item monetário identificado nesta ficha.</td></tr>'}</tbody></table></div>
   <details style="margin-top:6px"><summary class="sm">Texto lido (primeiros 3.000 caracteres)</summary><pre class="sm" style="white-space:pre-wrap;max-height:200px;overflow:auto">${esc(f.matchText || '')}</pre></details></details></div>`;
 }
 
@@ -7099,7 +7099,7 @@ function solDetail(r) {
   <h4>Fontes (${(r.fontes || []).length})</h4><ul class="sm" style="padding-left:18px">${(r.fontes || []).map(srcLi).join('')}</ul>
   <div class="row"><input type="text" id="lk-t" placeholder="Título do link" style="min-width:200px"><input type="text" id="lk-u" placeholder="https://… (Portal TOTVS, TDN, Central de Atendimento)" style="min-width:320px"><button class="btn ghost sm" data-a="solLink" data-id="${r.id}">Registrar link</button></div><p class="muted sm">O link é registrado como fonte e classificado pelo domínio. O aplicativo não acessa a página (sem acesso a outros hosts): conteúdo vem de materiais enviados ou da pesquisa assistida.</p>
   ${lkDetailBlock(r)}
-  ${smPanel(r)}${solNotesSec(r)}
+  ${fnSolRow(r)}${smPanel(r)}${solNotesSec(r)}
   <details><summary class="sm">Histórico de revisões (${(r.hist || []).length})</summary><ul class="sm">${(r.hist || []).map(h => `<li>${esc(dtBR(h.at))} • rev ${h.rev} • ${esc(h.acao)}${h.por ? ' • por ' + esc(who(h.por)) : ''} — ${esc(h.resumo)}</li>`).join('')}</ul></details></div>${relSection(r)}${tkSection(r)}`;
 }
 
@@ -7109,7 +7109,7 @@ function vSolucoes() {
   const sel = S.solutions.find(r => r.id === UI.solSel);
   let h = `  <div class="row" style="margin-bottom:10px"><input type="text" data-i="solq" value="${esc(UI.solQ)}" placeholder="Buscar nome, sigla, linha, termo ou conteúdo (funcionalidades, dores, finalidade)…" style="min-width:260px"><select data-c="solf" data-f="tipo">${optS('', 'Todos os tipos', f.tipo)}${Object.entries(TIPOS).map(([k, l]) => optS(k, l, f.tipo)).join('')}</select><select data-c="solf" data-f="st">${optS('', 'Qualquer status', f.st)}${STATUS_SOL.map(x => optS(x, x, f.st)).join('')}</select><select data-c="solf" data-f="rs">${optS('', 'Qualquer validação de referência', f.rs)}${Object.entries(REF_ST).map(([k, l]) => optS(k, l, f.rs)).join('')}${optS('sem', 'Sem situação registrada', f.rs)}</select><select data-c="solf" data-f="grupo">${optS('', 'Todos os grupos', f.grupo)}${REF24.GRUPOS.map(g => optS(g, g, f.grupo)).join('')}</select><select data-c="solf" data-f="arq">${optS('', 'Ativas', f.arq)}${optS('1', 'Arquivadas', f.arq)}</select><span class="sp"></span><button class="btn pri" data-a="solNew">+ Nova solução</button><button class="btn ghost" data-a="solSeed" title="Recria apenas registros iniciais que foram removidos">Restaurar base inicial</button></div>
   ${dorHtml()}`;
-  if (UI.solEdit) h += solForm(); h += solImportCard(); if (sel && !UI.solEdit) h += solDetail(sel);
+  h += fnCard(); if (UI.solEdit) h += solForm(); h += solImportCard(); if (sel && !UI.solEdit) h += solDetail(sel);
   h += `<div class="card"><h3>Registros (${list.length}${list.length !== all.length ? ' de ' + all.length : ''})</h3><div class="tw"><table><thead><tr><th style="min-width:220px">Nome</th><th>Sigla / ID interno</th><th>Tipo</th><th>Linha / categoria</th><th>Segmentos</th><th>Status</th><th>Validação da referência</th><th>Fontes</th><th>Atualizado</th></tr></thead><tbody>${list.map(r => `<tr class="clk" data-a="solView" data-id="${r.id}"><td><b>${esc(r.nome)}</b>${r.pend?.some(p => !p.resolvido) ? ' ' + pill('conflito', 'bad') : ''}${solConflicts(r).some(k => !k.pend) ? ' ' + pill('fontes divergem', 'bad') : ''}<div class="muted sm">${esc(r.origem)}${(r.notasInt || []).length ? ' • ' + r.notasInt.length + ' nota(s) interna(s)' : ''}</div></td><td class="sm nw">${esc(r.sigla || '—')}<div class="muted">${esc(r.refId || '')}</div></td><td class="sm">${esc(TIPOS[r.tipo])}${r.tipo === 'servico' ? `<div class="muted">${esc(r.fornecedor || 'fornecedor?')}</div>` : ''}</td><td class="sm">${esc(r.linha || '—')}<div class="muted">${esc(r.categoria || '')}</div></td><td class="sm">${r.segmentos.map(id => esc(segName(id) || id)).join(', ') || '—'}</td><td>${pill(r.status, ST_SOL[r.status] || 'off')}</td><td>${r.refStatus ? pill(REF_ST[r.refStatus], REF_STK[r.refStatus]) : '<span class="muted sm">—</span>'}</td><td class="sm">${(r.fontes || []).slice(0, 2).map(f => esc(f.t)).join('<br>')}${(r.fontes || []).length > 2 ? `<div class="muted">+${r.fontes.length - 2}</div>` : ''}</td><td class="nw sm">${esc(r.atualizadoEm)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Nenhum registro.</td></tr>'}</tbody></table></div></div>`;
   /* Rodada 28: lista primeiro; ferramentas de alimentação da base ficam recolhidas (estado lembrado neste navegador; aberto sob automação de testes) */
   const fo = UI.solFeed || UI.sm.open;
@@ -8339,7 +8339,7 @@ function briefRaw(c) {
           const total = brN(parseNum(g('total'))), liq = brN(parseNum(g('liq'))), qtd = brN(parseNum(g('qtd'))), unit = brN(parseNum(g('unit')));
           if (total == null && liq == null && qtd == null && unit == null) return;
           meta.cod.push(s('cod')); meta.cli.push(s('cli')); meta.contrato.push(s('contrato')); meta.proposta.push(s('proposta')); meta.cond.push(s('cond'));
-          const kind = classifyItem(desc);
+          const kind = fnIdent({ cod: s('codp'), nome: desc, desc }).kind;
           const row = { desc, codp: s('codp') || '', qtd, unit, total, liq, comp: brCompNorm(g('comp')) || brCompNorm(f.comp) || null, kind, statusRaw: s('status') || '', deptRaw: s('dept') || '', contr: brN(parseNum(g('contr'))), util: brN(parseNum(g('util'))), file: f.file, loc: `aba ${sh.name} • linha ${r.n}` };
           push(row, kind === 'total');
         });
@@ -8767,6 +8767,62 @@ function fsPendencias(c) {
   if (sd.length) L.push({ falta: 'Vigência dos descontos', importa: `${sd.length} desconto(s) na ficha sem prazo documentado. Sem vigência não há como saber se a condição termina.`, decisao: 'Se há conversa de renovação de condições.', acao: ['ctab', 'fichas', 'Ver fichas'] });
   return L;
 }
+
+/* ===== Rodada 32: natureza do item de ficha pelo PRODUTO (não por palavras soltas) =====
+   Ordem: classificação manual do item > código do produto ligado pelo executivo (S.meta.codMap) > produto reconhecido na Base de Soluções pelo nome (coluna de descrição) > regras de texto.
+   Só vale para ficha tabular com coluna de código/descrição; ficha em texto corrido segue pelas regras de texto. "Imposto"/"total" nunca se aplicam a linha que tem código de produto. */
+const COB = { recorrente: 'Recorrente (licença, manutenção, assinatura)', consumo: 'Pacote de consumo mensal (franquia)', avulso: 'Avulso (projeto ou serviço pontual)' };
+const COB_KIND = { recorrente: 'recorrente', consumo: 'recorrente', avulso: 'avulso' };
+/* sem campo gravado: produto, módulo, plataforma e solução complementar são cobrados de forma recorrente; serviço não é deduzido */
+const solCobranca = s => s ? (s.cobranca || (s.tipo && s.tipo !== 'servico' ? 'recorrente' : '')) : '';
+function fnEnrich(f) {
+  if (!f.tab || f._fnE === (f.items || []).length) return; const map = new Map();
+  f.tab.sheets.forEach(sh => { const hr = sh.rows.find(r => r.n === sh.h + 1); if (!hr) return; const col = brCols(hr.c); if (col.desc == null || col.codp == null) return;
+    sh.rows.filter(r => r.n > sh.h + 1).forEach(r => map.set(`aba ${sh.name} • linha ${r.n}`, { cod: String(r.c[col.codp] ?? '').trim(), nome: String(r.c[col.desc] ?? '').trim() })); });
+  (f.items || []).forEach(it => { const m = map.get(it.loc); if (m && m.cod && m.nome) { it.cod = m.cod.slice(0, 40); it.nome = m.nome.slice(0, 120); } });
+  Object.defineProperty(f, '_fnE', { value: (f.items || []).length, enumerable: false, writable: true });
+}
+function fnIdent(it) {
+  if (it.cod && it.nome) {
+    const m = S.meta.codMap?.[it.cod];
+    if (m) { const sol = m.sol ? S.solutions.find(s => s.id === m.sol) : null, cob = m.cob || solCobranca(sol); if (cob) return { kind: COB_KIND[cob], via: 'codigo', sol }; }
+    const p = prodTest(it.nome).find(x => !x.bloq), sol = p ? S.solutions.find(s => s.id === p.id) : null, cob = solCobranca(sol);
+    if (cob) return { kind: COB_KIND[cob], via: 'produto', sol };
+    for (const [k, re] of KIND_RULES) if (k !== 'imposto' && k !== 'total' && re.test(it.nome)) return { kind: k, via: 'texto', sol };
+    return { kind: 'outro', via: 'texto', sol };
+  }
+  return { kind: classifyItem(it.desc || ''), via: 'texto', sol: null };
+}
+function fnApply(c) {
+  (c.fichas || []).forEach(f => { fnEnrich(f); (f.items || []).forEach(it => { if (it.kindMode === 'manual') return; if (!it.cod && it.kind !== 'outro') return; /* ficha em texto: mantém o que já estava */
+    const r = fnIdent(it); it.kind = r.kind; it.kindMode = r.via === 'texto' ? 'inferido' : r.via; if (r.sol) it.solId = r.sol.id; else delete it.solId; }); });
+}
+/* códigos de produto ainda sem natureza: o executivo liga uma vez e vale para todas as fichas */
+function fnPend() {
+  const g = new Map();
+  Object.values(S.clients).forEach(c => fichasOk(c).forEach(f => (f.items || []).forEach(it => { if (!it.cod || it.dup || it.kindMode === 'manual' || it.kind !== 'outro') return;
+    const e = g.get(it.cod) || { cod: it.cod, nome: it.nome, cli: new Set(), n: 0, v: 0 }; e.cli.add(c.key); e.n++; e.v += it.vals?.[it.vi] || 0; g.set(it.cod, e); })));
+  return [...g.values()].sort((a, b) => b.v - a.v);
+}
+function fnSave(cod) {
+  const sol = $(`[data-fn-sol="${CSS.escape(cod)}"]`)?.value || '', cob = $(`[data-fn-cob="${CSS.escape(cod)}"]`)?.value || '';
+  if (!cob && !solCobranca(S.solutions.find(s => s.id === sol))) return toast('Escolha o modelo de cobrança (ou um produto que já tenha modelo definido).', 'bad');
+  const p = fnPend().find(x => x.cod === cod); S.meta.codMap ||= {}; S.meta.codMap[cod] = { sol: sol || null, cob: cob || null, nome: p?.nome || S.meta.codMap[cod]?.nome || '', at: nowISO() };
+  touchMeta(); reanalyzeAll(true, 'Código de produto identificado: ' + cod); render(); toast('Código identificado. Vale para todas as fichas.', 'ok');
+}
+function fnDel(cod) { if (S.meta.codMap) delete S.meta.codMap[cod]; touchMeta(); reanalyzeAll(true, 'Identificação de código removida: ' + cod); render(); }
+function fnCard() {
+  const P = fnPend(), M = Object.entries(S.meta.codMap || {}); if (!P.length && !M.length) return '';
+  const sols = activeSols().slice().sort((a, b) => a.nome.localeCompare(b.nome)), so = v => optS('', 'Produto da Base (opcional)', v) + sols.map(s => optS(s.id, s.nome, v)).join(''), co = v => optS('', 'Modelo de cobrança…', v) + Object.entries(COB).map(([k, l]) => optS(k, l, v)).join('');
+  let h = `<div class="card"><div class="row"><h3>Itens de ficha a identificar</h3>${P.length ? pill(P.length + ' código(s)', 'warn') : pill('tudo identificado', 'ok')}</div>`;
+  if (P.length) h += `<p class="muted sm">Códigos de produto que apareceram em fichas e ainda não têm natureza definida — hoje ficam fora do MRR. Ligue cada código uma vez; vale para todas as fichas.</p><div class="tw" style="max-height:none"><table><thead><tr><th>Código</th><th>Nome na ficha</th><th class="r">Clientes</th><th class="r">Valor</th><th>Identificação</th><th></th></tr></thead><tbody>${P.slice(0, 40).map(e => `<tr><td class="nw"><b>${esc(e.cod)}</b></td><td>${esc(e.nome)}</td><td class="r">${e.cli.size}</td><td class="r nw">${fmtBRL(e.v)}</td><td><select style="max-width:210px" data-fn-sol="${esc(e.cod)}">${so('')}</select> <select style="max-width:210px" data-fn-cob="${esc(e.cod)}">${co('')}</select></td><td><button class="btn sm" data-a="fnSave" data-id="${esc(e.cod)}">Salvar</button></td></tr>`).join('')}</tbody></table></div>`;
+  if (M.length) h += `<details class="sm"><summary>${M.length} código(s) já identificado(s)</summary><ul>${M.map(([cod, m]) => `<li><b>${esc(cod)}</b> ${esc(m.nome || '')} → ${esc(S.solutions.find(s => s.id === m.sol)?.nome || 'sem produto ligado')} • ${esc(COB[m.cob || solCobranca(S.solutions.find(s => s.id === m.sol))] || '—')} <button class="btn ghost sm" data-a="fnDel" data-id="${esc(cod)}">Remover</button></li>`).join('')}</ul></details>`;
+  return h + '</div>';
+}
+/* modelo de cobrança no detalhe do produto */
+function fnSolRow(r) { return `<div class="row sm" style="margin:6px 0"><label>Modelo de cobrança <select data-c="solCob" data-id="${r.id}">${optS('', r.tipo !== 'servico' ? 'Padrão do tipo: recorrente' : 'Não definido', r.cobranca || '')}${Object.entries(COB).map(([k, l]) => optS(k, l, r.cobranca || '')).join('')}</select></label><span class="muted">Define a natureza dos itens de ficha reconhecidos como este produto.</span></div>`; }
+function fnSolCob(id, v) { const r = S.solutions.find(s => s.id === id); if (!r) return; r.cobranca = COB[v] ? v : ''; hist(r, 'editado', 'Modelo de cobrança: ' + (COB[r.cobranca] || 'padrão do tipo')); r.atualizadoEm = today(); solChanged(r, 'editado'); reanalyzeAll(true, 'Modelo de cobrança de ' + r.nome); render(); }
+const FN_ACT = { fnSave: t => fnSave(t.dataset.id), fnDel: t => fnDel(t.dataset.id) };
 
 /* ===== Rodada 18 §A: comparação de portfólio entre clientes comparáveis (da PRÓPRIA carteira) =====
    Regra central: "não identificado nos documentos" ≠ "cliente não possui". Cliente sem ficha = situação DESCONHECIDA (nunca "não possui").
@@ -10823,7 +10879,7 @@ const ACT = {
   delF1: t => { UI.confirm = 'del:' + t.dataset.id; render(); }, delF0: () => { UI.confirm = null; render(); }, delF: t => { UI.confirm = null; deleteFicha(t.dataset.k, t.dataset.id); },
   dismErr: t => dismissFichaErr(t.dataset.k, t.dataset.id), markRev: t => markReviewed(t.dataset.k, t.dataset.id),
   refAuto: () => setRefComp(''), filtSem: () => { UI.f = { ...UI.f, fs: 'nao_carregada' }; UI.view = 'clientes'; render(); window.scrollTo(0, 0); },
-  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...COV_ACT, ...VAL_ACT, ...REL_ACT, ...TK_ACT, ...UT_ACT, ...RD_ACT, ...DOR_ACT, ...DT_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
+  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...FN_ACT, ...COV_ACT, ...VAL_ACT, ...REL_ACT, ...TK_ACT, ...UT_ACT, ...RD_ACT, ...DOR_ACT, ...DT_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
   solView: t => { UI.solSel = t.dataset.id; UI.solEdit = null; render(); window.scrollTo(0, 0); }, solEdit: t => solEditOpen(t.dataset.id),
   solForce: () => { UI.solEdit.d.ackDup = true; solSave(); }, solMerge: t => solMergeInto(t.dataset.id),
   solArq: t => solArchive(t.dataset.id, !!t.dataset.on), solSeed: solRestoreSeed, pendOk: t => solResolvePend(t.dataset.id, +t.dataset.i, !!t.dataset.adopt),
@@ -10971,6 +11027,7 @@ document.addEventListener('change', async e => {
     case 'impRes': { UI.wiz.res[t.dataset.i] = v; render(); break; }
     case 'impCf': { UI.wiz.cf[t.dataset.id] = v; break; }
     case 'impClear': { UI.wiz.opt = { ...(UI.wiz.opt || {}), clear: t.checked }; render(); break; }
+    case 'solCob': fnSolCob(t.dataset.id, v); break;
     case 'ptipo': UI.plan.tipo = v; render(); break;
     case 'pprio': UI.plan.prio = v; render(); break;
     case 'pst': UI.plan.st = v; render(); break;

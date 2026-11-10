@@ -111,7 +111,7 @@ function briefRaw(c) {
           const total = brN(parseNum(g('total'))), liq = brN(parseNum(g('liq'))), qtd = brN(parseNum(g('qtd'))), unit = brN(parseNum(g('unit')));
           if (total == null && liq == null && qtd == null && unit == null) return;
           meta.cod.push(s('cod')); meta.cli.push(s('cli')); meta.contrato.push(s('contrato')); meta.proposta.push(s('proposta')); meta.cond.push(s('cond'));
-          const kind = classifyItem(desc);
+          const kind = fnIdent({ cod: s('codp'), nome: desc, desc }).kind;
           const row = { desc, codp: s('codp') || '', qtd, unit, total, liq, comp: brCompNorm(g('comp')) || brCompNorm(f.comp) || null, kind, statusRaw: s('status') || '', deptRaw: s('dept') || '', contr: brN(parseNum(g('contr'))), util: brN(parseNum(g('util'))), file: f.file, loc: `aba ${sh.name} • linha ${r.n}` };
           push(row, kind === 'total');
         });

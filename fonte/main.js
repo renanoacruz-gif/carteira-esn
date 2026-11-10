@@ -19,7 +19,7 @@ const ACT = {
   delF1: t => { UI.confirm = 'del:' + t.dataset.id; render(); }, delF0: () => { UI.confirm = null; render(); }, delF: t => { UI.confirm = null; deleteFicha(t.dataset.k, t.dataset.id); },
   dismErr: t => dismissFichaErr(t.dataset.k, t.dataset.id), markRev: t => markReviewed(t.dataset.k, t.dataset.id),
   refAuto: () => setRefComp(''), filtSem: () => { UI.f = { ...UI.f, fs: 'nao_carregada' }; UI.view = 'clientes'; render(); window.scrollTo(0, 0); },
-  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...COV_ACT, ...VAL_ACT, ...REL_ACT, ...TK_ACT, ...UT_ACT, ...RD_ACT, ...DOR_ACT, ...DT_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
+  ...CE_ACT, ...RX_ACT, ...MKV_ACT, ...SM_ACT, ...SG_ACT, ...SEM_ACT, ...FN_ACT, ...COV_ACT, ...VAL_ACT, ...REL_ACT, ...TK_ACT, ...UT_ACT, ...RD_ACT, ...DOR_ACT, ...DT_ACT, ...ICAP_ACT, ...HK_ACT, solNew, solSave, solCancel: () => { UI.solEdit = null; render(); }, solClose: () => { UI.solSel = null; render(); },
   solView: t => { UI.solSel = t.dataset.id; UI.solEdit = null; render(); window.scrollTo(0, 0); }, solEdit: t => solEditOpen(t.dataset.id),
   solForce: () => { UI.solEdit.d.ackDup = true; solSave(); }, solMerge: t => solMergeInto(t.dataset.id),
   solArq: t => solArchive(t.dataset.id, !!t.dataset.on), solSeed: solRestoreSeed, pendOk: t => solResolvePend(t.dataset.id, +t.dataset.i, !!t.dataset.adopt),
@@ -167,6 +167,7 @@ document.addEventListener('change', async e => {
     case 'impRes': { UI.wiz.res[t.dataset.i] = v; render(); break; }
     case 'impCf': { UI.wiz.cf[t.dataset.id] = v; break; }
     case 'impClear': { UI.wiz.opt = { ...(UI.wiz.opt || {}), clear: t.checked }; render(); break; }
+    case 'solCob': fnSolCob(t.dataset.id, v); break;
     case 'ptipo': UI.plan.tipo = v; render(); break;
     case 'pprio': UI.plan.prio = v; render(); break;
     case 'pst': UI.plan.st = v; render(); break;
