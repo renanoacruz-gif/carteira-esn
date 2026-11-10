@@ -12,7 +12,7 @@ const IC = {
   merge: '<path d="M5 4v6a4 4 0 0 0 4 4h6M19 4v6a4 4 0 0 1-4 4"/><path d="M12 14v6M9 17l3 3 3-3"/>',
   sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>', sair: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 8l4 4-4 4M19 12H9"/>',
   shield: '<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>', link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   trend: '<path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/>',
   left: '<path d="M15 6l-6 6 6 6"/>', right: '<path d="M9 6l6 6-6 6"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -66,7 +66,7 @@ function paintShell() {
     const act = k === top, n = k === 'importar' ? S.inbox.length : k === 'pend' ? bd('pend') : 0;
     return (sep ? '<div class="sb-sep sb-lb">Suporte operacional</div>' : '') + btn([k, l, i], act && (!sub.length || UI.view === k && !sub.some(s => s[0] === k)), false, n) + (act && sub.length ? `<div class="sb-sub">${sub.map(s => btn(s, (UI.view === 'diag' ? 'cliente' : UI.view) === s[0], true, bd(s[0]))).join('')}</div>` : '');
   }).join('')}</div>`;
-  $('#sbfoot').innerHTML = `<button type="button" class="sb-user" data-a="nav" data-v="conta" data-tip="${esc(ME.nome || 'Minha conta')} — carteira privada desta conta" data-tipc="1"><span class="av">${ico('user', 18)}</span><span class="sb-lb"><b>${esc(ME.nome || 'Minha conta')}</b><span class="sm" id="pstat">${esc(UI.persist)}</span></span></button>`;
+  $('#sbfoot').innerHTML = `<button type="button" class="sb-user" data-a="nav" data-v="conta" data-tip="${esc(ME.nome || 'Minha conta')} — carteira privada desta conta" data-tipc="1"><span class="av">${ico('user', 18)}</span><span class="sb-lb"><b>${esc(ME.nome || 'Minha conta')}</b><span class="sm" id="pstat">${esc(UI.persist)}</span></span></button>${window.__HOSTED__ ? `<button type="button" class="sb-item sb-out" data-a="sair" data-tip="Sair da ferramenta" data-tipc="1">${ico('sair', 18)}<span class="sb-lb">Sair</span></button>` : ''}`;
   if (keep) $(`#nav [data-v="${keep}"]`)?.focus();
   const tg = $('#sbtg'); tg.innerHTML = ico(UI.sbCol && !isMobile() ? 'right' : 'left', 18); tg.setAttribute('aria-expanded', String(!(UI.sbCol && !isMobile()))); tg.setAttribute('aria-label', UI.sbCol ? 'Expandir menu lateral' : 'Recolher menu lateral');
   const sb = $('#sb'); if (isMobile()) { sb.inert = !UI.sbOpen; sb.setAttribute('aria-hidden', String(!UI.sbOpen)); } else { sb.inert = false; sb.removeAttribute('aria-hidden'); }

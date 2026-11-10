@@ -91,7 +91,15 @@ function hkCard() {
   <div class="tbl-wrap"><table class="tbl sm"><thead><tr><th>Provedor</th><th>Situação</th><th>Chave</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="sm muted">Usuário: <b>${esc(ME.id || '—')}</b>. Use “Testar” na tabela acima para confirmar cada chave. Pesquisas e leituras só saem para o provedor que você autorizar a cada envio.</p></div>`;
 }
+/* Rodada 28: Sair. Grava o que estiver pendente, encerra a sessão do Cloudflare Access neste domínio e leva à página pública /sobre. */
+async function sair() {
+  try { await flush(); } catch {}
+  try { await fetch('/cdn-cgi/access/logout', { credentials: 'include', redirect: 'manual', cache: 'no-store' }); } catch {}
+  location.href = '/sobre/';
+}
 const HK_ACT = {
+  sair,
+  solFeed: () => { UI.solFeed = !(UI.solFeed || UI.sm.open); if (!UI.solFeed) UI.sm.open = false; try { localStorage.setItem('gc_solfeed', UI.solFeed ? '1' : '0'); } catch {} render(); },
   hkSalvar: t => { const p = t.dataset.p, inp = document.getElementById('hk-' + p), v = (inp?.value || '').trim(); if (!AI_PROV[p]) return; if (v.length < 8 || v.length > 400 || !/^[\x21-\x7e]+$/.test(v)) { toast('Chave inválida (sem espaços, 8–400 caracteres).'); return; } const o = hkLer(); o[p] = v; if (!hkSalvarTudo(o)) { toast('Este navegador não permite guardar a chave (armazenamento bloqueado).'); return; } inp.value = ''; toast('Chave salva neste navegador.'); render(); },
   hkRemover: t => { const o = hkLer(); delete o[t.dataset.p]; hkSalvarTudo(o); toast('Chave removida deste navegador.'); render(); },
 };

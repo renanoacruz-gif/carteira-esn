@@ -20,14 +20,14 @@ for u,f in [('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.j
     assert u in hh,u; hh=hh.replace(u,V(f))
 hh=re.sub(r"const PDF_WORKER_DIRECT='[^']*';\nconst PDF_WORKER=[^\n]*\n","const PDF_WORKER_DIRECT='"+V('pdf.worker.min.js')+"';\nconst PDF_WORKER='"+V('pdf.worker.min.js')+"';\n",hh,count=1); assert "const PDF_WORKER='/vendor/pdf.worker.min.js?v=" in hh
 assert 'cdnjs.cloudflare.com' not in hh.split('<body>')[0] and 'cdnjs.cloudflare.com/ajax/libs/xlsx' not in hh
-# Lote 4: Space Grotesk self-hosted só no hospedado (o artefato segue com o Google Fonts); fora do caminho crítico de terceiros
+# Lote 4: fonte (IBM Plex Sans) self-hosted só no hospedado (o artefato segue com o Google Fonts); fora do caminho crítico de terceiros
 UR="U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
-FNT={w:'space-grotesk-latin-%d-normal.woff2'%w for w in (500,600,700)}
+FNT={w:'ibm-plex-sans-latin-%d-normal.woff2'%w for w in (400,500,600,700)}
 FU=lambda f: '/fonts/'+f+'?v='+hashlib.sha1(open(d+'fonts/'+f,'rb').read()).hexdigest()[:10]
 os.makedirs(hd+'public/fonts',exist_ok=True)
 for f in FNT.values(): shutil.copy(d+'fonts/'+f,hd+'public/fonts/'+f)
-ffcss=''.join("@font-face{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:%d;src:url(%s) format('woff2');unicode-range:%s}"%(w,FU(f),UR) for w,f in FNT.items())
-gf='<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">\n'
+ffcss=''.join("@font-face{font-family:'IBM Plex Sans';font-style:normal;font-display:swap;font-weight:%d;src:url(%s) format('woff2');unicode-range:%s}"%(w,FU(f),UR) for w,f in FNT.items())
+gf='<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">\n'
 assert gf in hh
 # sem <link rel=preload>: medido em Slow 4G, o preload de 2 fontes (26 KB) disputa banda com o HTML e atrasa o 1º conteúdo em ~125 ms; font-display:swap basta
 hh=hh.replace(gf,'<style>'+ffcss+'</style>\n',1)

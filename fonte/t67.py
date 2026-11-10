@@ -12,9 +12,9 @@ with sync_playwright() as p:
         fora=[u for u in reqs if not u.startswith('data:') and not u.startswith('http://localhost:8790/sobre/')]
         ck('%s: tudo sob /sobre/'%pg_url, not fora, fora)
         ck('%s: sem erros de rede/console'%pg_url, not falhas, falhas)
-        ok=pg.evaluate("document.fonts.load('700 16px \"Space Grotesk\"').then(l=>l.length>0)"); ck('%s: Space Grotesk carregada'%pg_url, ok)
+        ok=pg.evaluate("document.fonts.load('700 16px \"IBM Plex Sans\"').then(l=>l.length>0)"); ck('%s: IBM Plex Sans carregada'%pg_url, ok)
         pg.close()
     b.close()
-for w in (500,600,700):
-    r=urllib.request.urlopen('http://localhost:8790/sobre/fonts/space-grotesk-latin-%d-normal.woff2'%w); ck('fonte %d servida com cache imutável'%w, r.status==200 and 'immutable' in r.headers.get('cache-control',''))
+for w in (400,500,600,700):
+    r=urllib.request.urlopen('http://localhost:8790/sobre/fonts/ibm-plex-sans-latin-%d-normal.woff2'%w); ck('fonte %d servida com cache imutável'%w, r.status==200 and 'immutable' in r.headers.get('cache-control',''))
 print('FALHAS:',F) if F else print('TUDO OK')
