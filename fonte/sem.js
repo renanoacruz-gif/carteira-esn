@@ -16,7 +16,8 @@ const SEM_GEN = {
   financeiro: /^(cobran|boleto|concilia|antecip|prazo de pagamento|receb|fluxo de caixa|pix|contas a)/i, processos: /^(aprova|papel|documento|assinatura|planilha|protocolo|solicita)/i,
   producao: /^(produ|capacidade|programa|perda|manuten|apontamento|parada)/i, analytics: /^(relat|indicador|funil|pipeline|forecast|comiss)/i,
   logistica: /^(entrega|rota|frota|expedi|armaz|cd$|estoque|separa|agendamento|transporte|frete)/i, sustentacao: /^(chamado|upgrade|release|vers|atualiza|banco de dados|backup|homologa|infra)/i,
-  treinamento: /^(treinamento|capacita|ado|uso do sistema|parametriza|customiza)/i, nfse: /^(nfs|nota de servi|iss|munic)/i, obras: /^(obra|empreendimento|engenharia)/i
+  treinamento: /^(treinamento|capacita|ado|uso do sistema|parametriza|customiza)/i, nfse: /^(nfs|nota de servi|iss|munic)/i, obras: /^(obra|empreendimento|engenharia)/i,
+  pdv: /^(frente de loja|pdv|ponto de venda|autoatendimento|self-?checkout|omni-?channel|omnichannel|multicanal|marketplace|loja virtual)/i
 };
 const _L = '(?<![\\wÀ-ÿ])', _R = '(?![\\wÀ-ÿ])';
 const SEM_DIF = new RegExp(_L + '(?:manual\\w*|na m[aã]o|[àa] m[aã]o|demor\\w+|atras\\w+|erros?|errad\\w+|retrabalh\\w+|dificuldad\\w+|problem\\w+|falhas?|lent[ao]s?|lentid[aã]o|trav\\w+|n[aã]o (?:conseguimos|conseguem|consegue|temos|tem|possu\\w+|sabemos|sabem|h[aá]|existe|integr\\w+|control\\w+|usam|usamos)|sem (?:controle|visibilidade|vis[aã]o|indicadores?|integra\\w+|rastre\\w+|padr\\w+|atualiza\\w+|automa\\w+|sistema|apoio)|falta(?:m)?(?: de)?|precis\\w+|necessit\\w+|necessidade|gostar\\w+|gostaria|queremos|quer(?:em)?|deseja\\w*|buscam?|planilha\\w*|e-?mails?|whats\\w*|papel|gargalos?|riscos?|multas?|autua\\w+|perdas?|diverg\\w+|inconsist\\w+|desatualizad\\w+|obsolet\\w+|fora de suporte|descontinuad\\w+|insatisf\\w+|reclam\\w+|duplicidade)' + _R, 'i');

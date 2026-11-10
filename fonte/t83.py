@@ -6,9 +6,9 @@ A, errs = open_h(em)
 A.wait_for_timeout(500)
 
 tot = ev(A, "KB.solutions.length")
-ck('base inicial (kb.js) = 59 soluções (24 originais + 35 novas)', tot == 59, tot)
+ck('base inicial (kb.js) >= 59 soluções (rodada 26: 24 originais + 35 novas; rodadas seguintes só crescem)', tot >= 59, tot)
 seedn = ev(A, "(S.meta.seedIds||[]).length")
-ck('todos os 59 ids da base inicial foram semeados na conta', seedn == 59, seedn)
+ck('todos os ids da base inicial foram semeados na conta', seedn == tot, seedn)
 
 ids = ev(A, "S.solutions.map(s=>s.id)")
 ck('nenhum id duplicado', len(ids) == len(set(ids)), [i for i in ids if ids.count(i) > 1])
