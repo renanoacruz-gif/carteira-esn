@@ -19,6 +19,6 @@ o = mk('q1', "[{id:'protheus'}]", "[{name:'ata.txt',text:'As nao conformidades e
 ck('evidência do cliente gera oportunidade de qualidade', 'manufatura_qualidade:evidencia' in o)
 o = mk('q2', "[{id:'protheus'}]", "[{name:'ata.txt',text:'A empresa tem certificacao de qualidade ISO 9001.'}]")
 ck('menção genérica a qualidade (sem dificuldade) não gera oportunidade', not any(x.startswith('manufatura_qualidade') for x in o), o)
-ck('15 RULES e 12 segmentos', ev(A, "RULES.length") == 15 and ev(A, "KB.segments.length") == 12)
+ck('>= 15 RULES (rodada 33; rodadas seguintes só crescem) e 12 segmentos', ev(A, "RULES.length") >= 15 and ev(A, "KB.segments.length") == 12)
 ck('sem erros de página', not errs, errs)
 print('FALHAS', F); p.stop()
