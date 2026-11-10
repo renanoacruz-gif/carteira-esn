@@ -154,11 +154,11 @@
     const sw = (m, t) => `<button type="button" data-r3="${m}" aria-pressed="${ST.mode === m}">${t}</button>`;
     const leg = PL.map((l, i) => cnt[i] ? `<li><i style="background:${VAR[i]}"></i>${l} <b>${cnt[i]}</b></li>` : '').join('');
     return `<section id="rf3d" class="rf3d" aria-label="Mapa 3D da carteira"><div class="rf3d-stage" id="rf3d-stage"></div>
-      <div class="rf3d-hud"><div><div class="rf3d-eb">Mapa da carteira</div><div class="rf3d-t">${nodes.length} cliente(s)</div><div class="rf3d-s">MRR informado na planilha: <b>${brl(total)}</b> em ${withMrr} de ${nodes.length}</div></div>
+      <div class="rf3d-hud"><div><div class="rf3d-eb">Mapa da carteira</div><div class="rf3d-s">MRR informado na planilha</div><div class="rf3d-t">${brl(total)}</div><div class="rf3d-s">em <b>${withMrr}</b> de <b>${nodes.length}</b> cliente(s)</div></div>
       <div class="rf3d-ctl"><div class="rf3d-seg" role="group" aria-label="Visualização">${sw('orb', 'Orbe')}${sw('bars', 'Barras de MRR')}</div><button type="button" class="rf3d-fx" data-r3="fx" aria-pressed="${ST.fx}" title="Liga ou desliga a animação 3D">${ST.fx ? '3D ligado' : '3D desligado'}</button></div></div>
       <ul class="rf3d-leg" aria-label="Legenda">${ST.mode === 'orb' ? leg : ''}</ul>
       <div class="rf3d-hint">${ST.mode === 'orb' ? 'Cor = prioridade da principal oportunidade · tamanho = MRR · faixas = segmentos' : 'Altura = MRR informado por segmento'} · arraste para girar · clique para abrir a ficha</div>
-      <div class="rf3d-tip" id="rf3d-tip" hidden></div><div class="rf3d-lbs" id="rf3d-lbs"></div>
+      ${typeof ckHoje === 'function' ? ckHoje() : ''}<div class="rf3d-tip" id="rf3d-tip" hidden></div><div class="rf3d-lbs" id="rf3d-lbs"></div>
       <p class="sr">${nodes.length} clientes; ${withMrr} com MRR informado; ${cnt[0]} com prioridade alta. Use a lista de Clientes para navegar pelo teclado.</p></section>`;
   }
   const status = () => ST.mode === 'bars' && !bars.some(b => b.m > 0) ? 'Nenhum cliente com MRR informado na planilha.' : '';
@@ -237,9 +237,10 @@
     const view = typeof UI !== 'undefined' ? UI.view : ''; const root = $1('#app');
     if (!root || view !== 'geral' || !WIDE.matches || !(typeof clients === 'function' && clients().length)) { ST.vis = false; return; }
     if (root.querySelector('#rf3d')) return;
-    if (!root.querySelector('.grid.g4')) return; const anchor = root.querySelector('#hoje') || root.querySelector('.grid.g4'); /* o valor vem primeiro: o mapa 3D entra depois de "Onde vale aprofundar hoje" */
+    if (!root.querySelector('.grid.g4')) return; /* visual v2: a orbe abre a Visão (o destaque de "Onde vale aprofundar hoje" fica dentro do palco) e a grade de indicadores vem logo abaixo */
+    let anchor = root.firstElementChild; while (anchor && anchor.matches('.alert')) anchor = anchor.nextElementSibling; if (!anchor) return;
     const s = clients().map(c => c.key + c.mrr + c.topScore).join('|'); if (!nodes.length || s !== ST.s) { ST.s = s; build(); ST.grow = performance.now(); }
-    anchor.insertAdjacentHTML('afterend', hud()); ST.vis = true; ST.last = 0; mountView();
+    anchor.insertAdjacentHTML('beforebegin', hud() + (typeof ckBento === 'function' ? ckBento() : '')); ST.vis = true; ST.last = 0; mountView();
     observe();
   }
   let q = 0; const sched = () => { if (!q) q = requestAnimationFrame(() => { q = 0; mount(); }); };

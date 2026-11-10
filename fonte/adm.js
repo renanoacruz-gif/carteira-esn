@@ -155,7 +155,7 @@ function admSerie(s) {
   const lab = (i) => `<text x="${(pad + i * bw + bw / 2).toFixed(1)}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--txt2)">${esc(s[i].t.slice(5))}</text>`;
   const passo = Math.ceil(s.length / 10), ticks = s.map((_, i) => (i % passo === 0 ? lab(i) : '')).join('');
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Executivos com acesso e com atividade útil por ${s.length > 31 ? 'semana' : 'dia'}" style="width:100%;max-height:190px"><line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="var(--bd)"/>${bars}${ticks}<text x="${pad}" y="11" font-size="10" fill="var(--txt2)">máx. ${mx}</text></svg>
-  <div class="sm muted"><span style="color:var(--ciano)">■</span> com acesso &nbsp; <span style="color:var(--pet)">■</span> com atividade útil</div>`;
+  <div class="sm muted"><span style="color:var(--ciano)">■</span> com acesso &nbsp; <span style="color:var(--ink)">■</span> com atividade útil</div>`;
 }
 function vAdm() {
   if (!window.__PAINEL) return `<div class="card empty"><h2>Acesso restrito</h2><p>Este painel é exclusivo da conta administradora.</p></div>`;
