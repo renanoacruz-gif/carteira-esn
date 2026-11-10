@@ -3,8 +3,8 @@
 --pet:#002233;--pet2:#012739;--ciano:#00DBFF;--ciano2:#00C9EB;--menta:#00FFD3;--lima:#D9FF65;--rosa:#FF42B7;--roxo:#A44DFF;--lar:#E67E08;--cz:#74838F;--claro:#EDEDED;
 /* Derivados para a interface (não são cores de marca): neutros, texto e estados */
 --ink:#002233;--wh:#fff;--emph:#002233;--bg:#F2F5F8;--card:#fff;--bd:#DCE3E8;--bd2:#EEF2F5;--txt:#002233;--txt2:#4B5E6A;--link:#006C85;--ok:#0E8F6B;--bad:#C2185B;--focus:#00A9C7;
-/* Tipografia: corpo Verdana (oficial); títulos e números Space Grotesk (escolha do projeto, não consta no catálogo) */
---fh:'Space Grotesk',Verdana,sans-serif;--fb:Verdana,Geneva,Tahoma,sans-serif;
+/* Tipografia: IBM Plex Sans em títulos, números e corpo (rodada 28, escolha do executivo) */
+--fh:'IBM Plex Sans',system-ui,'Segoe UI',sans-serif;--fb:'IBM Plex Sans',system-ui,'Segoe UI',sans-serif;
 /* Espaçamento, raios, sombras, movimento */
 --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--r-sm:6px;--r:10px;--r-lg:16px;
 --sh1:0 1px 2px rgba(0,34,51,.06);--sh2:0 4px 16px rgba(0,34,51,.08);--sh3:0 16px 40px rgba(0,34,51,.22);
@@ -59,7 +59,7 @@ button,select,input,textarea{font-family:inherit;font-size:var(--fs-md);color:va
 .sb-item:focus-visible,.sb-tg:focus-visible{outline:3px solid var(--ciano);outline-offset:-2px}
 .sb-lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb .badge{background:var(--rosa);color:var(--pet);border-radius:var(--r-pill);font-size:var(--fs-xs);font-weight:700;padding:1px 7px;line-height:1.5}
-.sb-foot{border-top:1px solid var(--wa12);padding-top:var(--s3);margin-top:var(--s2)}
+.sb-foot{border-top:1px solid var(--wa12);padding-top:var(--s3);margin-top:var(--s2)}.sb-out{height:36px;font-size:var(--fs-md);color:var(--on-pet2)}.sb-out:hover{color:var(--wh)}
 .sb-user{background:none;border:0;width:100%;text-align:left;cursor:pointer;font:inherit;border-radius:var(--r);display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s3) var(--s1)}
 .sb-user .av{width:32px;height:32px;border-radius:50%;background:var(--ca16);color:var(--ciano);display:grid;place-items:center;flex:none}
 .sb-user .sb-lb{display:flex;flex-direction:column;font-size:var(--fs-sm);color:var(--wh);line-height:1.25}
