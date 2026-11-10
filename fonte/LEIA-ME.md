@@ -183,3 +183,12 @@ Testes: `t77.py` (dock) e `t78.py` (redesign). O hero lê `clients()`/`rxClass` 
 
 ## Oportunidade por solução (`oppsol.js`)
 O card de oportunidade (Oportunidades, Raio-X do cliente e mobile) abre com a faixa "Soluções TOTVS": um card por produto, com o nome em destaque, categoria, estado de contratação, finalidade e situação de integração com Protheus. "Aprofundar esta solução" (por produto) abre: por que aparece para o cliente, dores, funcionalidades, pré-requisitos, integrações, limitações, o que validar e perguntas; "Abrir na Base de Soluções" leva ao registro. Só usa o que a Base documenta: lacunas aparecem como "ainda não detalha…" e oportunidades de relacionamento mostram "Sem solução de produto associada". "Onde vale aprofundar hoje" passa a citar o produto principal. Motor e regras não mudaram. Teste: `t79.py`.
+
+## Bloco de pendências (ficha do Cliente no celular, textos hospedados)
+- Conta, IA e Integrações (modo hospedado): sem referência a "artefato"/claude.ai; "Login e acesso" descreve o Cloudflare Access.
+- Release preenchida por print: a evidência exibe "Print …" / "campo preenchido por print" (o `tipo` continua `planilha`; só o rótulo muda; registros antigos mantêm o rótulo).
+- Paleta Ctrl+K: telas deduplicadas por destino (`refresh.js`, `telas()`).
+- Dock ≤380px: colunas 1fr 1fr 1.7fr 1fr 1fr, sem rótulo cortado em 360px.
+- Ficha do Cliente ≤900px (`mobile.js` `ficha()`/`tabelas()` + bloco "Ficha do Cliente e Plano no celular"): cabeçalho em grade de botões de 44 px; `.strip` em faixa rolável; alertas recolhidos (toque expande); abas em linha única rolável com a ativa à vista; tabelas largas em `.m-ts` (rolagem só na tabela); filtros do Plano em grade. Página sem rolagem horizontal.
+- D5 (várias planilhas): a importação já mescla em clientes existentes (código/CNPJ/nome, com revisão de conflitos) e acrescenta novos; "carteiras nomeadas separadas" não foi feito (exige particionar `S.clients`, chaves de storage, sincronização D1 e evidências — não é aditivo).
+Teste: `t80.py` (18 verificações). Regressão idêntica ao baseline de `main` (t40, t41, t44, t47b, t53, t63, t64 já tinham as mesmas falhas legadas).

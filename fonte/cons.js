@@ -82,7 +82,9 @@ function relSources(c) {
 function relSync(c) {
   if (c.release && !c.rel.some(e => e.fonte.tipo === 'planilha' && e.v === relNorm(String(c.release).replace(/^.*12\.1\./, '')))) {
     const m = String(c.release).match(/12\.1\.(\d+)|^(\d{2,4})$/); if (m) { const r = relNorm(m[1] || m[2]); c.rel.filter(e => e.fonte.tipo === 'planilha' && e.st === 'candidato').forEach(e => { e.st = 'substituido'; evH(e, 'substituído por nova importação da planilha', 'importação'); });
-      c.rel.push(mkEv(r, { st: 'candidato', cls: 'NECESSITA VALIDAÇÃO', tipo: 'planilha', ref: `Planilha ${c.src?.file || ''}`, loc: `linha ${c.src?.row || '?'} (coluna release)`, trecho: String(c.release), sig: 'planilha|' + r, por: 'importação da planilha', extra: { produto: baseLines(c)[0] || 'Protheus', tipo: 'producao', decl: true } })); }
+      /* tipo 'planilha' é mantido (a lógica de cadCur/relSync depende dele); só o rótulo exibido muda quando a release veio de print */
+      const pf = c.prFill?.release && String(c.prFill.release.para) === String(c.release) ? c.prFill.release : null;
+      c.rel.push(mkEv(r, { st: 'candidato', cls: 'NECESSITA VALIDAÇÃO', tipo: 'planilha', ref: pf ? `Print ${pf.imagem || ''}`.trim() : `Planilha ${c.src?.file || ''}`, loc: pf ? 'campo preenchido por print' : `linha ${c.src?.row || '?'} (coluna release)`, trecho: String(c.release), sig: 'planilha|' + r, por: pf ? 'preenchimento por print' : 'importação da planilha', extra: { produto: baseLines(c)[0] || 'Protheus', tipo: 'producao', decl: true } })); }
   }
   relSources(c).forEach(s => { const t = String(s.t || ''); let m; REL_RE.lastIndex = 0; let n = 0;
     while ((m = REL_RE.exec(t)) && n < 12) { n++; const r = relNorm(m[1] || m[2]); const tipo = relContext(t, m.index, m[0].length), produto = relProduct(t, m.index, c), sig = `${r}|${tipo}|${s.ref}`;

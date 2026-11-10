@@ -593,10 +593,12 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 #app .kpi .v{font-size:32px}
 #app .grid.g4.kpi-strip>.kpi{flex-basis:min(46vw,176px)}
 /* Dock inferior flutuante */
-#tabbar:not([hidden]){--tb-h:60px;display:grid;grid-template-columns:1fr 1fr 1.34fr 1fr 1fr;gap:2px;position:fixed;left:var(--s3);right:var(--s3);bottom:calc(var(--s3) + env(safe-area-inset-bottom,0px));z-index:var(--z-top);padding:6px;border-radius:26px;background:color-mix(in srgb,var(--w) 88%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid var(--bd-soft);box-shadow:var(--sh3)}
+#tabbar:not([hidden]){--tb-h:60px;display:grid;grid-template-columns:1fr 1fr 1.7fr 1fr 1fr;gap:2px;position:fixed;left:var(--s3);right:var(--s3);bottom:calc(var(--s3) + env(safe-area-inset-bottom,0px));z-index:var(--z-top);padding:6px;border-radius:26px;background:color-mix(in srgb,var(--w) 88%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid var(--bd-soft);box-shadow:var(--sh3)}
 #tabbar .tb-i{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;padding:var(--s1) 0;border:0;border-radius:20px;background:none;color:var(--txt3);font:inherit;font-size:var(--fs-2xs);cursor:pointer;transition:background var(--t),color var(--t),transform var(--t)}
 #tabbar .tb-i span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#tabbar .tb-i.on{background:var(--pet);color:var(--w);font-weight:700}
+#tabbar .tb-i.on{background:var(--pet);color:var(--w);font-weight:600}
+#tabbar .tb-i{min-width:0}
+@media(max-width:380px){#tabbar:not([hidden]){left:var(--s2);right:var(--s2);padding:4px;gap:0}}
 #tabbar .tb-i:active{transform:scale(.94)}
 .main-col{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 .toast{bottom:calc(84px + var(--s3) + env(safe-area-inset-bottom,0px))}
@@ -629,6 +631,31 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 .mdl-bg{place-items:end center;padding:0}
 .mdl-box{width:100%;max-width:none;border-radius:var(--m-r) var(--m-r) 0 0;padding:var(--s5) var(--s4) calc(var(--s5) + env(safe-area-inset-bottom,0px));animation:sheet var(--t-md) var(--ease)}
 @keyframes sheet{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+/* Ficha do Cliente e Plano no celular (Q10) */
+#app .m-chead{gap:var(--s2);align-items:center}
+#app .m-chead .sp{display:none}
+#app .m-chead>.btn:first-child{flex:0 0 auto}
+#app .m-chead>h2{flex:1 1 calc(100% - 110px);min-width:0;margin:0;overflow-wrap:anywhere}
+#app .m-chead>.btn:not(:first-child){flex:1 1 calc(50% - var(--s2));min-height:44px;justify-content:center;text-align:center}
+#app>.strip{display:flex;gap:var(--s2);overflow-x:auto;scroll-snap-type:x proximity;scroll-padding-inline:var(--s3);scrollbar-width:none;margin-inline:calc(-1*var(--s3));padding:var(--s1) var(--s3) var(--s2)}
+#app>.strip::-webkit-scrollbar{display:none}
+#app>.strip>*{flex:0 0 min(44vw,168px);scroll-snap-align:start}
+#app .m-al{position:relative;cursor:pointer;padding-right:calc(var(--s4) + 20px)}
+#app .m-al:not(.open){max-height:calc(2.9em + 2*var(--s3));overflow:hidden}
+#app .m-al::after{content:"";position:absolute;right:var(--s3);top:var(--s3);width:14px;height:14px;background:currentColor;opacity:.55;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform var(--t)}
+#app .m-al.open::after{transform:rotate(180deg)}
+#app .m-al:focus-visible{outline:3px solid var(--ciano2);outline-offset:2px}
+#app .ctabs{flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;margin-inline:calc(-1*var(--s3));padding-inline:var(--s3);scroll-padding-inline:var(--s3)}
+#app .ctabs::-webkit-scrollbar{display:none}
+#app .ctabs button{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;min-height:44px}
+#app .m-ts{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#app .row.sm>label{min-width:0;max-width:100%}
+#app .row.sm select{max-width:100%;min-width:0;width:100%}
+#app .filters{grid-template-columns:1fr 1fr}
+#app .filters>input[data-i=pq]{grid-column:1/-1;min-width:0!important}
+#app .filters>.sp{display:none}
+#app .filters>select[data-c=pst]{grid-column:1/-1}
+#app .filters>.btn{width:100%;min-height:44px;justify-content:center}
 }
 @media print{#tabbar,.mhero{display:none!important}}
 
@@ -1995,7 +2022,9 @@ function relSources(c) {
 function relSync(c) {
   if (c.release && !c.rel.some(e => e.fonte.tipo === 'planilha' && e.v === relNorm(String(c.release).replace(/^.*12\.1\./, '')))) {
     const m = String(c.release).match(/12\.1\.(\d+)|^(\d{2,4})$/); if (m) { const r = relNorm(m[1] || m[2]); c.rel.filter(e => e.fonte.tipo === 'planilha' && e.st === 'candidato').forEach(e => { e.st = 'substituido'; evH(e, 'substituído por nova importação da planilha', 'importação'); });
-      c.rel.push(mkEv(r, { st: 'candidato', cls: 'NECESSITA VALIDAÇÃO', tipo: 'planilha', ref: `Planilha ${c.src?.file || ''}`, loc: `linha ${c.src?.row || '?'} (coluna release)`, trecho: String(c.release), sig: 'planilha|' + r, por: 'importação da planilha', extra: { produto: baseLines(c)[0] || 'Protheus', tipo: 'producao', decl: true } })); }
+      /* tipo 'planilha' é mantido (a lógica de cadCur/relSync depende dele); só o rótulo exibido muda quando a release veio de print */
+      const pf = c.prFill?.release && String(c.prFill.release.para) === String(c.release) ? c.prFill.release : null;
+      c.rel.push(mkEv(r, { st: 'candidato', cls: 'NECESSITA VALIDAÇÃO', tipo: 'planilha', ref: pf ? `Print ${pf.imagem || ''}`.trim() : `Planilha ${c.src?.file || ''}`, loc: pf ? 'campo preenchido por print' : `linha ${c.src?.row || '?'} (coluna release)`, trecho: String(c.release), sig: 'planilha|' + r, por: pf ? 'preenchimento por print' : 'importação da planilha', extra: { produto: baseLines(c)[0] || 'Protheus', tipo: 'producao', decl: true } })); }
   }
   relSources(c).forEach(s => { const t = String(s.t || ''); let m; REL_RE.lastIndex = 0; let n = 0;
     while ((m = REL_RE.exec(t)) && n < 12) { n++; const r = relNorm(m[1] || m[2]); const tipo = relContext(t, m.index, m[0].length), produto = relProduct(t, m.index, c), sig = `${r}|${tipo}|${s.ref}`;
@@ -4489,9 +4518,12 @@ function vConta() {
   <div class="kpi"><div class="sm muted">Perfil</div><b>Executivo de Soluções e Negócios</b><div class="sm muted">perfil único: Executivo Comercial</div></div>
   <div class="kpi"><div class="sm muted">Sua carteira</div><b>${nCl} cliente(s)</b><div class="sm muted">privada: só esta conta lê e grava</div></div></div>
   <ul class="sm" style="margin-top:12px"><li><b>Acesso automático:</b> ao abrir o app autenticado, você cai na própria carteira. Não há seletor de usuário, papel ou carteira de outro executivo.</li>
-  <li><b>Isolamento:</b> carteira, fichas, contratos, histórico, notas, diagnósticos, oportunidades, decisões e planos ficam em <code>data/users/&lt;sua conta&gt;/</code>, que a plataforma bloqueia para qualquer outra conta — inclusive o dono do artefato. O app só usa o id da sessão; nenhum identificador digitado ou de URL entra no caminho.</li>
-  <li><b>Catálogo compartilhado:</b> Base de Soluções (produtos, documentação, fontes oficiais, links TDN) é uma só para todos os executivos com acesso de colaborador.</li></ul></div>`;
-  h += `<div class="card"><h3>Login por e-mail e senha — limite desta plataforma</h3><p class="sm">Este app roda como artefato da plataforma e <b>não pode chamar outro servidor</b> (CSP). Por isso o login, a senha, a sessão e o logout são os da própria conta claude.ai de quem abre o link; <b>o app não implementa cadastro, senha, hash nem confirmação de e-mail</b>, e nenhuma tela simula isso. Para encerrar o acesso, saia da conta na plataforma — sem sessão, o app não carrega a carteira.</p>
+  <li><b>Isolamento:</b> ${window.__HOSTED__ ? 'carteira, fichas, contratos, histórico, notas, diagnósticos, oportunidades, decisões e planos pertencem à sua conta (identificada pelo Cloudflare Access) e só ela os lê e grava. O servidor usa a identidade da sessão; nenhum identificador digitado ou de URL define de quem são os dados.' : 'carteira, fichas, contratos, histórico, notas, diagnósticos, oportunidades, decisões e planos ficam em <code>data/users/&lt;sua conta&gt;/</code>, que a plataforma bloqueia para qualquer outra conta — inclusive o dono do artefato. O app só usa o id da sessão; nenhum identificador digitado ou de URL entra no caminho.'}</li>
+  <li><b>Catálogo compartilhado:</b> Base de Soluções (produtos, documentação, fontes oficiais, links TDN) é uma só para todos os executivos ${window.__HOSTED__ ? 'com acesso à plataforma' : 'com acesso de colaborador'}.</li></ul></div>`;
+  h += window.__HOSTED__
+    ? `<div class="card"><h3>Login e acesso</h3><p class="sm">O login é feito pelo <b>Cloudflare Access</b>, com o seu e-mail corporativo. <b>O app não implementa cadastro, senha nem confirmação de e-mail</b>, e nenhuma tela simula isso. Sem sessão válida do Access, o app não carrega a carteira.</p>
+  <p class="sm">Para dar acesso a outro executivo, fale com o administrador da plataforma. Cada um passa a ter a própria carteira vazia e privada.</p></div>`
+    : `<div class="card"><h3>Login por e-mail e senha — limite desta plataforma</h3><p class="sm">Este app roda como artefato da plataforma e <b>não pode chamar outro servidor</b> (CSP). Por isso o login, a senha, a sessão e o logout são os da própria conta claude.ai de quem abre o link; <b>o app não implementa cadastro, senha, hash nem confirmação de e-mail</b>, e nenhuma tela simula isso. Para encerrar o acesso, saia da conta na plataforma — sem sessão, o app não carrega a carteira.</p>
   <p class="sm">Para dar acesso a outro executivo: compartilhe o artefato com ele como <b>colaborador</b> (nível que permite gravar no catálogo). Sem esse nível ele lê o catálogo, mas não grava. Cada um passa a ter a própria carteira vazia e privada.</p></div>`;
   const nm = x => who(x);
   h += `<div class="card"><div class="row"><h3>Catálogo compartilhado</h3><span class="sp"></span><button class="btn ghost sm" data-a="catRefresh">Reler catálogo</button></div>
@@ -4614,7 +4646,7 @@ function vIntegra() {
   h += `<div class="card"><h3>Regras já implementadas</h3><ul class="sm"><li><b>Vínculo e duplicidade:</b> id externo → CNPJ+código → CNPJ → código. Coincidência parcial vira "revisar"; id externo contraditório com o CNPJ, CNPJ repetido ou código divergente vira "conflito". Nada é mesclado ou gravado automaticamente.</li>
   <li><b>Conflito de sincronização:</b> valor externo diferente do interno gera divergência campo a campo; o dado interno confirmado nunca é sobrescrito.</li>
   <li><b>Autorização:</b> toda operação passa por <code>intRun</code>, que exige conta autenticada, conector ativo e entrega apenas a carteira do próprio executivo.</li>
-  <li><b>Credenciais:</b> nunca ficam no app. Quando houver conector, as chaves serão segredos do backend (Worker). Pendência de projeto: como o backend verificará a identidade do executivo — o artefato não envia prova de identidade ao Worker hoje.</li></ul></div>`;
+  <li><b>Credenciais:</b> nunca ficam no app. Quando houver conector, as chaves serão segredos do backend (Worker). ${window.__HOSTED__ ? 'A identidade do executivo chega ao Worker pelo Cloudflare Access.' : 'Pendência de projeto: como o backend verificará a identidade do executivo — o artefato não envia prova de identidade ao Worker hoje.'}</li></ul></div>`;
   const L = S.intlog.slice(0, 30);
   h += `<div class="card"><h3>Registro de operações e erros</h3>${L.length ? `<div class="tw"><table><thead><tr><th>Quando</th><th>Sistema</th><th>Operação</th><th>Resultado</th><th>Detalhe</th></tr></thead><tbody>${L.map(x => `<tr><td>${esc(dtBR(x.at))}</td><td>${esc(x.sistema)}</td><td>${esc(x.op)}</td><td>${pill(x.estado, x.estado === 'ok' ? 'ok' : x.estado === 'erro' ? 'bad' : 'warn')}</td><td class="sm">${esc(x.msg || (x.n != null ? x.n + ' registro(s)' : ''))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted">Nenhuma operação registrada.</p>'}</div>`;
   return h;
@@ -6845,7 +6877,12 @@ function pesqCard(rec) {
 
 function vIA() {
   const cfg = aiCfg(), st = aiStatus(), req = UI.pesqReq;
-  let h = `<div class="alert b"><b>Limite do ambiente deste artefato.</b> Ele não possui backend nem armazenamento seguro de segredos e o navegador do artefato é impedido de chamar outros hosts. Por isso <b>não existe campo de chave aqui</b>: as chaves de Gemini, OpenAI e Anthropic existem somente como segredos do backend (Worker). O app gera o pedido, o backend o executa e você importa a resposta para revisão. Em aplicativo hospedado fora do artefato, com <code>ALLOWED_ORIGINS</code> no Worker, a chamada passa a ser direta.</div>
+  let h = window.__HOSTED__
+    ? `<div class="alert b"><b>Suas chaves de IA.</b> Cada executivo usa a própria chave, cadastrada em <b>Minhas chaves de IA</b> mais abaixo. Ela fica só neste navegador; sem chave, a carteira e o diagnóstico funcionam, mas pesquisa, OCR e análise reforçada ficam indisponíveis.</div>
+  ${iaProvCards()}
+  <div class="card"><h3>Segurança das chaves e dados enviados</h3><ul class="sm"><li>Sua chave é enviada ao servidor só junto de cada pedido, para repasse ao provedor; o servidor não a grava nem a registra.</li><li>Ela não entra em relatórios, exportações, backups ou logs. Arquivos de resposta que pareçam conter credenciais são recusados na importação.</li><li>O servidor recusa pedidos com CNPJ ou valores em R$ e não registra o conteúdo.</li><li>Enviado ao provedor: segmento, processos e necessidades (revisáveis antes de gerar o arquivo) e, quando você incluir, nomes de produtos. <b>Nunca</b>: CNPJ, razão social de cliente, valores, fichas ou documentos completos.</li><li>Quando a pesquisa web é solicitada, o resultado informa se ela realmente ocorreu. Sem confirmação, o conteúdo é tratado como conhecimento do modelo, não como consulta atualizada.</li></ul>
+  <p class="sm muted">Use “Testar” em cada provedor com a sua chave antes de depender dele.</p></div>`
+    : `<div class="alert b"><b>Limite do ambiente deste artefato.</b> Ele não possui backend nem armazenamento seguro de segredos e o navegador do artefato é impedido de chamar outros hosts. Por isso <b>não existe campo de chave aqui</b>: as chaves de Gemini, OpenAI e Anthropic existem somente como segredos do backend (Worker). O app gera o pedido, o backend o executa e você importa a resposta para revisão. Em aplicativo hospedado fora do artefato, com <code>ALLOWED_ORIGINS</code> no Worker, a chamada passa a ser direta.</div>
   ${iaProvCards()}
   <div class="card"><h3>Segurança das chaves e dados enviados</h3><ul class="sm"><li>Segredos do backend: <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>GROQ_API_KEY</code> (<code>wrangler secret put NOME</code>; remover: <code>wrangler secret delete NOME</code>).</li><li>Nunca entram no código do artefato, no navegador, em localStorage, no banco, em relatórios, exportações, backups ou logs. Arquivos de resposta que pareçam conter credenciais são recusados na importação.</li><li>O backend recusa pedidos com CNPJ ou valores em R$ e não registra o conteúdo.</li><li>Enviado ao provedor: segmento, processos e necessidades (revisáveis antes de gerar o arquivo) e, quando você incluir, nomes de produtos. <b>Nunca</b>: CNPJ, razão social de cliente, valores, fichas ou documentos completos.</li><li>Quando a pesquisa web é solicitada, o resultado informa se ela realmente ocorreu. Sem confirmação, o conteúdo é tratado como conhecimento do modelo, não como consulta atualizada.</li></ul>
   <p class="sm muted">Não validado contra os provedores reais neste ambiente (sem acesso às APIs): o Worker foi testado com respostas simuladas seguindo a documentação oficial. Use “Testar” em cada provedor com a sua chave antes de depender dele.</p></div>`;
@@ -9831,7 +9868,7 @@ document.addEventListener('toggle', e => { if (e.target?.id === 'semana') UI.sem
   });
 
   /* ---------- paleta Ctrl/⌘+K ---------- */
-  const telas = () => [...document.querySelectorAll('#nav .sb-item[data-v]')].map(b => ({ v: b.dataset.v, t: b.dataset.tip || b.textContent.trim() })).filter(x => x.t);
+  const telas = () => [...document.querySelectorAll('#nav .sb-item[data-v]')].map(b => ({ v: b.dataset.v, t: b.dataset.tip || b.textContent.trim() })).filter(x => x.t).filter((x, i, a) => a.findIndex(y => y.v === x.v) === i);
   const fn = n => (typeof n === 'function');
   function palList(q) {
     const nq = fn(norm) ? norm(q).trim() : q.toLowerCase().trim(), out = [];
@@ -10289,13 +10326,29 @@ function solStrip(c, o) {
     const s = app.querySelector('#shcard'); if (!s || s.querySelector('.shc-tg')) return;
     s.classList.add('shc-c'); s.querySelector('h3')?.insertAdjacentHTML('afterend', '<button type="button" class="btn ghost sm shc-tg" aria-expanded="false">Configurar</button>');
   }
+  /* Ficha do Cliente e tabelas largas (Q10): só classes/atributos/wrappers; ações e dados intactos */
+  function ficha(app) {
+    if (UI.view !== 'cliente') return;
+    app.querySelector('.row [data-a=pesqCli]')?.closest('.row')?.classList.add('m-chead');
+    app.querySelectorAll(':scope > .alert.b:not([data-ma])').forEach(a => { a.dataset.ma = '1'; a.classList.add('m-al'); a.setAttribute('role', 'button'); a.tabIndex = 0; a.setAttribute('aria-expanded', 'false'); });
+    const on = app.querySelector('.ctabs button.on'); if (on && app.dataset.mtab !== UI.sel + '|' + UI.ctab) { app.dataset.mtab = UI.sel + '|' + UI.ctab; on.parentElement.scrollLeft = Math.max(0, on.offsetLeft - 16); }
+  }
+  function tabelas(app) {
+    app.querySelectorAll('table').forEach(t => {
+      if (t.closest('.tw, .tbl-wrap, .m-ts, table.chain') || t.parentElement.closest('table')) return;
+      const p = t.parentElement; if (t.scrollWidth <= p.clientWidth + 1) return;
+      const w = document.createElement('div'); w.className = 'm-ts'; p.insertBefore(w, t); w.appendChild(t);
+    });
+  }
+  const alToggle = e => { const a = e.target.closest && e.target.closest('.m-al'); if (!a || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') || e.target.closest('a,button,input,select,textarea')) return; if (e.type === 'keydown') e.preventDefault(); a.setAttribute('aria-expanded', String(a.classList.toggle('open'))); };
+  document.addEventListener('click', alToggle); document.addEventListener('keydown', alToggle);
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('.mo-tg, .shc-tg'); if (!t) return;
     const box = t.classList.contains('mo-tg') ? t.closest('.opp') : t.closest('#shcard'), on = box.classList.toggle('open'); t.setAttribute('aria-expanded', String(on));
     t.textContent = t.classList.contains('mo-tg') ? (on ? 'Recolher detalhes' : 'Ver evidências e detalhes') : (on ? 'Recolher' : 'Configurar');
   });
   let q = 0;
-  const run = () => { q = 0; try { logo(); const app = $1('#app'); if (!app) return; if (!mq.matches) { app.classList.remove('m-geral'); return; } hero(app); opps(app); sheet(app); } catch { /* shell ainda não montado */ } };
+  const run = () => { q = 0; try { logo(); const app = $1('#app'); if (!app) return; if (!mq.matches) { app.classList.remove('m-geral'); return; } hero(app); opps(app); sheet(app); ficha(app); tabelas(app); } catch { /* shell ainda não montado */ } };
   const sched = () => { if (!q) q = requestAnimationFrame(run); };
   const app = $1('#app'); if (app) new MutationObserver(sched).observe(app, { childList: true, subtree: true });
   mq.addEventListener?.('change', sched); sched();

@@ -29,7 +29,7 @@
   });
 
   /* ---------- paleta Ctrl/⌘+K ---------- */
-  const telas = () => [...document.querySelectorAll('#nav .sb-item[data-v]')].map(b => ({ v: b.dataset.v, t: b.dataset.tip || b.textContent.trim() })).filter(x => x.t);
+  const telas = () => [...document.querySelectorAll('#nav .sb-item[data-v]')].map(b => ({ v: b.dataset.v, t: b.dataset.tip || b.textContent.trim() })).filter(x => x.t).filter((x, i, a) => a.findIndex(y => y.v === x.v) === i);
   const fn = n => (typeof n === 'function');
   function palList(q) {
     const nq = fn(norm) ? norm(q).trim() : q.toLowerCase().trim(), out = [];
