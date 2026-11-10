@@ -132,7 +132,13 @@ const solutions = [
 { id:'dotz', nome:'Dotz', cat:'Vendas', finalidade:'Plataforma de engajamento e fidelização B2B2C, em parceria estratégica com a TOTVS (caso de uso em supermercados).', publico:'Varejo/supermercados que querem programa de fidelidade integrado ao ERP.', integraProtheus:null, fornecedor:'Dotz (parceiro TOTVS)',
   fonte:src('TI Inside – Sistema de gestão da TOTVS integra solução de engajamento e fidelização da Dotz para supermercados','https://tiinside.com.br/03/01/2023/sistema-de-gestao-da-totvs-integra-solucao-de-engajamento-e-fidelizacao-para-supermercados/'), consulta:C2, limites:'FONTE SECUNDÁRIA (2023). Qual linha ERP foi integrada (Winthor/Protheus) não especificado na fonte consultada.', kw:/\bdotz\b/i },
 { id:'lexos', nome:'Lexos (hub de integração com marketplaces)', cat:'Varejo', finalidade:'Hub de integração com marketplaces (Magalu, Mercado Livre e outros), adquirido pela TOTVS em 2023 para reforçar o Digital Commerce.', publico:'Varejistas que vendem em múltiplos marketplaces.', integraProtheus:null,
-  fonte:src('Mercado&Consumo – Totvs adquire Lexos mirando PMEs brasileiras','https://mercadoeconsumo.com.br/16/05/2023/ecommerce/totvs-adquire-lexos-mirando-pmes-brasileiras/'), consulta:C2, limites:'Hoje é empresa do grupo TOTVS (não mais parceiro externo); sinergia prevista com RD Station segundo a fonte.', kw:/\blexos\b/i }
+  fonte:src('Mercado&Consumo – Totvs adquire Lexos mirando PMEs brasileiras','https://mercadoeconsumo.com.br/16/05/2023/ecommerce/totvs-adquire-lexos-mirando-pmes-brasileiras/'), consulta:C2, limites:'Hoje é empresa do grupo TOTVS (não mais parceiro externo); sinergia prevista com RD Station segundo a fonte.', kw:/\blexos\b/i },
+
+/* ===== Rodada 27 (10/11/2026): gaps de catálogo achados na pesquisa do segmento Varejo (Universo TOTVS 2026) ===== */
+{ id:'equals', nome:'Equals (conciliação financeira)', cat:'Techfin', finalidade:'Conciliação automática de Pix/cartão/boleto, com agentes de IA; integração nativa com 5 ERPs TOTVS (RM, Datasul, Protheus, Winthor, Consinco).', publico:'Clientes com múltiplos meios de pagamento e canais de venda.', integraProtheus:true,
+  fonte:src('Central do Varejo – Conciliação financeira: Equals lança agentes de IA da TOTVS','https://centraldovarejo.com.br/?p=46747'), consulta:C2, limites:'Unidade incorporada com a compra da Linx (concluída em 02/03/2026); confirmar modelo de contratação.', kw:/\bequals\b.{0,15}(concilia|totvs)/i },
+{ id:'totvs_pay', nome:'TOTVS Pay', cat:'Techfin', finalidade:'Recebimento de cartão de crédito, Pix e boleto dentro do ERP (parceria com a Zoop), sem mensalidade nem setup, ativação em minutos.', publico:'Clientes que hoje negociam taxas/integrações direto com adquirentes.', integraProtheus:null,
+  fonte:src('Central do Varejo – TOTVS lança o TOTVS Pay para receber cartão, Pix e boleto dentro do ERP','https://centraldovarejo.com.br/?p=46691'), consulta:C2, limites:'Lançamento muito recente (Universo TOTVS 2026); a TOTVS não informou quais ERPs recebem na 1ª fase — confirmar elegibilidade antes de ofertar.', kw:/totvs pay/i }
 ];
 
 /* Padrões para identificar produtos citados em planilha/fichas/documentos (NÃO prova parque completo) */
@@ -156,6 +162,7 @@ const NEEDS = {
  treinamento:/treinamento|capacita|ado[cç][aã]o|uso do sistema|parametriza|customiza|\bgap\b/i,
  nfse:/nfs-?e|nota de servi[cç]o|\biss\b|munic[ií]pi/i,
  obras:/\bobras?\b|empreendimento|medi[cç][aã]o|canteiro|or[cç]amento de obra|engenharia/i,
+ pdv:/frente de loja|\bpdv\b|ponto de venda|autoatendimento|self-?checkout|omnichannel|omni-?channel|multicanal|marketplace|loja virtual/i,
  retencao:/cancel|churn|insatisf|reclama|concorr[eê]n|troca de (erp|sistema)|migrar para|renegocia|risco de perda/i
 };
 
@@ -219,7 +226,28 @@ const segments = [
  processos:[],tendencias:[{t:'Caso Vittia (maio/2026): empresa do agro adotou Suíte Logística TOTVS (Agendamentos, WMS SaaS, YMS, Checklist, Coleta e Entrega, Roteirização e Entrega). É EVIDÊNCIA DE CASO, não de dor do segmento.',fonte:src('Baguete – Vittia impulsiona a gestão integrada com TOTVS','https://www.baguete.com.br/noticias/vittia-impulsiona-a-gestao-integrada-com-conjunto-de-solucoes-da-totvs','2026-05-14'),needs:['logistica'],impacto:'Hipótese de logística integrada.'}],
  dores:[],demandas:[],aplicacoes:[{sol:'logistica',porque:'Caso de referência de segmento.'}],perguntas:['Qual o principal gargalo operacional hoje (colheita, armazenagem, entrega, crédito)?'] },
 { id:'saude', nome:'Saúde', re:/sa[uú]de|hospital|cl[ií]nica|laborat|farm[aá]c|odonto|operadora/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão. Pesquisar fontes oficiais (ANS/ANVISA) antes de abordar.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] },
-{ id:'varejo', nome:'Varejo', re:/varejo|loja|farmácia|supermerc|moda|e-?commerce/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] },
+{ id:'varejo', nome:'Varejo', re:/varejo|loja|farmácia|supermerc|moda|e-?commerce/i, estudo:true,
+ resumo:'Maior aposta recente da TOTVS (aquisição da Linx, R$ 3,05 bi); frente de loja, omnichannel e conciliação de pagamentos concentram o investimento; crédito do consumidor segue restrito.',
+ processos:['Frente de loja / PDV','Gestão de estoque multicanal','Fiscal no caixa (NF/NFC-e)','Conciliação de meios de pagamento','Omnichannel / marketplace'],
+ tendencias:[
+  {t:'TOTVS incorpora ao padrão do Protheus rotinas que hoje exigem 5–6 mil horas de customização; roteiro foca 4 subsegmentos: material de construção, autopeças, eletroeletrônicos e varejo generalista.',fonte:src('Central do Varejo – Protheus passa a trazer no padrão o que o varejo customizava','https://centraldovarejo.com.br/?p=46683','2026 (Universo TOTVS 2026)'),needs:['pdv'],impacto:'Padronização reduz customização e GAP, mas exige mapear o subsegmento do cliente.'},
+  {t:'Storex (frente de loja ex-Linx) processa 30 milhões de vendas/mês em ~5 mil lojas; self-checkout já responde por 40% das vendas da Renner; PDV móvel no Grupo SBF (Centauro/Nike) reduziu caixas fixos a no máximo 4 por loja.',fonte:src('Central do Varejo – Self-checkout já responde por 40% das vendas da Renner','https://centraldovarejo.com.br/?p=46739','2026 (Universo TOTVS 2026)'),needs:['pdv'],impacto:'Frente de loja moderna é tema competitivo ativo entre grandes redes.'},
+  {t:'Novo leiaute fiscal do cupom/nota no PDV pode travar caixas a partir de out/2026: automação comercial e teclados físicos não reconhecem os caracteres alfanuméricos exigidos pelo novo campo.',fonte:src('Tagd Law – Novo modelo de nota fiscal pode travar caixas do varejo a partir de outubro','https://tagdlaw.com.br/novo-modelo-de-nota-fiscal-pode-travar-caixas-do-varejo-a-partir-de-outubro/','2026-09-10'),needs:['fiscal','pdv'],impacto:'Risco operacional imediato: checar se o PDV do cliente já está atualizado.'},
+  {t:'Equals (ex-Linx) ganhou integração nativa com 5 ERPs TOTVS (RM, Datasul, Protheus, Winthor, Consinco); agentes de IA reduzem a checagem diária de conciliação de 50 para 5 minutos.',fonte:src('Central do Varejo – Conciliação financeira: Equals lança agentes de IA da TOTVS','https://centraldovarejo.com.br/?p=46747','2026-10-14 (Universo TOTVS 2026)'),needs:['financeiro'],impacto:'Oportunidade de automação de conciliação para clientes com múltiplos meios de pagamento.'},
+  {t:'TOTVS Pay (lançado com a Zoop) permite receber cartão, Pix e boleto dentro do ERP, sem mensalidade/setup, ativação em minutos (vs. 45–60 dias no modelo tradicional de negociar com adquirentes).',fonte:src('Central do Varejo – TOTVS lança o TOTVS Pay para receber cartão, Pix e boleto dentro do ERP','https://centraldovarejo.com.br/?p=46691','2026 (Universo TOTVS 2026)'),needs:['financeiro'],impacto:'Oferta própria recente — ainda sem clareza de quais ERPs recebem na 1ª fase; validar elegibilidade antes de ofertar.'},
+  {t:'Endividamento das famílias brasileiras seguia em torno de 81–82% em 2026 (recorde da série Peic/CNC), com inadimplência na faixa de 29–30%; crédito mais seletivo e juros altos restringem categorias discricionárias (vestuário, bens duráveis).',fonte:src('Paraíba Business – Endividamento recua a 81,6% e inadimplência cai a 29,3% em outubro, diz CNC','https://paraibabusiness.com.br/endividamento-recua-a-816-e-inadimplencia-cai-a-293-em-outubro-diz-cnc/','2026-10'),needs:['financeiro'],impacto:'Pressão sobre vendas financiadas/crediário; reforça o valor de antecipação de recebíveis e cobrança eficiente.'}
+ ],
+ dores:['Frente de loja/PDV não integrada ao estoque e ao financeiro (hipótese setorial)','Falta de visão unificada de estoque entre loja física, e-commerce e marketplace (hipótese setorial)','Conciliação manual de Pix/cartão/boleto por canal (hipótese setorial)'],
+ demandas:['Frente de loja integrada ao ERP (PDV, autoatendimento, mobilidade)','Omnichannel com estoque único entre canais','Conciliação e meios de pagamento dentro do ERP'],
+ aplicacoes:[
+  {sol:'linx',porque:'Frente de loja (Storex/Linx POS), TEF e PDV móvel — maior ativo de varejo da TOTVS; convivência com Protheus ainda em evolução.'},
+  {sol:'totvs_omni',porque:'Omnichannel/marketplace com estoque unificado entre canais.'},
+  {sol:'systock',porque:'Inteligência de estoque integrada ao Winthor.'},
+  {sol:'equals',porque:'Conciliação nativa de Pix/cartão com 5 ERPs TOTVS.'},
+  {sol:'totvs_pay',porque:'Recebimento de cartão/Pix/boleto dentro do ERP.'},
+  {sol:'varejonline',porque:'Entrada para pequeno varejo.'}
+ ],
+ perguntas:['Qual sistema de frente de loja/PDV é usado hoje e ele já está integrado ao estoque e ao ERP?','Quantos canais de venda ativos (loja física, e-commerce, marketplace) e como é a visão de estoque entre eles?','O PDV/automação comercial já foi adaptado ao novo leiaute fiscal da Reforma Tributária?','Como é feita hoje a conciliação de Pix, cartão e boleto?'] },
 { id:'educacional', nome:'Educacional', re:/educa|escola|faculdade|ensino|universid/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] },
 { id:'financial', nome:'Financial Services', re:/financ|banco|seguro|cr[eé]dito|cons[oó]rcio|fintech/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] },
 { id:'hospitalidade', nome:'Hospitalidade e Turismo', re:/hotel|hospitalid|turismo|resort|restaurante/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] },
@@ -242,7 +270,13 @@ const transversal = [
  validar:'Situação atual da liminar/multas após o julgamento do STF NÃO foi verificada: confirmar antes de usar urgência com o cliente.' },
 { id:'nfse', nome:'NFS-e de padrão nacional', need:'nfse',
  fatos:[{t:'Res. CGSN 191/2026: emissor nacional obrigatório para ME/EPP do Simples a partir de 01/11/2026 (antes previsto para 01/09/2026); municípios aderindo ao padrão desde 01/01/2026.',fonte:src('Senior – Portal de Exigências Legais','https://documentacao.senior.com.br/exigenciaslegais/noticias/federal/2026/2026-08-11-simples-nacional-resolucao-cgsn-no-191-2026-utilizacao-do-emissor-da-nfs-e-de-padrao-nacional-sera-a-partir-de-novembro','2026-08-11')}],
- validar:'Confirmar no portal gov.br/nfse a regra vigente para o município e o regime do cliente.' }
+ validar:'Confirmar no portal gov.br/nfse a regra vigente para o município e o regime do cliente.' },
+{ id:'nfce_pdv', nome:'Novo leiaute fiscal no PDV (risco de travamento de caixa)', need:'fiscal',
+ fatos:[
+  {t:'Automação comercial e teclados físicos de PDV podem não reconhecer caracteres alfanuméricos do novo campo fiscal, com risco de travar caixas a partir de out/2026.',fonte:src('Tagd Law – Novo modelo de nota fiscal pode travar caixas do varejo a partir de outubro','https://tagdlaw.com.br/novo-modelo-de-nota-fiscal-pode-travar-caixas-do-varejo-a-partir-de-outubro/','2026-09-10')},
+  {t:'Lojistas precisam atualizar softwares de automação e equipamentos de frente de loja para as novas regras fiscais.',fonte:src('Sitecontabil – Setor varejista enfrenta novas regras fiscais e corrida contra o tempo','https://sitecontabil.com.br/noticias_empresariais/ler/setor-varejista-enfrenta-novas-regras-fiscais-e-corrida-contra-o-tempo','2026-09-15')}
+ ],
+ validar:'Confirmar no site oficial da TOTVS/NF-e se o leiaute e o cronograma mudaram desde esta pesquisa; não comunicar prazo fechado ao cliente sem checar.' }
 ];
 
 return { consulta:C, solutions, productPatterns, modalidadeRe, NEEDS, segments, transversal, sol:id=>solutions.find(s=>s.id===id) };
