@@ -1583,7 +1583,7 @@ const KIND_RULES = [
   ['imposto', /\b(iss|issqn|pis|cofins|icms|csll|irrf|inss|ipi)\b|reten[cç][aã]o|imposto|tribut/i],
   ['desconto', /desconto|abatimento|bonifica/i],
   ['excedente', /excedente|excesso|hora extra|adicional|ultrapass/i],
-  ['recorrente', /mensalidade|licen[cç]a|assinatura|subscription|suporte|manuten[cç][aã]o|\bscc\b|cloud|\bcdu\b|\bsmse\b|plataforma|saas|hospedagem|recorr|cess[aã]o de uso|servi[cç]o continuado/i],
+  ['recorrente', /\bsms (?:full|lgt|totvs)\b|mensalidade|licen[cç]a|assinatura|subscription|suporte|manuten[cç][aã]o|\bscc\b|cloud|\bcdu\b|\bsmse\b|plataforma|saas|hospedagem|recorr|cess[aã]o de uso|servi[cç]o continuado/i],
   ['avulso', /projeto|implanta|consultoria|treinamento|hora t[eé]cnica|horas?\b|migra[cç]|atualiza[cç]|desenvolvimento|visita|diagn[oó]stico|servi[cç]o avulso/i]
 ];
 const KIND_LABEL = { recorrente: 'Recorrente', avulso: 'Avulso', excedente: 'Excedente', desconto: 'Desconto', imposto: 'Imposto', total: 'Total do documento (excluído)', outro: 'Não classificado' };
@@ -1915,6 +1915,8 @@ function diffSnap(a, b) {
 }
 function analyzeClient(c, st) {
   c.segInfo = classifySeg(c, st.meta.segOv);
+  /* rodada 31: item que ficou 'outro' por inferência é reavaliado quando as regras ganham termos (ex.: SMS = manutenção recorrente); escolha manual nunca é alterada */
+  (c.fichas || []).forEach(f => (f.items || []).forEach(it => { if (it.kind === 'outro' && it.kindMode !== 'manual') it.kind = classifyItem(it.desc || ''); }));
   markDuplicates(c);
   c.productsIdent = identifiedProducts(c);
   consInit(c); cadInit(c); migrateDecl(c); relSync(c); fisSync(c);
