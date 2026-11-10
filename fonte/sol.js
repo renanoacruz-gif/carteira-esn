@@ -9,7 +9,10 @@ const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const hostOf = u => { try { return new URL(u).hostname; } catch { return ''; } };
 const isOfficialUrl = u => OFFICIAL_HOST.test(hostOf(u));
 const today = () => new Date().toISOString().slice(0, 10);
-const TIPO_SEED = { protheus: 'produto', cfgtrib: 'modulo', transmite: 'complementar', rh: 'modulo', ponto: 'modulo', sst: 'modulo', scc: 'servico', cloud: 'servico' };
+const TIPO_SEED = { protheus: 'produto', cfgtrib: 'modulo', transmite: 'complementar', rh: 'modulo', ponto: 'modulo', sst: 'modulo', scc: 'servico', cloud: 'servico',
+  rm_erp: 'produto', winthor_erp: 'produto', winthor_wms: 'modulo', rm_labore: 'modulo', rm_smartview: 'modulo', rm_portal: 'modulo', datasul_suprimentos: 'modulo', totvs_performance: 'servico', totvs_rental: 'produto',
+  totvs_juridico: 'produto', totvs_hospitalidade: 'produto', totvs_educacional: 'produto', rm_saude: 'produto', datasul_gps: 'produto', linx: 'produto', rdstation: 'produto', varejonline: 'produto',
+  corten: 'plataforma', lynn: 'plataforma', carol: 'plataforma', intera: 'plataforma' };
 
 function newSol(o = {}) {
   return { id: 's_' + uid(), nome: '', tipo: 'produto', categoria: '', linha: '', segmentos: [], necessidades: [], dores: [], funcionalidades: [], prerequisitos: [], integracoes: [], fontes: [], termos: [], termosRe: '', fornecedor: 'TOTVS', disponibilidade: '', limites: '', obs: '', status: 'NECESSITA VALIDAÇÃO', oficial: false, arquivado: false, origem: 'manual', atualizadoEm: today(), rev: 1, pend: [], hist: [], sigla: '', refId: '', codOferta: '', grupo: '', refStatus: '', refNota: '', finalidade: '', processos: [], lacunas: [], notasInt: [], ...o };
@@ -23,7 +26,8 @@ function seedSolutions() {
     const segs = KB.segments.filter(g => g.aplicacoes.some(a => a.sol === s.id)).map(g => g.id);
     const flag = /secund|n[ãa]o verificad|validar|imprensa|inferid|sem oferta oficial|n[ãa]o h[áa] fonte oficial/i.test(s.limites + ' ' + s.nome + ' ' + (s.fonte.t || ''));
     const tp = TIPO_SEED[s.id] || 'complementar';
-    return newSol({ id: s.id, nome: s.nome, tipo: tp, ...(tp === 'servico' ? { fornecedor: 'TOTVS (a confirmar)', disponibilidade: 'A validar com o portfólio de serviços TOTVS' } : {}), categoria: s.cat, linha, segmentos: segs, necessidades: needs, funcionalidades: [it(s.finalidade)], limites: s.limites, fontes: [src],
+    const fornec = s.fornecedor ? { fornecedor: s.fornecedor, disponibilidade: s.disponibilidade || 'Parceria TOTVS — ver programa de parceiros' } : tp === 'servico' ? { fornecedor: 'TOTVS (a confirmar)', disponibilidade: 'A validar com o portfólio de serviços TOTVS' } : {};
+    return newSol({ id: s.id, nome: s.nome, tipo: tp, ...fornec, categoria: s.cat, linha, segmentos: segs, necessidades: needs, funcionalidades: [it(s.finalidade)], limites: s.limites, fontes: [src],
       integracoes: s.integraProtheus === true ? [{ sistema: 'Protheus', estado: 'confirmada', t: 'Integração/compatibilidade com Protheus documentada na fonte', o: 'base inicial', f: s.fonte.t, loc: '' }] : s.integraProtheus === false ? [{ sistema: 'Protheus', estado: 'nao_integra', t: 'Não integra com Protheus segundo a fonte', o: 'base inicial', f: s.fonte.t, loc: '' }] : [{ sistema: 'Protheus', estado: 'nao_verificada', t: 'Compatibilidade com Protheus não verificada', o: 'base inicial', f: s.fonte.t, loc: '' }],
       termosRe: s.kw?.source || '', status: flag ? 'NECESSITA VALIDAÇÃO' : 'Em revisão', oficial: !flag && !!s.fonte.u && isOfficialUrl(s.fonte.u), origem: 'base inicial', atualizadoEm: s.consulta, publicoTxt: s.publico,
       hist: [{ at: new Date().toISOString(), rev: 1, acao: 'carga inicial', resumo: 'Registro criado a partir da pesquisa feita em ' + s.consulta + '. Tipo e linha atribuídos por inferência — revisar.' }] });
