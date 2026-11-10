@@ -767,6 +767,46 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 .ckf-ch button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 @media print{.ck-ch,.ckf{background:none;color:inherit;box-shadow:none}}
 @media(max-width:900px){#top .th-btn{display:none}}
+
+/* ===== Limpeza visual: textos recolhidos, cartões dobráveis, faixa de status compacta ===== */
+.ck-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.ck-c,.ck-bars li,.ck-bars li>div{min-width:0}
+.ck-bars li>div>a,.ck-bars li>div>b{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.ck-bars li>div>span{flex:none}.ck-bars i{overflow:hidden}
+.cl-x{position:relative;cursor:pointer}
+.cl-x[role=button]{padding-right:28px}
+.cl-x[role=button]::after{content:"";position:absolute;right:6px;top:.25em;width:14px;height:14px;background:currentColor;opacity:.55;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform var(--t)}
+.cl-x.open::after{transform:rotate(180deg)}
+.cl-x:focus-visible,.cl-hd:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:var(--r-sm)}
+.cl-p:not(.open){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden;max-width:none}
+.cl-p.open{max-width:none}
+.cl-al:not(.open){max-height:calc(1.5em + 2*var(--s3) + 2px);overflow:hidden}
+.cl-al[role=button]::after{top:calc(var(--s3) + 2px);right:var(--s3)}
+.cl-ul:not(.open){display:none}.cl-ulb{margin:var(--s1) 0}
+.cl-fold>.cl-hd{cursor:pointer;position:relative;padding-right:28px;margin-bottom:0}
+.cl-fold>.cl-hd::after{content:"";position:absolute;right:0;top:50%;width:16px;height:16px;margin-top:-8px;background:var(--txt2);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform var(--t)}
+.cl-fold:not(.cl-closed)>.cl-hd::after{transform:rotate(180deg)}
+.cl-fold:not(.cl-closed)>.cl-hd{margin-bottom:var(--s3)}
+.cl-fold.cl-closed>:not(.cl-hd){display:none}
+.cl-fold.cl-closed{padding-top:var(--s4);padding-bottom:var(--s4)}
+#app .m-ts{max-width:100%;overflow-x:auto}
+#app .row select,#app .card label>select{max-width:100%}#app .row>label{min-width:0}
+@media(min-width:901px){
+#app .opp.mo-c:not(.open)>*:not(.row):not(.jd):not(.mo-tg):not(.solstrip):not(.sol-lb):not(.sol-h){display:none}
+#app .opp .mo-tg{margin:var(--s2) 0 0}
+#app .strip{display:flex;gap:var(--s2);overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+#app .strip .sti{flex:0 0 auto;display:flex;align-items:center;gap:var(--s2);padding:6px var(--s3);border-top-width:1px;border-radius:var(--r-pill);white-space:nowrap}
+#app .strip .sti>div:not(.stl){display:flex;align-items:center;gap:6px}#app .strip .stl{margin:0}
+#app .ctabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}#app .ctabs button{flex:0 0 auto;white-space:nowrap}
+.ck-ch{padding:var(--s4) var(--s5);gap:var(--s3)}.ck-ch>.row h2{font-size:var(--fs-4xl)}.ck-rd{padding:var(--s3) var(--s4)}
+.ck-id>i{width:44px;height:44px;border-radius:12px;font-size:var(--fs-xl)}.ck-st b{font-size:22px}
+}
+@media print{.cl-p,.cl-al{max-height:none!important;display:block!important;overflow:visible!important}.cl-ul{display:block!important}.cl-ulb,.mo-tg{display:none!important}.cl-fold.cl-closed>*{display:revert!important}#app .opp.mo-c>*{display:revert!important}}
+.cl-al:not(.open){max-height:calc(1lh + 2*var(--s3));white-space:nowrap}.cl-al:not(.open)>*{display:inline}.cl-al:not(.open){text-overflow:ellipsis}
+.cl-p.l2:not(.open){-webkit-line-clamp:2}
+@media(min-width:1100px){#app .ckf-ch+.filters{display:grid;grid-template-columns:1.6fr repeat(5,minmax(0,1fr));gap:var(--s2)}#app .ckf-ch+.filters>*{min-width:0!important;width:100%}}
+.cl-al:not(.open)>*{margin-right:.35em}
+#app .tbl-wrap{max-width:100%;overflow-x:auto}
 </style>
 <script>try{var t=localStorage.getItem('rf.theme');if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -10113,6 +10153,10 @@ function ckBento() {
   const mrrCard = `<div class="card ck-c"><h3>MRR por cliente</h3>${mr.length ? `<ul class="ck-bars">${mr.slice(0, TOP).map(c => `<li><div><a href="#" data-a="open" data-k="${esc(c.key)}">${esc(c.name)}</a><span>${fmtBRL(c.mrr)}</span></div><i aria-hidden="true"><b style="width:${(100 * c.mrr / mx).toFixed(1)}%"></b></i></li>`).join('')}</ul>${mr.length > TOP ? `<a class="sm" href="#" data-a="nav" data-v="clientes">Ver os ${mr.length} clientes</a>` : ''}<p class="sm muted ck-ft">${chip('FATO')} informado na planilha</p>` : '<p class="muted sm">Nenhum cliente com MRR informado na planilha.</p>'}</div>`;
   /* Oportunidades */
   const opCardH = `<div class="card ck-c"><h3>Oportunidades mapeadas</h3><div class="ck-big"><b>${all.length}</b><span>em ${cliOp} de ${s.n} cliente(s)</span></div>${all.length ? `<div class="ck-split" role="img" aria-label="${nI} identificada(s) e ${nH} hipótese(s)">${nI ? `<i class="ok" style="flex:${nI}"></i>` : ''}${nH ? `<i class="hy" style="flex:${nH}"></i>` : ''}</div>` : ''}<div class="ck-lg"><span><b class="ok">${nI}</b> identificada(s)</span><span><b class="hy">${nH}</b> hipótese(s) de investigação</span></div><a class="sm ck-ft" href="#" data-a="nav" data-v="oport">Ver oportunidades</a></div>`;
+  /* Soluções TOTVS mais sugeridas (por nº de clientes) — é o que a ferramenta existe para responder */
+  const sm = new Map(); all.forEach(x => (x.o.sols || []).forEach(sl => { if (!sl.nome) return; if (!sm.has(sl.nome)) sm.set(sl.nome, new Set()); sm.get(sl.nome).add(x.c.key); }));
+  const sl = [...sm.entries()].map(([n, st]) => [n, st.size]).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])), smx = sl.length ? sl[0][1] : 0;
+  const solCard = `<div class="card ck-c"><h3>Soluções TOTVS mais sugeridas</h3>${sl.length ? `<ul class="ck-bars">${sl.slice(0, 5).map(([n, k]) => `<li><div><b title="${esc(n)}">${esc(n)}</b><span>${k} cliente(s)</span></div><i aria-hidden="true"><b style="width:${(100 * k / smx).toFixed(1)}%"></b></i></li>`).join('')}</ul><a class="sm ck-ft" href="#" data-a="nav" data-v="oport">Ver todas as ${sl.length} em Oportunidades</a>` : '<p class="muted sm">Nenhuma solução sugerida ainda. Anexe fichas de faturamento para o motor comparar com a Base de Soluções.</p>'}</div>`;
   /* Prontidão dos dados */
   const pend = typeof pendItems === 'function' ? pendItems().length : 0;   /* mesma contagem do menu lateral */
   const prCard = `<div class="card ck-c"><h3>Prontidão dos dados</h3><div class="ck-rings"><div>${ckRing(s.withF, s.n, 'Fichas confirmadas', s.withF ? 'ok' : 'off')}<span><b>Fichas</b>confirmadas</span></div><div>${ckRing(s.mrrN, s.n, 'MRR informado')}<span><b>MRR</b>informado</span></div></div>${pend ? `<div class="ck-pend"><b>${pend}</b><span>pendência(s) documental(is)</span><a href="#" data-a="nav" data-v="pend">Resolver</a></div>` : '<p class="sm muted ck-ft">Sem pendências documentais.</p>'}</div>`;
@@ -10126,7 +10170,7 @@ function ckBento() {
     const cell = (r, f) => { const x = r.m.get(f); if (!x) return '<td><span class="ck-cell" aria-label="Sem indício"></span></td>'; const id = x.cl === 'identificada', t = `${x.o.nome} — ${id ? 'oportunidade identificada, prioridade ' + Math.round(x.o.score) : 'hipótese de investigação'}`; return `<td><button type="button" class="ck-cell ${id ? 'ok' : 'hy'}" data-a="openTab" data-k="${esc(r.c.key)}" data-v="raiox" title="${esc(t)}" aria-label="${esc(r.c.name + ': ' + t)}">${id ? Math.round(x.o.score) : 'H'}</button></td>`; };
     mapa = `<div class="card ck-map"><div class="row"><h3>Mapa de oportunidades — cliente × família de solução</h3><span class="sp"></span><span class="ck-k"><i class="ok"></i>Identificada (prioridade)</span><span class="ck-k"><i class="hy"></i>Hipótese</span><span class="ck-k"><i></i>Sem indício</span></div><div class="ck-tw"><table><thead><tr><th scope="col">Cliente</th>${fams.map(f => `<th scope="col">${esc(f)}</th>`).join('')}</tr></thead><tbody>${rows.slice(0, LIM).map(r => `<tr><th scope="row"><a href="#" data-a="open" data-k="${esc(r.c.key)}">${esc(r.c.name)}</a></th>${fams.map(f => cell(r, f)).join('')}</tr>`).join('')}</tbody></table></div><p class="sm muted">Cada célula abre o raio-X do cliente. Número = prioridade (score transparente); H = hipótese ainda sem confirmação.${rows.length > LIM ? ` Exibindo ${LIM} de ${rows.length} clientes com oportunidade (maior MRR primeiro).` : ''}${fc.size > fams.length ? ` Exibindo as ${fams.length} famílias mais frequentes de ${fc.size}.` : ''}</p></div>`;
   }
-  return `<section id="ck" class="ck" aria-label="Indicadores da carteira"><div class="ck-grid">${mrrCard}${opCardH}${prCard}</div>${mapa}</section>`;
+  return `<section id="ck" class="ck" aria-label="Indicadores da carteira"><div class="ck-grid">${mrrCard}${solCard}${opCardH}${prCard}</div>${mapa}</section>`;
 }
 
 /* ---------- Ficha do Cliente e Oportunidades (telas > 900px): só acrescenta blocos e classes depois do render() ---------- */
@@ -10156,7 +10200,9 @@ function ckBento() {
     const all = opAll().filter(x => x.cl !== 'nao'), nI = all.filter(x => x.cl === 'identificada').length, nH = all.length - nI, nL = all.filter(x => jdCur(x.c, x.o)).length, f = OPF();
     const m = (l, v, t, cls) => `<div><small>${l}</small><b>${v}</b><i aria-hidden="true"><u class="${cls}" style="width:${t > 0 ? (100 * v / t).toFixed(1) : 0}%"></u></i></div>`;
     const ch = (v, l, n) => `<button type="button" data-ckcl="${v}" aria-pressed="${(f.cl || '') === v}">${l} <b>${n}</b></button>`;
-    flt.insertAdjacentHTML('beforebegin', `<section id="ckf" class="ckf" aria-label="Resumo das oportunidades"><div class="ckf-g">${m('Mapeadas', all.length, all.length, 'c')}${m('Hipóteses a investigar', nH, all.length, 'hy')}${m('Identificadas', nI, all.length, 'ok')}${m('Com sua leitura', nL, all.length, 'c')}</div></section><div class="ckf-ch" role="group" aria-label="Filtro rápido por classificação">${ch('', 'Todas', all.length)}${ch('identificada', 'Identificadas', nI)}${ch('hipotese', 'Hipóteses', nH)}</div>`);
+    let top = app.firstElementChild; while (top && top.matches('.alert') && !top.matches('.alert.i')) top = top.nextElementSibling;
+    (top || flt).insertAdjacentHTML('beforebegin', `<section id="ckf" class="ckf" aria-label="Resumo das oportunidades"><div class="ckf-g">${m('Mapeadas', all.length, all.length, 'c')}${m('Hipóteses a investigar', nH, all.length, 'hy')}${m('Identificadas', nI, all.length, 'ok')}${m('Com sua leitura', nL, all.length, 'c')}</div></section>`);
+    flt.insertAdjacentHTML('beforebegin', `<div class="ckf-ch" role="group" aria-label="Filtro rápido por classificação">${ch('', 'Todas', all.length)}${ch('identificada', 'Identificadas', nI)}${ch('hipotese', 'Hipóteses', nH)}</div>`);
   }
   document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ckcl]'); if (!t) return; const f = OPF(); f.cl = t.dataset.ckcl; f.lim = 30; render(); });
   function run() {
@@ -10467,6 +10513,59 @@ function ckBento() {
   let q = 0; const sched = () => { if (!q) q = requestAnimationFrame(() => { q = 0; button(); card(); }); };
   ['top', 'app'].forEach(id => { const el = document.getElementById(id); if (el) new MutationObserver(sched).observe(el, { childList: true }); });
   apply(); sched();
+})();
+
+/* Limpeza visual — camada aditiva: recolhe textos explicativos (abre ao clicar), dobra cartões só de leitura da Visão,
+   oportunidades em acordeão também no computador e tabelas largas com rolagem própria. Nenhum texto é removido do DOM;
+   exportações e impressão não mudam (impressão abre tudo). */
+(() => {
+  'use strict';
+  const WIDE = matchMedia('(min-width: 901px)'), CTL = 'input,select,textarea,button';
+  const mk = (el, cls) => { el.classList.add('cl-x', cls); requestAnimationFrame(() => { if (el.scrollHeight <= el.clientHeight + 3 && el.scrollWidth <= el.clientWidth + 3) { el.classList.remove('cl-x', cls); return; } el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-expanded', 'false'); el.title = 'Clique para ler tudo'; }); };
+  function textos(app) {
+    app.querySelectorAll('.alert:not([data-cl])').forEach(a => { a.dataset.cl = '1'; if (a.matches('.busy,.m-al') || a.closest('.a4,.rf3d,.mdl-box') || a.querySelector(CTL + ',[data-a]') || a.textContent.trim().length < 170) return; mk(a, 'cl-al'); });
+    app.querySelectorAll('p:not([data-cl])').forEach(p => { p.dataset.cl = '1'; if (!p.matches('.muted,.sm,.lead') || p.closest('.a4,.rf3d,.alert,.ck,.mdl-box,details.sol-more,.empty') || p.querySelector(CTL) || p.textContent.trim().length < 130) return; mk(p, 'cl-p'); });
+    app.querySelectorAll('td:not([data-cl])').forEach(td => { td.dataset.cl = '1'; if (td.closest('.a4,.rf3d,.ck,.mdl-box,table.chain,.bfkv,.bft2') || td.querySelector(CTL + ',[data-a],table,ul,ol') || td.textContent.trim().length < 150) return; const d = document.createElement('div'); while (td.firstChild) d.appendChild(td.firstChild); td.appendChild(d); mk(d, 'cl-p'); d.classList.add('l2'); });
+    app.querySelectorAll('ul:not([data-cl]),ol:not([data-cl])').forEach(u => { u.dataset.cl = '1'; if (u.matches('.hjw,.ck-bars') || u.closest('.a4,.rf3d,.alert,.ck,.ck-ch,.mdl-box,details,.onb,#onb') || u.querySelector(CTL + ',[data-a]') || u.children.length < 3 || u.textContent.trim().length < 280) return;
+      u.classList.add('cl-ul'); const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ghost sm cl-ulb'; b.setAttribute('aria-expanded', 'false'); b.textContent = `Ver detalhes (${u.children.length})`; u.parentNode.insertBefore(b, u); });
+  }
+  function visao(app) {
+    if (UI.view !== 'geral') return;
+    app.querySelectorAll(':scope > .card:not([data-cf]), :scope > .grid > .card:not([data-cf])').forEach(c => {
+      c.dataset.cf = '1'; const hd = c.firstElementChild; if (!hd || c.id === 'hoje' || c.closest('.ck') || c.querySelector(CTL) || !(hd.matches('h3') || (hd.matches('.row') && hd.querySelector('h3'))) || c.children.length < 2) return;
+      c.classList.add('cl-fold', 'cl-closed'); hd.classList.add('cl-hd'); hd.setAttribute('role', 'button'); hd.tabIndex = 0; hd.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function opps(app) {
+    if (!WIDE.matches) return;   /* no celular quem faz é mobile.js (mesmas classes) */
+    app.querySelectorAll('.card.opc .opp:not([data-mc])').forEach(o => {
+      o.dataset.mc = '1'; o.classList.add('mo-c');
+      const jd = o.querySelector(':scope > .jd'), b = '<button type="button" class="btn ghost sm mo-tg" aria-expanded="false">Ver evidências e detalhes</button>';
+      if (jd) jd.insertAdjacentHTML('afterend', b); else o.querySelector(':scope > .row')?.insertAdjacentHTML('afterend', b);
+    });
+  }
+  function tabelas(app) {
+    if (!WIDE.matches) return;
+    app.querySelectorAll('.card table').forEach(t => {
+      if (t.closest('.tw, .tbl-wrap, .m-ts, .ck-tw, table.chain, .a4') || t.parentElement.closest('table')) return;
+      const p = t.parentElement; if (t.offsetWidth <= p.clientWidth + 1 && t.scrollWidth <= p.clientWidth + 1) return;
+      const w = document.createElement('div'); w.className = 'm-ts'; p.insertBefore(w, t); w.appendChild(t);
+    });
+    const on = app.querySelector('.ctabs button.on'); if (on && app.dataset.ctab !== UI.sel + '|' + UI.ctab) { app.dataset.ctab = UI.sel + '|' + UI.ctab; const b = on.parentElement; if (on.offsetLeft + on.offsetWidth > b.scrollLeft + b.clientWidth || on.offsetLeft < b.scrollLeft) b.scrollLeft = Math.max(0, on.offsetLeft - 24); }
+  }
+  const tog = e => {
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    const t = e.target; if (!t.closest) return;
+    const ub = t.closest('.cl-ulb'); if (ub) { const u = ub.nextElementSibling, on = u.classList.toggle('open'); ub.setAttribute('aria-expanded', String(on)); ub.textContent = on ? 'Recolher detalhes' : `Ver detalhes (${u.children.length})`; return; }
+    const hd = t.closest('.cl-hd'); if (hd && !t.closest('a,button,input,select')) { if (e.type === 'keydown') e.preventDefault(); const on = !hd.parentElement.classList.toggle('cl-closed'); hd.setAttribute('aria-expanded', String(on)); return; }
+    const x = t.closest('.cl-x[role=button]'); if (x && !x.classList.contains('m-al') && !t.closest('a,button,input,select,textarea')) { if (e.type === 'keydown') e.preventDefault(); if (e.type === 'click' && String(getSelection()).length) return; x.setAttribute('aria-expanded', String(x.classList.toggle('open'))); }
+  };
+  document.addEventListener('click', tog); document.addEventListener('keydown', tog);
+  let q = 0;
+  const run = () => { q = 0; const app = document.getElementById('app'); if (!app || typeof UI === 'undefined') return; try { textos(app); visao(app); opps(app); tabelas(app); } catch (err) { console.warn('clean', err); } };
+  const sched = () => { if (!q) q = requestAnimationFrame(run); };
+  const host = document.getElementById('app'); if (host) new MutationObserver(sched).observe(host, { childList: true, subtree: true });
+  sched();
 })();
 
 /* Mobile (≤900px): barra inferior de navegação, "Primeiros passos" compacto e KPIs em faixa deslizante.

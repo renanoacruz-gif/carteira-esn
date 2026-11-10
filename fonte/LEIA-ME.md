@@ -203,3 +203,12 @@ Teste: `t80.py` (18 verificações). Regressão idêntica ao baseline de `main` 
 
 ## Landing (/sobre) no padrão visual v2
 `landing/index.tpl.html`: o painel ilustrativo do topo deu lugar a uma captura real da Visão no modo noturno; nova seção "Novo visual" (ficha, oportunidades em funil, tema claro) e três cartões de função (mapa 3D, mapa cliente × solução, modo noturno). Capturas em `landing/img/*.webp` (planilha de teste, sem dado real), copiadas para `/sobre/img/` com versão por conteúdo e cache imutável (`_headers`). Para refazer as capturas: gerar em 1440×900 @1,5x e salvar em 1800×1125 WebP.
+
+## Limpeza visual (branch feat/limpeza-visual) — `clean.js`
+Objetivo: dados importantes na frente, texto explicativo a um clique. Camada aditiva; nenhum texto sai do DOM e exportações/impressão não mudam (a impressão abre tudo).
+- **Correção de estouro:** barras e nomes de "MRR por cliente" não saem mais do cartão com nome longo (`min-width:0` + reticências); tabelas largas ganham rolagem própria também no computador (`.m-ts`, `.tbl-wrap`); seletores limitados à largura do cartão. Antes, Resumo e Contratação geravam rolagem lateral da página em 1366 px.
+- **Textos recolhidos:** avisos longos sem botão (`.alert` ≥170 caracteres) ficam em uma linha; parágrafos de apoio (`p.muted/.sm/.lead` ≥130) em uma linha; células de tabela longas em duas; listas explicativas longas atrás de "Ver detalhes (N)". Clique, Enter ou Espaço abre. Só recolhe quando o texto realmente não cabe.
+- **Visão:** cartões só de leitura (sem botão/campo) abaixo do cockpit ficam dobrados; título abre. "Onde vale aprofundar hoje" e cartões com ação ficam abertos. Novo cartão "Soluções TOTVS mais sugeridas" (5 maiores por nº de clientes).
+- **Oportunidades:** funil no topo; filtros em uma linha (≥1100 px); cartão em acordeão também no computador (soluções e leitura visíveis; "Ver evidências e detalhes" abre a cadeia).
+- **Ficha:** faixa de status em uma linha de pílulas; abas em uma linha rolável; cabeçalho mais baixo. Em 1366×768 as abas passam a aparecer na primeira dobra.
+Teste: `t82.py` (28 verificações, com nome de cliente de 90 caracteres). Regressão igual ao baseline.

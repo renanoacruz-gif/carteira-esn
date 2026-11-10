@@ -1,0 +1,45 @@
+# t82 — limpeza visual: nada estoura do cartão, textos explicativos recolhidos (abrem ao clicar), oportunidades em acordeão no computador
+import sys, time; sys.path.insert(0, '/home/claude/test')
+from t40_lib import *
+em = 'qa.t82.%d@totvs.com.br' % time.time()
+A, errs = open_h(em)
+A.set_viewport_size({'width': 1366, 'height': 768})
+A.evaluate("UI.view='importar'; render()"); A.wait_for_timeout(300)
+A.set_input_files('#f-cart', D + 'carteira.xlsx'); A.wait_for_timeout(500); A.click('[data-a=impPrev]'); A.wait_for_timeout(300); A.click('[data-a=impGo]'); A.wait_for_timeout(3000)
+ev(A, "S.clients['c_T00002'].name='Distribuidora Beta de Bebidas e Alimentos do Paraná Sociedade Anônima Indústria e Comércio';0")
+OVER = """(()=>{const o=[];document.querySelectorAll('#app .card, #app .kpi, #app .ck-ch').forEach(c=>{if(getComputedStyle(c).overflow==='hidden')return;const cr=c.getBoundingClientRect();c.querySelectorAll('*').forEach(e=>{if(!e.offsetParent||e.closest('.tw,.tbl-wrap,.ck-tw,.m-ts,.strip,.ctabs,canvas'))return;const r=e.getBoundingClientRect();if(r.width>2&&r.right>cr.right+2)o.push(e.tagName+'.'+e.className)})});return [...new Set(o)].slice(0,4)})()"""
+for v in ['geral', 'clientes', 'oport', 'plano', 'mercado', 'solucoes', 'importar', 'pend', 'integra', 'conta', 'ia']:
+    ev(A, "UI.view=%r;render();0" % v); A.wait_for_timeout(800)
+    o = ev(A, OVER); sw = ev(A, "document.documentElement.scrollWidth")
+    ck('%s: nada fora do cartão e sem rolagem lateral (nome longo)' % v, not o and sw <= 1366, [o, sw])
+for t in ['raiox', 'resumo', 'cadastro', 'contratacao', 'diagnostico']:
+    ev(A, "UI.sel='c_T00001';UI.view='cliente';UI.ctab=%r;render();0" % t); A.wait_for_timeout(700)
+    o = ev(A, OVER); sw = ev(A, "document.documentElement.scrollWidth")
+    ck('ficha %s: nada fora do cartão e sem rolagem lateral' % t, not o and sw <= 1366, [o, sw])
+# ficha: avisos em uma linha, faixa de status compacta, abas em uma linha
+ev(A, "UI.ctab='raiox';render();0"); A.wait_for_timeout(700)
+m = ev(A, "({al:[...document.querySelectorAll('#app > .alert.cl-al')].map(a=>Math.round(a.getBoundingClientRect().height)),strip:Math.round(document.querySelector('#app .strip').getBoundingClientRect().height),tabs:Math.round(document.querySelector('#app .ctabs').getBoundingClientRect().height),tabsTop:Math.round(document.querySelector('#app .ctabs').getBoundingClientRect().top+scrollY)})")
+print(m)
+ck('ficha: avisos longos recolhidos em uma linha', len(m['al']) >= 2 and max(m['al']) <= 48)
+ck('ficha: faixa de status em uma linha', m['strip'] <= 52)
+ck('ficha: abas em uma linha', m['tabs'] <= 52)
+ck('ficha: abas visíveis na primeira dobra (1366×768)', m['tabsTop'] < 768)
+A.locator('#app > .alert.cl-al').first.click(); A.wait_for_timeout(200)
+ck('aviso abre ao clicar e mostra o texto inteiro', ev(A, "(()=>{const a=document.querySelector('#app > .alert.cl-al');return a.classList.contains('open')&&a.getAttribute('aria-expanded')==='true'&&a.scrollHeight<=a.clientHeight+3})()"))
+ck('texto continua no DOM (nada removido)', 'Ausência de ficha' in ev(A, "document.querySelector('#app').textContent"))
+# oportunidades: acordeão no computador
+ev(A, "UI.view='oport';render();0"); A.wait_for_timeout(900)
+ck('oportunidades: funil no topo, antes de "Como ler"', ev(A, "(()=>{const f=document.querySelector('#ckf'),i=document.querySelector('#app > .alert.i');return !!f&&!!i&&f.getBoundingClientRect().top<i.getBoundingClientRect().top})()"))
+ck('oportunidades: detalhes recolhidos, soluções e leitura visíveis', ev(A, "(()=>{const o=document.querySelectorAll('.card.opc .opp')[1];return o.classList.contains('mo-c')&&!o.classList.contains('open')&&!o.querySelector('table.chain').offsetParent&&!!o.querySelector('.solstrip').offsetParent&&!!o.querySelector('.jd').offsetParent})()"))
+A.locator('.card.opc .opp .mo-tg').nth(1).click(); A.wait_for_timeout(300)
+ck('"Ver evidências e detalhes" abre a cadeia de evidência', ev(A, "!!document.querySelectorAll('.card.opc .opp')[1].querySelector('table.chain').offsetParent"))
+# visão: cartões só de leitura dobrados; os com ação continuam abertos
+ev(A, "UI.view='geral';render();0"); A.wait_for_timeout(1200)
+f = ev(A, "({fold:document.querySelectorAll('#app .cl-fold.cl-closed').length,ctl:[...document.querySelectorAll('#app .cl-fold')].filter(c=>c.querySelector('button,input,select')).length,hoje:!!document.querySelector('#hoje').offsetParent&&!document.querySelector('#hoje').classList.contains('cl-fold')})")
+print(f)
+ck('Visão: cartões só de leitura dobrados; nenhum cartão com botão/campo é dobrado', f['fold'] >= 3 and f['ctl'] == 0 and f['hoje'])
+A.locator('#app .cl-fold.cl-closed .cl-hd').first.click(); A.wait_for_timeout(200)
+ck('cartão dobrado abre ao clicar no título', ev(A, "document.querySelectorAll('#app .cl-fold:not(.cl-closed)').length") == 1)
+ck('sem erros de página', not errs, errs)
+print('FAILS', F)
+p.stop()
