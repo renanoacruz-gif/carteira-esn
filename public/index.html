@@ -8254,18 +8254,20 @@ O briefing só é gerado a partir da ficha de faturamento anexada ao cliente. Se
 const BR_C = { bg: [250, 250, 247], navy: [14, 31, 48], teal: [14, 110, 98], terra: [181, 80, 42], txt: [33, 37, 41], mut: [100, 110, 120], line: [214, 216, 208], alt: [242, 243, 238], tealBg: [222, 239, 235], terraBg: [247, 227, 219], neuBg: [231, 234, 238] };
 const BR_DEPTS = [
   ['rh', 'RH & Pessoas', /folha|\brh\b|\bponto|recursos humanos|pessoas|admiss|esocial|beneficio|recrut|talent|payroll|seguranca do trabalho|medicina|\bsst\b|labore|colaborador|banco de horas|treinamento corporativo/],
-  ['fin', 'Financeiro, Fiscal & Contábil', /financ|fiscal|contab|tribut|\bfatur|\bnf-?e\b|sped|tesouraria|contas a (pagar|receber)|concilia|bancari|cobranca|imposto|livros fiscais|reinf|\becf\b|\becd\b|ativo fixo|imobilizado|patrimonio|techfin|\bpix\b|boleto|cartao|credito|cambio|fluxo de caixa|orcament|controladoria|gestao de contratos/],
-  ['cmp', 'Compras & Estoque', /compra|estoque|suprimento|almoxarif|cotac|requisic|fornecedor|procurement|inventario|recebimento/],
+  ['fin', 'Financeiro, Fiscal & Contábil', /financ|fiscal|contab|tribut|\bfatur|\bnf-?e\b|sped|tesouraria|contas a (pagar|receber)|transmite|\bnfs\b|concilia|bancari|cobranca|imposto|livros fiscais|reinf|\becf\b|\becd\b|ativo fixo|imobilizado|patrimonio|techfin|\bpix\b|boleto|cartao|credito|cambio|fluxo de caixa|orcament|controladoria|gestao de contratos/],
+  ['cmp', 'Compras & Estoque', /compra|estoque|suprim|almoxarif|cotac|requisic|fornecedor|procurement|inventario|recebimento/],
   ['log', 'Logística & Distribuição', /logistic|distribui|transport|\btms\b|\bwms\b|\bgfe\b|frete|expedic|roteir|entrega|embarque|mdf-?e|ct-?e|armazenagem|frota|cross.?dock|despacho/],
   ['man', 'Manufatura & Ativos', /manufatur|producao|\bpcp\b|\bmes\b|\bmrp\b|industri|chao de fabrica|\bmnt\b|\bativos?\b|\bplm\b|qualidade|\bqmt\b|\bqie\b|\bppi\b|engenharia|custos|apontamento|fabrica|oficina|\bsfc\b|\beam\b|\bepi\b|metrologia|manutencao de ativos/],
   ['agr', 'Agroindústria', /agro|agricol|pecuar|safra|fazenda|rural|\bcana\b|usina|graos|\bagr\b|sementes|frigorific|laticin|cooperativ|originacao|cafe\b|agronegocio/],
-  ['cld', 'Cloud & Plataformas', /cloud|nuvem|iaas|paas|saas|hospedagem|hosting|fluig|carol|analytics|plataforma|\bapi\b|\bbi\b|\bia\b|inteligencia artificial|integra[cç]|\brpa\b|low.?code|workflow|dbaccess|appserver|license server|identity/],
-  ['srv', 'Serviços & Suporte', /suporte|consultoria|hora tecnica|horas? (tecnica|de consultor)|treinamento|implanta|customer success|sustenta|servico (avulso|especializado|tecnico|profissional|gerenciado)|visita tecnica|projeto|migracao|diagnostico|atendimento|\bsla\b/],
+  ['cld', 'Cloud & Plataformas', /cloud|nuvem|iaas|paas|saas|hospedagem|hosting|fluig|carol|analytics|plataforma|\bapi\b|\bbi\b|\bia\b|inteligencia artificial|integra[cç]|\brpa\b|low.?code|workflow|dbaccess|appserver|license server|identity|assinatura eletronica|\ba eletronica\b/],
+  ['srv', 'Serviços & Suporte', /suporte|e-?learning|consultoria|hora tecnica|horas? (tecnica|de consultor)|treinamento|implanta|customer success|sustenta|servico (avulso|especializado|tecnico|profissional|gerenciado)|visita tecnica|projeto|migracao|diagnostico|atendimento|\bsla\b/],
   ['com', 'Comercial & Vendas', /\bvendas?\b|gestao comercial|\bcrm\b|\bcpq\b|varejo|\bpdv\b|e-?commerce|marketplace|televendas|\bsfa\b|loja|food service|restaurante/],
+  /* rodada 30: itens de manutenção de licença do ERP sem módulo no nome (SMS FULL, SMS TEC USER…): último na precedência, só pega o que nenhum departamento reconheceu */
+  ['erp', 'ERP — licenças de uso geral', /^sms\b|\bcdu\b/],
   ['out', 'Outros / a classificar', /$^/]
 ];
 /* precedência de classificação (Cloud e Serviços antes, Agro antes dos demais) */
-const BR_PREC = ['cld', 'srv', 'agr', 'rh', 'fin', 'cmp', 'log', 'man', 'com'];
+const BR_PREC = ['cld', 'srv', 'agr', 'rh', 'fin', 'cmp', 'log', 'man', 'com', 'erp'];
 const BR_PLAT = [['Protheus', /protheus|\bsiga[a-z]{2,4}\b/], ['RM', /\brm\b|totvs rm|rm (labore|folha|saldus|classis|nucleus|fluxus|bonum)/], ['Datasul', /datasul|\bems\b|\bhcm datasul/], ['Logix', /logix/], ['Fluig', /fluig/], ['Techfin', /techfin/], ['Carol / IA', /carol|inteligencia artificial/], ['TOTVS Cloud', /totvs cloud|\bcloud\b|nuvem/], ['Winthor', /winthor/], ['TOTVS BI', /\bbi\b|analytics/]];
 const BR_NAT = { recorrente: 'Recorrente', avulso: 'Avulso', excedente: 'Excedente', desconto: 'Desconto', outro: 'Não classificado' };
 const brN = v => (v == null || isNaN(v)) ? null : v;
