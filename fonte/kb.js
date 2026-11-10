@@ -259,6 +259,24 @@ const segments = [
 { id:'juridico', nome:'Jurídico', re:/jur[ií]dic|advoc|escrit[oó]rio de advocacia/i, estudo:false, resumo:'ESTUDO NÃO CARREGADO nesta versão.', processos:[],tendencias:[],dores:[],demandas:[],aplicacoes:[],perguntas:[] }
 ];
 
+/* Rodada 35: CNAE (cadastro público do CNPJ, já consultado em cnpj.js) → segmento TOTVS.
+   Nível divisão/grupo da Classificação Nacional de Atividades Econômicas; cobre só os segmentos que a TOTVS Curitiba trabalha —
+   saúde (86-88), educação (85), jurídico (691) e hospitalidade (55-56, 79) ficam de propósito fora do mapa (retornam null → cai na inferência por nome ou fica sem segmento).
+   Sempre tratado como INFERÊNCIA a confirmar pelo usuário, igual à inferência por razão social já existente. */
+const CNAE_SEG = [
+ { re:/^0[1-3]/, seg:'agro' },                       /* agricultura, pecuária, pesca, floresta */
+ { re:/^(1[0-9]|2[0-9]|3[0-3])/, seg:'manufatura' },  /* indústrias de transformação (seção C) */
+ { re:/^4[1-3]/, seg:'construcao' },                  /* construção */
+ { re:/^71/, seg:'construcao' },                      /* arquitetura e engenharia */
+ { re:/^(45|47)/, seg:'varejo' },                     /* comércio de veículos e varejo */
+ { re:/^46/, seg:'distribuicao' },                    /* comércio por atacado */
+ { re:/^51/, seg:'servicos' },                        /* transporte aéreo — tratado como serviços (precedente: cliente de táxi aéreo) */
+ { re:/^(49|50|52|53)/, seg:'logistica_seg' },        /* transporte terrestre/aquaviário, armazenagem e correio */
+ { re:/^692/, seg:'servicos' },                       /* contabilidade, consultoria e auditoria (691 jurídicas fica de fora) */
+ { re:/^(58|59|6[0-3]|70|72|73|74|77|78|8[0-2])/, seg:'servicos' }, /* TI, informação, consultoria, atividades administrativas */
+];
+const cnaeSeg = codigo => { const d = String(codigo || '').replace(/\D/g, ''); if (d.length < 2) return null; const hit = CNAE_SEG.find(x => x.re.test(d)); return hit ? hit.seg : null; };
+
 /* Evidências transversais (regulatórias) — aplicam-se a clientes com base relevante identificada */
 const transversal = [
 { id:'reforma', nome:'Reforma Tributária do Consumo (IBS/CBS)', need:'fiscal',
@@ -284,5 +302,5 @@ const transversal = [
  validar:'Confirmar no site oficial da TOTVS/NF-e se o leiaute e o cronograma mudaram desde esta pesquisa; não comunicar prazo fechado ao cliente sem checar.' }
 ];
 
-return { consulta:C, solutions, productPatterns, modalidadeRe, NEEDS, segments, transversal, sol:id=>solutions.find(s=>s.id===id) };
+return { consulta:C, solutions, productPatterns, modalidadeRe, NEEDS, segments, transversal, cnaeSeg, sol:id=>solutions.find(s=>s.id===id) };
 })();

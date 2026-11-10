@@ -241,6 +241,8 @@ function classifySeg(c, ov) {
     const hit = KB.segments.find(s => s.re.test(raw)); if (hit) return { id: hit.id, mode: 'planilha', ev: `Planilha: "${c.seg}"${parts.length > 1 ? ' (principal = primeiro valor)' : ''}`, raw: c.seg, sec: secOf(hit.id) };
     return { id: null, mode: 'nao_mapeado', ev: `Planilha: "${c.seg}" (sem correspondência nos segmentos TOTVS)`, raw: c.seg, sec: secOf(null) };
   }
+  const cnae = c.cnpjCad?.cnaePrincipal, cnaeId = cnae && KB.cnaeSeg(cnae.codigo);
+  if (cnaeId) { const s = KB.segments.find(x => x.id === cnaeId); if (s) return { id: s.id, mode: 'inferido', ev: `Inferido pelo CNAE da consulta de CNPJ (${cnae.formatado} — ${cnae.descricao}) — INFERÊNCIA, confirmar` }; }
   const nm = norm(c.name || ''); const hit = KB.segments.find(s => s.re.test(nm));
   if (hit) return { id: hit.id, mode: 'inferido', ev: `Inferido pela razão social ("${c.name}") — INFERÊNCIA, confirmar` };
   return { id: null, mode: 'ausente', ev: 'Segmento ausente na planilha' };
