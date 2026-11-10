@@ -11,5 +11,7 @@
   Cache-Control: public, max-age=31536000, immutable
 /sobre/fonts/*
   Cache-Control: public, max-age=31536000, immutable
+/sobre/img/*
+  Cache-Control: public, max-age=31536000, immutable
 /sw.js
   Cache-Control: no-cache

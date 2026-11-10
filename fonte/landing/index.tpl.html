@@ -166,6 +166,24 @@ footer a:hover{text-decoration:underline}
   .rv,.rg .orb{animation:none}
   *{transition:none!important}
 }
+
+/* produto em tela (capturas reais) */
+.shot{margin:0;border-radius:20px;overflow:hidden;background:#00131C;border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,19,28,.45),0 2px 0 rgba(255,255,255,.06) inset;transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.shot:hover{transform:translateY(-4px);box-shadow:0 40px 90px rgba(0,19,28,.5)}
+.shot-b{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#012739;color:#9FC1D1;font-size:12px;letter-spacing:.04em}
+.shot-b i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.22)}.shot-b span{margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shot img{width:100%;height:auto}
+.shot figcaption{padding:14px 18px;font-size:14px;color:#A9C4D0;background:#012739;line-height:1.5}.shot figcaption b{color:#fff}
+.hero .shot figcaption{font-size:12px;padding:9px 14px;text-align:center}
+.hero .w{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:center}
+.hero h1{font-size:clamp(36px,4.3vw,58px)}
+.vis{background:var(--pet);color:#D6E6EE;position:relative;overflow:hidden}
+.vis::before{content:"";position:absolute;inset:0;background:radial-gradient(700px 380px at 85% 0%,rgba(0,219,255,.16),transparent 65%),radial-gradient(520px 320px at 0% 100%,rgba(0,255,211,.08),transparent 70%);pointer-events:none}
+.vis .w{position:relative}.vis h2{color:#fff}.vis .sh p{color:#A9C4D0}.vis .sh .eb{color:var(--lima)}.vis .sh .eb::before{background:var(--lima)}
+.vg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.vg .lg{grid-column:1/-1}
+.vn{margin-top:22px;font-size:13px;color:#8FB0BE}
+@media (max-width:960px){.hero .w{grid-template-columns:1fr}.vg{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.shot,.shot:hover{transition:none;transform:none}}
 </style>
 </head>
 <body>
@@ -175,7 +193,8 @@ footer a:hover{text-decoration:underline}
  <div class="w">
   <img src="{{LOGO_W}}" alt="TOTVS" width="132" height="38">
   <nav class="nav" aria-label="Principal">
-   <a href="#funcoes">Funções</a>
+   <a href="#visual">Visual</a>
+      <a href="#funcoes">Funções</a>
    <a href="#fluxo">Como funciona</a>
    <a href="#dados">Seus dados</a>
    <a class="btn p" href="/">Entrar</a>
@@ -197,33 +216,30 @@ footer a:hover{text-decoration:underline}
    <p class="hint rv d4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 8 8 6 8-6"/></svg>Acesso com e-mail @totvs.com.br: você recebe um código por e-mail.</p>
   </div>
 
-  <div class="pn rv d3" aria-hidden="true">
-   <div class="pn-h"><span>Leitura por cliente</span><i><b></b><b></b><b></b></i></div>
-   <div class="rg">
-    <svg viewBox="0 0 220 220">
-     <circle class="core" cx="110" cy="110" r="52"/>
-     <g class="orb">
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#00DBFF" stroke-dasharray="64 489" stroke-dashoffset="0"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#00FFD3" stroke-dasharray="64 489" stroke-dashoffset="-92"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#D9FF65" stroke-dasharray="64 489" stroke-dashoffset="-184"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#A44DFF" stroke-dasharray="64 489" stroke-dashoffset="-276"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#FF42B7" stroke-dasharray="64 489" stroke-dashoffset="-368"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#E67E08" stroke-dasharray="64 489" stroke-dashoffset="-460"/>
-     </g>
-     <path d="M92 110h36M110 92v36" stroke="#00DBFF" stroke-width="2.4" stroke-linecap="round"/>
-    </svg>
-   </div>
-   <div class="chips">
-    <div class="chip"><b style="background:#00FFD3"></b>Faz sentido</div>
-    <div class="chip"><b style="background:#00DBFF"></b>Investigar</div>
-    <div class="chip"><b style="background:#D9FF65"></b>Já atendida</div>
-    <div class="chip"><b style="background:#FF42B7"></b>Descartar</div>
-   </div>
-   <p class="pn-f">Raio-X em 6 blocos · cada oportunidade com sua leitura</p>
+  <figure class="shot rv d3">
+        <div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Visão da carteira · modo noturno</span></div>
+        <img src="/sobre/img/visao_noturno.webp?v={{V_visao_noturno}}" width="1800" height="1125" alt="Tela Visão da carteira no modo noturno: orbe 3D com um ponto por cliente, MRR informado em destaque, painel Onde vale aprofundar hoje e indicadores de MRR por cliente, oportunidades e prontidão dos dados." fetchpriority="high">
+        <figcaption>Tela real do sistema com dados de demonstração.</figcaption>
+      </figure>
   </div>
  </div>
 </div>
 
+<section class="vis" id="visual">
+  <div class="w">
+    <div class="sh">
+      <span class="eb">Novo visual</span>
+      <h2>Um cockpit para a carteira, de dia ou de noite.</h2>
+      <p>A carteira abre em um mapa 3D, cada cliente tem um painel de prontidão e as oportunidades aparecem em funil. Tema claro ou noturno, à sua escolha.</p>
+    </div>
+    <div class="vg">
+      <figure class="shot lg"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Ficha do cliente</span></div><img loading="lazy" src="/sobre/img/ficha.webp?v={{V_ficha}}" width="1800" height="1125" alt="Ficha do cliente no modo noturno: cabeçalho com MRR, participação na carteira, oportunidades e trilha de prontidão em quatro passos."><figcaption><b>Ficha do cliente.</b> MRR, participação na carteira e a trilha de prontidão: planilha, ficha de faturamento, contrato e release.</figcaption></figure>
+      <figure class="shot"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Oportunidades</span></div><img loading="lazy" src="/sobre/img/oport.webp?v={{V_oport}}" width="1800" height="1125" alt="Tela Oportunidades no tema claro: funil com mapeadas, hipóteses, identificadas e com leitura, e filtro rápido."><figcaption><b>Oportunidades em funil.</b> Quantas são hipótese, quantas já têm dado objetivo e quantas você já leu.</figcaption></figure>
+      <figure class="shot"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Visão da carteira · tema claro</span></div><img loading="lazy" src="/sobre/img/visao_claro.webp?v={{V_visao_claro}}" width="1800" height="1125" alt="Tela Visão da carteira no tema claro, com o mesmo mapa 3D e os indicadores."><figcaption><b>Claro ou noturno.</b> A troca fica na barra superior e em Configurações, e vale por navegador.</figcaption></figure>
+    </div>
+    <p class="vn">Telas reais do sistema com dados de demonstração.</p>
+  </div>
+</section>
 <section id="funcoes">
  <div class="w">
   <div class="sh">
@@ -232,7 +248,10 @@ footer a:hover{text-decoration:underline}
    <p>Cada função existe no sistema hoje. O que depende de chave de IA está indicado.</p>
   </div>
   <div class="grid">
-   <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Importação da carteira</h3><p>Traga a carteira de uma planilha XLSX ou de um link do Google Planilhas, com prévia antes de gravar. Clientes que saem da planilha são mantidos e marcados.</p></article>
+   <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></div><h3>Mapa 3D da carteira</h3><p>Cada cliente é um ponto na orbe: a cor mostra a prioridade da principal oportunidade e o tamanho, o MRR informado. Clique para abrir a ficha.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h3>Mapa cliente × solução</h3><p>Uma grade mostra, por cliente e família de solução, onde há oportunidade identificada, hipótese ou nenhum indício.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20 14.500A8.500 8.500 0 0 1 9.500 4 8.500 8.500 0 1 0 20 14.500z"/></svg></div><h3>Modo noturno</h3><p>Tema claro, noturno ou automático conforme o sistema. Os documentos gerados continuam em fundo claro.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Importação da carteira</h3><p>Traga a carteira de uma planilha XLSX ou de um link do Google Planilhas, com prévia antes de gravar. Clientes que saem da planilha são mantidos e marcados.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><h3>Página do cliente</h3><p>Cadastro, contratos e campos editáveis, separando o que você informou do que o sistema calculou.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div><h3>Fichas de faturamento</h3><p>Anexe fichas por cliente ou em lote, com fila, contador e nova tentativa nas que falharem.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg></div><h3>Imagens e prints</h3><p>Cole ou envie prints e o OCR extrai os campos para o perfil e o raio-X do cliente.</p><span class="tag">Usa a sua chave de IA</span></article>

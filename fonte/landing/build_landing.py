@@ -13,6 +13,12 @@ for w in (500, 600, 700):
     ff += f"@font-face{{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:{w};src:url(/sobre/fonts/{f}?v={v}) format('woff2');unicode-range:{UR}}}"
 logo = 'data:image/png;base64,' + open(f'{fonte}/logo_w.b64').read().strip()
 h = open(f'{here}/index.tpl.html').read().replace('{{FONTS}}', ff).replace('{{LOGO_W}}', logo)
+# capturas do produto: servidas de /sobre/img (coberto pelo Bypass do Access), versionadas pelo conteúdo
+os.makedirs(f'{root}/public/sobre/img', exist_ok=True)
+for n in sorted(os.listdir(f'{here}/img')):
+    d = open(f'{here}/img/{n}', 'rb').read(); open(f'{root}/public/sobre/img/{n}', 'wb').write(d)
+    h = h.replace('{{V_' + n.rsplit('.', 1)[0] + '}}', hashlib.sha1(d).hexdigest()[:10])
+assert '{{V_' not in h
 os.makedirs(f'{root}/public/sobre', exist_ok=True)
 open(f'{root}/public/sobre/index.html', 'w').write(h)
 print(len(h))

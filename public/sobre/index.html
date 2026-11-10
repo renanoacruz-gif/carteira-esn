@@ -166,6 +166,24 @@ footer a:hover{text-decoration:underline}
   .rv,.rg .orb{animation:none}
   *{transition:none!important}
 }
+
+/* produto em tela (capturas reais) */
+.shot{margin:0;border-radius:20px;overflow:hidden;background:#00131C;border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,19,28,.45),0 2px 0 rgba(255,255,255,.06) inset;transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.shot:hover{transform:translateY(-4px);box-shadow:0 40px 90px rgba(0,19,28,.5)}
+.shot-b{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#012739;color:#9FC1D1;font-size:12px;letter-spacing:.04em}
+.shot-b i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.22)}.shot-b span{margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shot img{width:100%;height:auto}
+.shot figcaption{padding:14px 18px;font-size:14px;color:#A9C4D0;background:#012739;line-height:1.5}.shot figcaption b{color:#fff}
+.hero .shot figcaption{font-size:12px;padding:9px 14px;text-align:center}
+.hero .w{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:center}
+.hero h1{font-size:clamp(36px,4.3vw,58px)}
+.vis{background:var(--pet);color:#D6E6EE;position:relative;overflow:hidden}
+.vis::before{content:"";position:absolute;inset:0;background:radial-gradient(700px 380px at 85% 0%,rgba(0,219,255,.16),transparent 65%),radial-gradient(520px 320px at 0% 100%,rgba(0,255,211,.08),transparent 70%);pointer-events:none}
+.vis .w{position:relative}.vis h2{color:#fff}.vis .sh p{color:#A9C4D0}.vis .sh .eb{color:var(--lima)}.vis .sh .eb::before{background:var(--lima)}
+.vg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.vg .lg{grid-column:1/-1}
+.vn{margin-top:22px;font-size:13px;color:#8FB0BE}
+@media (max-width:960px){.hero .w{grid-template-columns:1fr}.vg{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.shot,.shot:hover{transition:none;transform:none}}
 </style>
 </head>
 <body>
@@ -175,7 +193,8 @@ footer a:hover{text-decoration:underline}
  <div class="w">
   <img src="data:image/png;base64,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" alt="TOTVS" width="132" height="38">
   <nav class="nav" aria-label="Principal">
-   <a href="#funcoes">Funções</a>
+   <a href="#visual">Visual</a>
+      <a href="#funcoes">Funções</a>
    <a href="#fluxo">Como funciona</a>
    <a href="#dados">Seus dados</a>
    <a class="btn p" href="/">Entrar</a>
@@ -197,33 +216,30 @@ footer a:hover{text-decoration:underline}
    <p class="hint rv d4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 8 8 6 8-6"/></svg>Acesso com e-mail @totvs.com.br: você recebe um código por e-mail.</p>
   </div>
 
-  <div class="pn rv d3" aria-hidden="true">
-   <div class="pn-h"><span>Leitura por cliente</span><i><b></b><b></b><b></b></i></div>
-   <div class="rg">
-    <svg viewBox="0 0 220 220">
-     <circle class="core" cx="110" cy="110" r="52"/>
-     <g class="orb">
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#00DBFF" stroke-dasharray="64 489" stroke-dashoffset="0"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#00FFD3" stroke-dasharray="64 489" stroke-dashoffset="-92"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#D9FF65" stroke-dasharray="64 489" stroke-dashoffset="-184"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#A44DFF" stroke-dasharray="64 489" stroke-dashoffset="-276"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#FF42B7" stroke-dasharray="64 489" stroke-dashoffset="-368"/>
-      <circle class="tk" cx="110" cy="110" r="88" stroke="#E67E08" stroke-dasharray="64 489" stroke-dashoffset="-460"/>
-     </g>
-     <path d="M92 110h36M110 92v36" stroke="#00DBFF" stroke-width="2.4" stroke-linecap="round"/>
-    </svg>
-   </div>
-   <div class="chips">
-    <div class="chip"><b style="background:#00FFD3"></b>Faz sentido</div>
-    <div class="chip"><b style="background:#00DBFF"></b>Investigar</div>
-    <div class="chip"><b style="background:#D9FF65"></b>Já atendida</div>
-    <div class="chip"><b style="background:#FF42B7"></b>Descartar</div>
-   </div>
-   <p class="pn-f">Raio-X em 6 blocos · cada oportunidade com sua leitura</p>
+  <figure class="shot rv d3">
+        <div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Visão da carteira · modo noturno</span></div>
+        <img src="/sobre/img/visao_noturno.webp?v=f8dfce34ec" width="1800" height="1125" alt="Tela Visão da carteira no modo noturno: orbe 3D com um ponto por cliente, MRR informado em destaque, painel Onde vale aprofundar hoje e indicadores de MRR por cliente, oportunidades e prontidão dos dados." fetchpriority="high">
+        <figcaption>Tela real do sistema com dados de demonstração.</figcaption>
+      </figure>
   </div>
  </div>
 </div>
 
+<section class="vis" id="visual">
+  <div class="w">
+    <div class="sh">
+      <span class="eb">Novo visual</span>
+      <h2>Um cockpit para a carteira, de dia ou de noite.</h2>
+      <p>A carteira abre em um mapa 3D, cada cliente tem um painel de prontidão e as oportunidades aparecem em funil. Tema claro ou noturno, à sua escolha.</p>
+    </div>
+    <div class="vg">
+      <figure class="shot lg"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Ficha do cliente</span></div><img loading="lazy" src="/sobre/img/ficha.webp?v=a6311000b2" width="1800" height="1125" alt="Ficha do cliente no modo noturno: cabeçalho com MRR, participação na carteira, oportunidades e trilha de prontidão em quatro passos."><figcaption><b>Ficha do cliente.</b> MRR, participação na carteira e a trilha de prontidão: planilha, ficha de faturamento, contrato e release.</figcaption></figure>
+      <figure class="shot"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Oportunidades</span></div><img loading="lazy" src="/sobre/img/oport.webp?v=891bd272a0" width="1800" height="1125" alt="Tela Oportunidades no tema claro: funil com mapeadas, hipóteses, identificadas e com leitura, e filtro rápido."><figcaption><b>Oportunidades em funil.</b> Quantas são hipótese, quantas já têm dado objetivo e quantas você já leu.</figcaption></figure>
+      <figure class="shot"><div class="shot-b" aria-hidden="true"><i></i><i></i><i></i><span>Visão da carteira · tema claro</span></div><img loading="lazy" src="/sobre/img/visao_claro.webp?v=f49b71db10" width="1800" height="1125" alt="Tela Visão da carteira no tema claro, com o mesmo mapa 3D e os indicadores."><figcaption><b>Claro ou noturno.</b> A troca fica na barra superior e em Configurações, e vale por navegador.</figcaption></figure>
+    </div>
+    <p class="vn">Telas reais do sistema com dados de demonstração.</p>
+  </div>
+</section>
 <section id="funcoes">
  <div class="w">
   <div class="sh">
@@ -232,7 +248,10 @@ footer a:hover{text-decoration:underline}
    <p>Cada função existe no sistema hoje. O que depende de chave de IA está indicado.</p>
   </div>
   <div class="grid">
-   <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Importação da carteira</h3><p>Traga a carteira de uma planilha XLSX ou de um link do Google Planilhas, com prévia antes de gravar. Clientes que saem da planilha são mantidos e marcados.</p></article>
+   <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></div><h3>Mapa 3D da carteira</h3><p>Cada cliente é um ponto na orbe: a cor mostra a prioridade da principal oportunidade e o tamanho, o MRR informado. Clique para abrir a ficha.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h3>Mapa cliente × solução</h3><p>Uma grade mostra, por cliente e família de solução, onde há oportunidade identificada, hipótese ou nenhum indício.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20 14.500A8.500 8.500 0 0 1 9.500 4 8.500 8.500 0 1 0 20 14.500z"/></svg></div><h3>Modo noturno</h3><p>Tema claro, noturno ou automático conforme o sistema. Os documentos gerados continuam em fundo claro.</p></article>
+      <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Importação da carteira</h3><p>Traga a carteira de uma planilha XLSX ou de um link do Google Planilhas, com prévia antes de gravar. Clientes que saem da planilha são mantidos e marcados.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><h3>Página do cliente</h3><p>Cadastro, contratos e campos editáveis, separando o que você informou do que o sistema calculou.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div><h3>Fichas de faturamento</h3><p>Anexe fichas por cliente ou em lote, com fila, contador e nova tentativa nas que falharem.</p></article>
    <article class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg></div><h3>Imagens e prints</h3><p>Cole ou envie prints e o OCR extrai os campos para o perfil e o raio-X do cliente.</p><span class="tag">Usa a sua chave de IA</span></article>

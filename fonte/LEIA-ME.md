@@ -200,3 +200,6 @@ Teste: `t80.py` (18 verificações). Regressão idêntica ao baseline de `main` 
 - **Oportunidades**: funil (mapeadas, hipóteses, identificadas, com sua leitura) e filtro rápido que grava o mesmo `OPF().cl` do seletor.
 - Tudo acima vale para telas >900px, exceto o modo noturno (todas). Sem dependência nova. Testes: `t81.py` (27 verificações); `t73.py` e `t75.py` atualizados para a nova ordem da Visão (antes exigiam o mapa 3D depois de "Onde vale aprofundar hoje").
 - Não feito nesta rodada: cadeia de evidência em nós dentro do cartão de oportunidade, linha de evidências na ficha, grade de indicadores no celular.
+
+## Landing (/sobre) no padrão visual v2
+`landing/index.tpl.html`: o painel ilustrativo do topo deu lugar a uma captura real da Visão no modo noturno; nova seção "Novo visual" (ficha, oportunidades em funil, tema claro) e três cartões de função (mapa 3D, mapa cliente × solução, modo noturno). Capturas em `landing/img/*.webp` (planilha de teste, sem dado real), copiadas para `/sobre/img/` com versão por conteúdo e cache imutável (`_headers`). Para refazer as capturas: gerar em 1440×900 @1,5x e salvar em 1800×1125 WebP.
