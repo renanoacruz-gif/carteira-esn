@@ -3,7 +3,7 @@ const TIPOS = { produto: 'Produto', modulo: 'Módulo', plataforma: 'Plataforma',
 const REF_ST = { confirmada: 'Confirmada', corrigida: 'Corrigida (com fonte)', ambigua: 'Ambígua', nao_localizada: 'Não localizada', pendente: 'Validação pendente' };
 const REF_STK = { confirmada: 'ok', corrigida: 'info', ambigua: 'warn', nao_localizada: 'bad', pendente: 'off' };
 const STATUS_SOL = ['Validado', 'Em revisão', 'NECESSITA VALIDAÇÃO'];
-const NEED_LABEL = { fiscal: 'Fiscal/tributário', sst: 'SST/RH', financeiro: 'Financeiro/Techfin', processos: 'Processos/Documentos', producao: 'Produção/Manutenção', analytics: 'Indicadores/CRM', logistica: 'Logística', sustentacao: 'Sustentação/Nuvem', treinamento: 'Treinamento/Adoção', nfse: 'NFS-e', obras: 'Obras', pdv: 'Varejo/Frente de loja', qualidade: 'Qualidade industrial' };
+const NEED_LABEL = { fiscal: 'Fiscal/tributário', sst: 'SST/RH', financeiro: 'Financeiro/Techfin', processos: 'Processos/Documentos', producao: 'Produção/Manutenção', analytics: 'Indicadores/CRM', logistica: 'Logística', sustentacao: 'Sustentação/Nuvem', treinamento: 'Treinamento/Adoção', nfse: 'NFS-e', obras: 'Obras', pdv: 'Varejo/Frente de loja', qualidade: 'Qualidade industrial', vendasb2b: 'Vendas B2B/distribuição' };
 const OFFICIAL_HOST = /(^|\.)(totvs\.com|totvs\.com\.br|tdn\.totvs\.com|tdn\.totvs\.com\.br|centraldeatendimento\.totvs\.com|espacolegislacao\.totvs\.com|carol\.ai)$/i;
 const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const hostOf = u => { try { return new URL(u).hostname; } catch { return ''; } };
@@ -12,7 +12,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const TIPO_SEED = { protheus: 'produto', cfgtrib: 'modulo', transmite: 'complementar', rh: 'modulo', ponto: 'modulo', sst: 'modulo', scc: 'servico', cloud: 'servico',
   rm_erp: 'produto', winthor_erp: 'produto', winthor_wms: 'modulo', rm_labore: 'modulo', rm_smartview: 'modulo', rm_portal: 'modulo', datasul_suprimentos: 'modulo', totvs_performance: 'servico', totvs_rental: 'produto',
   totvs_juridico: 'produto', totvs_hospitalidade: 'produto', totvs_educacional: 'produto', rm_saude: 'produto', datasul_gps: 'produto', linx: 'produto', rdstation: 'produto', varejonline: 'produto',
-  corten: 'plataforma', lynn: 'plataforma', carol: 'plataforma', intera: 'plataforma', equals: 'servico', totvs_pay: 'servico', datasul_erp: 'produto' };
+  corten: 'plataforma', lynn: 'plataforma', carol: 'plataforma', intera: 'plataforma', equals: 'servico', totvs_pay: 'servico', datasul_erp: 'produto', b2b_isthmus: 'plataforma' };
 
 function newSol(o = {}) {
   return { id: 's_' + uid(), nome: '', tipo: 'produto', categoria: '', linha: '', segmentos: [], necessidades: [], dores: [], funcionalidades: [], prerequisitos: [], integracoes: [], fontes: [], termos: [], termosRe: '', fornecedor: 'TOTVS', disponibilidade: '', limites: '', obs: '', status: 'NECESSITA VALIDAÇÃO', oficial: false, arquivado: false, origem: 'manual', atualizadoEm: today(), rev: 1, pend: [], hist: [], sigla: '', refId: '', codOferta: '', grupo: '', refStatus: '', refNota: '', finalidade: '', processos: [], lacunas: [], notasInt: [], ...o };
