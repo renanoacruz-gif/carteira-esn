@@ -484,8 +484,8 @@ function diffSnap(a, b) {
 }
 function analyzeClient(c, st) {
   c.segInfo = classifySeg(c, st.meta.segOv);
-  /* rodada 31: item que ficou 'outro' por inferência é reavaliado quando as regras ganham termos (ex.: SMS = manutenção recorrente); escolha manual nunca é alterada */
-  (c.fichas || []).forEach(f => (f.items || []).forEach(it => { if (it.kind === 'outro' && it.kindMode !== 'manual') it.kind = classifyItem(it.desc || ''); }));
+  /* rodadas 31/32: natureza do item pela identidade do produto (fnat.js); escolha manual nunca é alterada */
+  fnApply(c);
   markDuplicates(c);
   c.productsIdent = identifiedProducts(c);
   consInit(c); cadInit(c); migrateDecl(c); relSync(c); fisSync(c);
