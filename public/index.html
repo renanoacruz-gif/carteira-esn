@@ -8301,14 +8301,17 @@ function brCols(hdr) {
   pick('contr', /contratad|licen.*contr|qtd.*contr|franquia|limite/); pick('util', /utiliz|consum|usad|apurad|realizad|medid/);
   pick('contrato', /contrato/); pick('proposta', /propost/); pick('cond', /cond.*pag|pagto|pagamento/);
   pick('comp', /compet|periodo|^mes\b|referencia|^ref\b/); pick('status', /status|situac/);
-  pick('dept', /depart|^grupo|linha|^area\b|familia/); pick('cod', /cod.*cli|cli.*cod/); pick('cli', /razao|nome.*(cli|empresa)|^cliente$|^empresa$|nome fantasia/);
-  pick('desc', /^descri/, /produto/, /servic/, /^item/, /modulo/, /solucao/, /nome/);
+  pick('dept', /depart|^grupo|linha|^area\b|familia/); pick('cod', /cod.*cli|cli.*cod|^clien fatu/); pick('cli', /razao|nome.*(cli|empresa)|^cliente$|^empresa$|nome fantasia/);
+  /* ficha TOTVS: PRODUTO = código, DESCPRO = nome. O nome vem da coluna de descrição; o código fica à parte */
+  pick('desc', /^desc/, /nome.*prod/); if (col.desc != null) pick('codp', /^produto$|^cod.*(prod|item)|^sku$/); else pick('codp', /^cod.*(prod|item)|^sku$/);
+  if (col.desc == null) pick('desc', /produto/, /servic/, /^item/, /modulo/, /solucao/, /nome/);
   return col;
 }
 const BR_RE = { contrato: /contrato\s*(?:n[º°o.]*\s*)?[:#\-]?\s*((?=[\w\/.\-]*\d)[A-Za-z0-9][\w\/.\-]{2,})/i, proposta: /propostas?\s*(?:n[º°o.]*\s*)?[:#\-]?\s*((?=[\w\/.\-]*\d)[A-Za-z0-9][\w\/.\-]{2,})/i };
 const brGrab = (txt, re) => { const m = String(txt || '').match(re); return m ? m[1].trim().slice(0, 80) : null; };
 const brMode = a => { const m = new Map(); a.filter(Boolean).forEach(x => m.set(x, (m.get(x) || 0) + 1)); const l = [...m.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]); return l.filter(x => !l.some(y => y !== x && y.length > x.length && y.toLowerCase().endsWith(x.toLowerCase()))); };
 
+const brNm = r => r.codp && r.codp !== r.desc ? `${r.desc} (cód. ${r.codp})` : r.desc;
 function briefFichas(c) { return fichasOk(c).filter(f => f.tab || (f.items || []).length); }
 function briefRaw(c) {
   const rows = [], docTot = [], meta = { cod: [], cli: [], contrato: [], proposta: [], cond: [] }, files = [], seen = new Map(); let tabular = false, hasCol = {};
@@ -8333,7 +8336,7 @@ function briefRaw(c) {
           if (total == null && liq == null && qtd == null && unit == null) return;
           meta.cod.push(s('cod')); meta.cli.push(s('cli')); meta.contrato.push(s('contrato')); meta.proposta.push(s('proposta')); meta.cond.push(s('cond'));
           const kind = classifyItem(desc);
-          const row = { desc, qtd, unit, total, liq, comp: brCompNorm(g('comp')) || brCompNorm(f.comp) || null, kind, statusRaw: s('status') || '', deptRaw: s('dept') || '', contr: brN(parseNum(g('contr'))), util: brN(parseNum(g('util'))), file: f.file, loc: `aba ${sh.name} • linha ${r.n}` };
+          const row = { desc, codp: s('codp') || '', qtd, unit, total, liq, comp: brCompNorm(g('comp')) || brCompNorm(f.comp) || null, kind, statusRaw: s('status') || '', deptRaw: s('dept') || '', contr: brN(parseNum(g('contr'))), util: brN(parseNum(g('util'))), file: f.file, loc: `aba ${sh.name} • linha ${r.n}` };
           push(row, kind === 'total');
         });
       });
@@ -8398,7 +8401,7 @@ function briefBlocks(M) {
   const top = M.sorted.slice(0, 10), rest = M.sorted.slice(10);
   H('Soluções contratadas (maiores valores)');
   B.push({ k: 'table', cols: [{ h: 'Solução', w: .34 }, { h: 'Plataforma', w: .12 }, { h: 'Departamento', w: .2 }, { h: 'Natureza', w: .12 }, { h: 'Situação', w: .1 }, { h: 'Valor total', w: .12, a: 'r' }],
-    rows: top.map(r => [r.desc, r.plat.join(', ') || '—', BR_DEPTS.find(d => d[0] === r.dept)[1], BR_NAT[r.nat], brChip(r.st, stTone(r.st)), { t: brBRL(r.total), b: true }]),
+    rows: top.map(r => [brNm(r), r.plat.join(', ') || '—', BR_DEPTS.find(d => d[0] === r.dept)[1], BR_NAT[r.nat], brChip(r.st, stTone(r.st)), { t: brBRL(r.total), b: true }]),
     foot: rest.length ? [`+ ${rest.length} item(ns) adicional(is) na Seção 04`, '', '', '', '', brBRL(rest.reduce((s, r) => s + (r.total || 0), 0))] : null });
   H('Focos operacionais (participação no valor positivo)');
   const foc = M.dep.filter(d => d.rows.length).sort((a, b) => b.v - a.v);
@@ -8419,7 +8422,7 @@ function briefBlocks(M) {
   sec('04', 'Faturamento Detalhado');
   const withLiq = M.liq != null, LIM = 70, vis = M.sorted.slice(0, LIM), hid = M.sorted.slice(LIM);
   B.push({ k: 'table', cols: withLiq ? [{ h: 'Produto', w: .38 }, { h: 'Qtd', w: .08, a: 'r' }, { h: 'Valor unitário', w: .16, a: 'r' }, { h: 'Valor total', w: .19, a: 'r' }, { h: 'Valor líquido', w: .19, a: 'r' }] : [{ h: 'Produto', w: .46 }, { h: 'Qtd', w: .1, a: 'r' }, { h: 'Valor unitário', w: .2, a: 'r' }, { h: 'Valor total', w: .24, a: 'r' }],
-    rows: vis.map(r => { const a = [r.desc, brNum(r.qtd), brBRL(r.unit), { t: brBRL(r.total), b: true, tone: (r.total || 0) < 0 ? 'alert' : null }]; if (withLiq) a.push(brBRL(r.liq)); return a; }),
+    rows: vis.map(r => { const a = [brNm(r), brNum(r.qtd), brBRL(r.unit), { t: brBRL(r.total), b: true, tone: (r.total || 0) < 0 ? 'alert' : null }]; if (withLiq) a.push(brBRL(r.liq)); return a; }),
     foot: [(hid.length ? `+ ${hid.length} linha(s) não exibidas · ` : '') + 'TOTAL', '', '', brBRL(M.bruto)].concat(withLiq ? [brBRL(M.liq)] : []) });
   if (M.textOnly) P('Ficha lida como texto (sem colunas): quantidade, valor unitário e valor líquido não identificáveis. Envie XLSX/CSV com VAL_TOTAL, VAL_LIQD, quantidade e valor unitário para o detalhamento completo.', 'alert');
   else if (!withLiq) P('A ficha não possui coluna de valor líquido (VAL_LIQD) identificável.', 'alert');
