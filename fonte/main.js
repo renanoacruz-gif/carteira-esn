@@ -45,6 +45,9 @@ const ACT = {
   roiAdd: t => roiAdd(t.dataset.k, t.dataset.t), roiRm: t => roiRm(t.dataset.k, t.dataset.id),
   execMode: t => { UI.execMode = t.dataset.v; render(); }, execPdf: t => execExport(t.dataset.k),
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
+  fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
+  fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''),
+  fcMore: () => { UI.fc ||= {}; UI.fc.lim = (UI.fc.lim || 150) + 150; render(); },
   briefOpen: t => { const c = S.clients[t.dataset.k]; UI.ctab = 'briefing'; if (c && !briefFichas(c).length) toast('Para gerar o briefing é necessário anexar a ficha de faturamento do cliente.'); render(); }, briefPdf: t => briefExport(t.dataset.k),
   refOk: t => refApprove(t.dataset.id), refNo: t => refDiscard(t.dataset.id), refAll: () => refApproveOfficial(), recArq: t => recArchive(t.dataset.col, t.dataset.id),
   mkNew: () => recNew('marcos', { produto: $('#mk_p').value, release: /^12\.1\./.test($('#mk_r').value.trim()) ? $('#mk_r').value.trim() : '12.1.' + $('#mk_r').value.trim(), tipo: $('#mk_t').value, data: $('#mk_d').value, fonteT: $('#mk_ft').value, fonteU: $('#mk_fu').value }),
@@ -179,6 +182,9 @@ document.addEventListener('change', async e => {
     case 'mrrRef': { if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return toast('Use AAAA-MM.'); if (S.meta.mrrComp) { S.meta.mrrComp = v || null; touchMeta(); } setRefComp(v); break; }
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
+    case 'fcmes': case 'fctri': { UI.fc ||= {}; UI.fc.sel = v; render(); break; }
+    case 'fcfst': case 'fcfcat': { UI.fc ||= {}; UI.fc[c.slice(3)] = v; render(); break; }
+    case 'fcsort': { UI.fc ||= {}; UI.fc.sort = v; render(); break; }
   }
 });
 /* Item 04: renders caros disparados por digitação são agrupados (140 ms); o estado (UI.*) é atualizado a cada tecla e só o render é adiado. deb.flush(k) executa já. */
@@ -196,6 +202,7 @@ document.addEventListener('input', e => {
   if (t.dataset.i === 'prodq') { UI.prodQ = t.value; deb('prodq', () => reRender('[data-i=prodq]')); }
   if (t.dataset.i === 'solq') { UI.solQ = t.value; deb('solq', () => reRender('[data-i=solq]')); }
   if (t.dataset.i === 'pq') { UI.plan.q = t.value; deb('pq', () => reRender('[data-i=pq]')); }
+  if (t.dataset.i === 'fcq') { UI.fc ||= {}; UI.fc.q = t.value; deb('fcq', () => reRender('[data-i=fcq]')); }
 });
 ['dragover', 'dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => {
   const d = e.target.closest?.('[data-drop]'); if (!d) return; e.preventDefault(); d.classList.toggle('ov', ev === 'dragover');

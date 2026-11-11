@@ -524,9 +524,14 @@ async function handlePlanilha(req) {
   const m = String(q?.url || '').trim().match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,100})(?:\/[^?#]*)?(?:[?#].*)?$/);
   if (!m) return J({ ok: false, erro: { codigo: 'link_invalido', mensagem: 'Use o link da planilha (https://docs.google.com/spreadsheets/d/…).' } }, 400);
   const g = String(q.url).match(/[?&#]gid=(\d{1,12})/), gid = g ? g[1] : '';
+  const aba = q.aba != null ? String(q.aba).trim() : '';
+  if (aba && !/^[^\n\r"<>]{1,40}$/.test(aba)) return J({ ok: false, erro: { codigo: 'aba_invalida', mensagem: 'Nome de aba inválido.' } }, 400);
   const now = Date.now(); while (PL_HITS.length && now - PL_HITS[0] > 60000) PL_HITS.shift(); if (PL_HITS.length >= 20) return J({ ok: false, erro: { codigo: 'limite_local', mensagem: 'Limite do backend: 20 sincronizações/min.' } }, 429); PL_HITS.push(now);
-  /* sem gid no link: exporta a primeira aba (gid=0 falha com HTTP 400 quando a primeira aba tem outro gid). Se o export falhar com 400, tenta o endpoint gviz. */
-  const tentativas = [`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv${gid ? '&gid=' + gid : ''}`, `https://docs.google.com/spreadsheets/d/${m[1]}/gviz/tq?tqx=out:csv${gid ? '&gid=' + gid : ''}`];
+  /* sem gid no link: exporta a primeira aba (gid=0 falha com HTTP 400 quando a primeira aba tem outro gid). Se o export falhar com 400, tenta o endpoint gviz.
+     com "aba" (nome da aba, ex.: Mesa Forecast de vários meses): busca por nome via sheet=, dispensando o gid de cada aba. */
+  const tentativas = aba
+    ? [`https://docs.google.com/spreadsheets/d/${m[1]}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(aba)}`, `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&sheet=${encodeURIComponent(aba)}`]
+    : [`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv${gid ? '&gid=' + gid : ''}`, `https://docs.google.com/spreadsheets/d/${m[1]}/gviz/tq?tqx=out:csv${gid ? '&gid=' + gid : ''}`];
   let r, ult = 0;
   for (const u0 of tentativas) {
     let u = u0;
