@@ -183,7 +183,7 @@ document.addEventListener('change', async e => {
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
     case 'fcmes': case 'fctri': { UI.fc ||= {}; UI.fc.sel = v; render(); break; }
-    case 'fcfst': case 'fcfcat': { UI.fc ||= {}; UI.fc[c.slice(3)] = v; render(); break; }
+    case 'fcfst': case 'fcftipo': { UI.fc ||= {}; UI.fc[c.slice(3)] = v; render(); break; }
     case 'fcsort': { UI.fc ||= {}; UI.fc.sort = v; render(); break; }
   }
 });

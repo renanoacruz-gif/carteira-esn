@@ -30,7 +30,7 @@ ck('fcHash distingue chaves diferentes', h1 != h3, (h1, h3))
 ck('fcHash gera id válido para seletor CSS (sem ":")', ':' not in h1, h1)
 
 # ---------- metas: casar pelo primeiro nome do usuário logado, com fallback para todas as linhas ----------
-ev(A, "ME.nome='Renan Oscar Araujo'; S.meta.fcData={opps:[],metas:[{nome:'Renan Silva',tipo:'ESN',ano:120000,mes:Array(9).fill(10000),tri:[30000,30000,30000,30000]},{nome:'Bruno Souza',tipo:'ESN',ano:100000,mes:Array(9).fill(9000),tri:[27000,27000,27000,27000]}]}; 1")
+ev(A, "ME.nome='Renan Oscar Araujo'; S.meta.fcData={opps:[],metas:[{nome:'Renan Silva',tipo:'CDU',ano:120000,mes:Array(9).fill(10000),tri:[30000,30000,30000,30000]},{nome:'Bruno Souza',tipo:'CDU',ano:100000,mes:Array(9).fill(9000),tri:[27000,27000,27000,27000]}]}; 1")
 rows = ev(A, "fcMetaRows().map(r=>r.nome)")
 ck('fcMetaRows casa só a linha "Renan Silva" (primeiro nome do usuário)', rows == ['Renan Silva'], rows)
 
@@ -44,7 +44,7 @@ ck('fcMesesSel trimestral Q2 retorna abr/mai/jun', ev(A, "JSON.stringify(fcMeses
 ck('fcMesesSel anual retorna os 9 meses do ciclo', ev(A, "fcMesesSel('anual',null).length") == 9)
 
 # ---------- fcMetaTotal: soma das linhas casadas, por período ----------
-ev(A, "ME.nome='Renan Oscar'; S.meta.fcData={opps:[],metas:[{nome:'Renan X',tipo:'ESN',ano:120000,mes:[10000,10000,10000,10000,10000,10000,10000,10000,10000],tri:[0,30000,30000,30000]}]}; 1")
+ev(A, "ME.nome='Renan Oscar'; S.meta.fcData={opps:[],metas:[{nome:'Renan X',tipo:'CDU',ano:120000,mes:[10000,10000,10000,10000,10000,10000,10000,10000,10000],tri:[0,30000,30000,30000]}]}; 1")
 ck('fcMetaTotal mensal (ago=idx4) == 10000', ev(A, "fcMetaTotal('mensal','08')") == 10000)
 ck('fcMetaTotal trimestral Q2 == 30000', ev(A, "fcMetaTotal('trimestral','Q2')") == 30000)
 ck('fcMetaTotal anual == 120000', ev(A, "fcMetaTotal('anual',null)") == 120000)
@@ -55,7 +55,7 @@ ev(A, """S.meta.fcData={opps:[
   {id:'o2',tab:'AGOSTO',mes:'08',cliente:'Cliente B',produto:'P2',status:'EM ABERTO',cdu:0,rec:0,serv:5000,total:5000,data:'2026-08-12',vendedor:''},
   {id:'o3',tab:'AGOSTO',mes:'08',cliente:'Cliente C',produto:'P3',status:'EM ASSINATURA',cdu:4000,rec:0,serv:0,total:4000,data:'2026-08-15',vendedor:''},
   {id:'o4',tab:'SETEMBRO',mes:'09',cliente:'Cliente D',produto:'P4',status:'GANHA',cdu:0,rec:0,serv:9999,total:9999,data:'2026-09-01',vendedor:''}
-], metas:[{nome:'Renan Oscar',tipo:'ESN',ano:120000,mes:[0,0,0,0,10000,0,0,0,0],tri:[0,0,0,0]}]}; ME.nome='Renan Oscar'; 1""")
+], metas:[{nome:'Renan Oscar',tipo:'CDU',ano:120000,mes:[0,0,0,0,10000,0,0,0,0],tri:[0,0,0,0]}]}; ME.nome='Renan Oscar'; 1""")
 k = ev(A, "fcKPI('mensal','08')")
 ck('KPI mensal ago: meta == 10000', k['meta'] == 10000, k['meta'])
 ck('KPI mensal ago: realizado soma só GANHA do mês (3000, ignora set/aberto/assinatura)', k['realizado'] == 3000, k['realizado'])
@@ -64,7 +64,24 @@ ck('KPI mensal ago: falta == 7000', k['falta'] == 7000, k['falta'])
 ck('KPI mensal ago: excedente == 0', k['excedente'] == 0, k['excedente'])
 ck('KPI mensal ago: aberto 1 oportunidade, R$5000', k['aberto']['n'] == 1 and k['aberto']['v'] == 5000, k['aberto'])
 ck('KPI mensal ago: assinatura 1 oportunidade, R$4000', k['assinatura']['n'] == 1 and k['assinatura']['v'] == 4000, k['assinatura'])
-ck('KPI mensal ago: categoria cdu=1000, rec=2000, serv=0 (só da ganha de agosto)', k['cat']['cdu'] == 1000 and k['cat']['rec'] == 2000 and k['cat']['serv'] == 0, k['cat'])
+g = {x['t']: x['ganho'] for x in k['porTipo']}
+ck('KPI mensal ago: ganho por tipo cdu=1000, rec=2000, serv=0 (só da ganha de agosto)', g == {'cdu': 1000, 'rec': 2000, 'serv': 0}, g)
+
+# ---------- tipo de venda: meta x ganho filtrados por CDU / Recorrente / Serviços ----------
+ck('fcNormRev normaliza os tipos', ev(A, "[fcNormRev('CDU'),fcNormRev('Recorrente'),fcNormRev('Serviços'),fcNormRev('rec'),fcNormRev('TOTAL')]") == ['cdu', 'rec', 'serv', 'rec', None])
+ev(A, "S.meta.fcData.metas=[{nome:'Renan Oscar',tipo:'CDU',ano:0,mes:[0,0,0,0,4000,0,0,0,0],tri:[0,0,0,0]},{nome:'Renan Oscar',tipo:'Recorrente',ano:0,mes:[0,0,0,0,8000,0,0,0,0],tri:[0,0,0,0]},{nome:'Renan Oscar',tipo:'TOTAL',ano:0,mes:[0,0,0,0,99999,0,0,0,0],tri:[0,0,0,0]}]; 1")
+kt = ev(A, "fcKPI('mensal','08','')")
+ck('todos os tipos: meta soma CDU+Recorrente e ignora linha sem tipo válido (12000)', kt['meta'] == 12000, kt['meta'])
+kc = ev(A, "fcKPI('mensal','08','cdu')")
+ck('tipo CDU: meta 4000, realizado 1000 (só a parcela CDU da ganha), 25%', kc['meta'] == 4000 and kc['realizado'] == 1000 and round(kc['atingimento']) == 25, kc)
+ck('tipo CDU: em assinatura conta só oportunidade com CDU (1, R$4000); em aberto 0', kc['assinatura'] == {'n': 1, 'v': 4000} and kc['aberto']['n'] == 0, (kc['assinatura'], kc['aberto']))
+kr = ev(A, "fcKPI('mensal','08','rec')")
+ck('tipo Recorrente: meta 8000, realizado 2000', kr['meta'] == 8000 and kr['realizado'] == 2000, kr)
+ks = ev(A, "fcKPI('mensal','08','serv')")
+ck('tipo Serviços sem meta: atingimento null, em aberto R$5000', ks['atingimento'] is None and ks['aberto']['v'] == 5000, ks)
+pt = {x['t']: x for x in kt['porTipo']}
+ck('porTipo traz meta x ganho dos 3 tipos', pt['cdu']['meta'] == 4000 and pt['cdu']['ganho'] == 1000 and pt['rec']['ganho'] == 2000 and pt['serv']['pct'] is None, kt['porTipo'])
+ev(A, "S.meta.fcData.metas=[{nome:'Renan Oscar',tipo:'CDU',ano:120000,mes:[0,0,0,0,10000,0,0,0,0],tri:[0,0,0,0]}]; 1")
 
 # ---------- meta zerada/ausente: não gera percentual enganoso ----------
 k0 = ev(A, "fcKPI('mensal','04')")  # abril: sem meta configurada (0) e sem oportunidades
@@ -72,7 +89,7 @@ ck('meta zerada/ausente: atingimento é null (não divide por zero)', k0['atingi
 ck('meta zerada/ausente: falta == 0 (max(0-0,0))', k0['falta'] == 0, k0['falta'])
 
 # ---------- excedente: realizado > meta ----------
-ev(A, "S.meta.fcData.metas=[{nome:'Renan Oscar',tipo:'ESN',ano:120000,mes:[0,0,0,0,1000,0,0,0,0],tri:[0,0,0,0]}]; 1")
+ev(A, "S.meta.fcData.metas=[{nome:'Renan Oscar',tipo:'CDU',ano:120000,mes:[0,0,0,0,1000,0,0,0,0],tri:[0,0,0,0]}]; 1")
 ke = ev(A, "fcKPI('mensal','08')")
 ck('realizado > meta: falta == 0', ke['falta'] == 0, ke['falta'])
 ck('realizado > meta: excedente == realizado - meta (2000)', ke['excedente'] == 2000, ke['excedente'])
@@ -106,11 +123,15 @@ html0 = ev(A, "document.getElementById('app').innerHTML")
 ck('sem dados sincronizados: tela mostra orientação para vincular a planilha', 'Mesa Forecast' in html0, len(html0))
 
 ev(A, """S.meta.fcSheet={url:'https://docs.google.com/spreadsheets/d/0123456789abcdefghij',minutes:30,auto:true,lastOk:new Date().toISOString()};
-S.meta.fcData={opps:[{id:'ox1',tab:'AGOSTO',mes:'08',cliente:'Cliente Z',produto:'ERP',status:'GANHA',cdu:1000,rec:0,serv:0,total:1000,data:'2026-08-05',vendedor:''}],metas:[{nome:'Renan Oscar',tipo:'ESN',ano:12000,mes:[0,0,0,0,1000,0,0,0,0],tri:[0,0,0,0]}]};
+S.meta.fcData={opps:[{id:'ox1',tab:'AGOSTO',mes:'08',cliente:'Cliente Z',produto:'ERP',status:'GANHA',cdu:1000,rec:0,serv:0,total:1000,data:'2026-08-05',vendedor:''}],metas:[{nome:'Renan Oscar',tipo:'CDU',ano:12000,mes:[0,0,0,0,1000,0,0,0,0],tri:[0,0,0,0]}]};
 UI.fc={per:'mensal',sel:'08'}; render(); 1""")
 A.wait_for_timeout(150)
 html1 = ev(A, "document.getElementById('app').innerHTML")
 ck('com dados: mostra os KPIs de meta/realizado', 'Meta comercial' in html1 and 'Realizado' in html1, len(html1))
+ck('com dados: seletor de tipo de venda e bloco Meta × Ganho por tipo', 'fcftipo' in html1 and 'Meta × Ganho por tipo de venda' in html1, len(html1))
+ev(A, "UI.fc.tipo='rec'; render(); 1")
+ck('filtro Recorrente: oportunidade só-CDU some da tabela', 'Cliente Z' not in ev(A, "document.getElementById('app').innerHTML"))
+ev(A, "UI.fc.tipo=''; render(); 1"); html1 = ev(A, "document.getElementById('app').innerHTML")
 ck('com dados: mostra a tabela de oportunidades com a linha sincronizada', 'Cliente Z' in html1, len(html1))
 
 ev(A, "UI.view='geral'; render(); 1")  # sai da tela antes de terminar (não deixa UI.view preso em forecast p/ outros testes)
