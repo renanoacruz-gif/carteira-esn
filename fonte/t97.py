@@ -114,7 +114,7 @@ ck('fcLink remove o vínculo quando chave vazia', ev(A, "S.meta.fcLink['o1']") i
 ev(A, "delete S.clients['c_t97']; 1")
 
 # ---------- render: tela "Meu Forecast" existe na navegação e renderiza sem erro, com e sem dados ----------
-ck('NAV inclui o destino "forecast"', ev(A, "NAV.some(x=>x[0]==='forecast')"))
+ck('NAV inclui o destino "forecast"', ev(A, "NAV.some(x=>x[0]==='forecast'||x[3].some(s=>s[0]==='forecast'))"))
 ck('V dispatch (ui.js) liga forecast -> vForecast', ev(A, "typeof vForecast") == 'function')
 
 ev(A, "delete S.meta.fcData; delete S.meta.fcSheet; UI.view='forecast'; render(); 1")

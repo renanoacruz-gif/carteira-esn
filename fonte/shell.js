@@ -23,9 +23,7 @@ const IC = {
 const ico = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
 /* 8 destinos de primeiro nível; telas internas ficam como subitens do destino ativo */
 const NAV = [
-  ['geral', 'Visão da Carteira', 'dash', []],
-  ['forecast', 'Meu Forecast', 'flag', []],
-  ['mrr', 'Carteira & MRR', 'coin', []],
+  ['geral', 'Visão da Carteira', 'dash', [['geral', 'Visão geral', 'dash'], ['mrr', 'Carteira & MRR', 'coin'], ['forecast', 'Meu Forecast', 'flag']]],
   ['clientes', 'Clientes', 'users', [['clientes', 'Clientes', 'users'], ['cliente', 'Cliente', 'user'], ['segmentos', 'Segmentos', 'pie'], ['consol', 'Consolidação', 'merge']]],
   ['oport', 'Oportunidades TOTVS', 'plan', [['oport', 'Oportunidades', 'plan'], ['plano', 'Acompanhamento (opcional)', 'merge']]],
   ['mercado', 'Inteligência de Mercado', 'trend', []],

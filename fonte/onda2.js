@@ -86,6 +86,7 @@ function tabReuniao(c) {
   <p class="muted sm">Combinados com este cliente, com a data que você definir. Retornos vencidos ou que vencem hoje entram na Central de Pendências e, se o lembrete diário estiver ativo, no número do aviso (só o número).</p>
   ${rs.length ? `<div class="tw"><table><thead><tr><th>Retorno</th><th>Prazo</th><th>Responsável</th><th>Situação</th><th></th></tr></thead><tbody>${rs.map(linha).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhum retorno registrado.</p>'}
   <div class="row" style="margin-top:8px"><input type="text" id="rt-texto" placeholder="O que ficou combinado (ex.: enviar proposta revisada)" style="min-width:280px;flex:1" maxlength="300"><input type="date" id="rt-prazo"><input type="text" id="rt-resp" placeholder="Responsável" style="min-width:120px" maxlength="80"><button class="btn" data-a="rtAdd" data-k="${kk(c)}">Adicionar retorno</button></div></div>`;
+  h += empInterCard(c);
   h += `<div class="card"><h3>Pós-reunião: ata → retornos</h3>
   <p class="muted sm">Cole a ata ou suas anotações. <b>Antes de qualquer envio, CNPJ, CPF, valores em reais, e-mails e telefones são trocados por marcadores</b> e você vê o texto exato que será enviado. A leitura usa a sua chave de IA (Configurações → IA e provedores); nada é salvo sem a sua revisão.</p>
   <textarea id="reu-ata" rows="6" style="width:100%" placeholder="Cole aqui a ata da reunião…">${esc(REU.ata)}</textarea>

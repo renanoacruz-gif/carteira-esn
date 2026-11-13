@@ -125,6 +125,7 @@ async function loadPortfolio(file) {
     const buf = await readBuf(file); const t = await readTable(file, buf);
     const sheets = t.sheets.filter(s => s.rows.some(r => r.some(c => String(c).trim() !== '')));
     if (!sheets.length) throw new Error('Arquivo sem dados.');
+    if (empPreparar(file.name, sheets, true)) { log(`"${file.name}" reconhecida como exportação Clientes_ESN do Empodera: encaminhada para Carteira & MRR.`, 'ok'); UI.busy = ''; UI.view = 'mrr'; render(); return; }
     const si = 0, h = detectHeader(sheets[si].rows);
     UI.wiz = { name: file.name, sheets, si, h, map: autoMap((sheets[si].rows[h] || []).map(String)) };
     log(`Carteira "${file.name}" lida: ${sheets.length} aba(s). Confira o mapeamento de colunas.`, 'ok');

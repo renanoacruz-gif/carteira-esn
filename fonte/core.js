@@ -411,6 +411,7 @@ const NPS_LOW = 6;
 function retentionSignals(c) {
   const s = [];
   const ch = norm(c.churn || ''); if (ch && !/^(0|nao|n|no|false|baixo|-|nenhum)$/.test(ch)) s.push({ cls: 'FATO', text: `Planilha: campo churn/risco = "${c.churn}"`, src: `Planilha • linha ${c.src?.row || '?'}` });
+  empSinais(c).forEach(x => s.push(x));
   const n = parseNum(c.nps); if (n != null && n <= 10 && n <= NPS_LOW) s.push({ cls: 'FATO', text: `Planilha: NPS = ${n} (≤ ${NPS_LOW} na escala 0–10 presumida — NECESSITA VALIDAÇÃO da escala)`, src: `Planilha • linha ${c.src?.row || '?'}` });
   return s;
 }

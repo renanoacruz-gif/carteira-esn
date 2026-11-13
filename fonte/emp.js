@@ -90,11 +90,15 @@ function empPlano(recs) {
   const ausentes = Object.values(S.clients).filter(c => c.emp && !c.emp.ausente && !inc.has(empCodKey(c.emp.cod)));
   return { cur, novos, primeira, mud, ausentes, mrrNovo: empSum(recs, r => r.mrrP), mrrAntes: empSum(Object.values(S.clients).filter(c => c.emp && !c.emp.ausente), c => c.emp.mrrP) };
 }
+/* Reconhece a exportação Clientes_ESN e abre a prévia; silencioso=true devolve false (em vez de erro) quando não é a planilha do Empodera */
+function empPreparar(nome, sheets, silencioso) {
+  let res; try { res = empLer(sheets); } catch (e) { if (silencioso) return false; throw e; }
+  if (!res.recs.length) { if (silencioso) return false; throw new Error('A planilha não tem clientes com código.'); }
+  const U = empUI(), m = nome.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/); U.pend = { name: nome, aba: res.aba, recs: res.recs, data: m ? m[3] + '-' + m[2] + '-' + m[1] : empHoje() }; U.tab = 'dados'; return true;
+}
 async function empArquivo(file) {
-  if (!file) return; const U = empUI();
-  try { const t = await readTable(file, await file.arrayBuffer()), res = empLer(t.sheets); if (!res.recs.length) throw new Error('A planilha não tem clientes com código.');
-    const m = file.name.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/); U.pend = { name: file.name, aba: res.aba, recs: res.recs, data: m ? m[3] + '-' + m[2] + '-' + m[1] : empHoje() }; U.tab = 'dados';
-  } catch (e) { toast(e.message || 'Arquivo não reconhecido.'); }
+  if (!file) return;
+  try { empPreparar(file.name, (await readTable(file, await file.arrayBuffer())).sheets); } catch (e) { toast(e.message || 'Arquivo não reconhecido.'); }
   render();
 }
 function empAplicar(data) {
@@ -105,10 +109,11 @@ function empAplicar(data) {
       c = S.clients[key] = { key, code: r.cod, name: r.fantasia || r.razao || r.cod, cnpj: r.cnpj.length === 14 ? r.cnpj : '', cnpjRaw: '', seg: r.seg, city: r.cidade, size: '', mrr: r.mrrP || null, productsRaw: '', churn: '', nps: '', notes: '', uf: r.uf, regime: '', release: '', fichas: [], docs: [], mgmt: {}, act: {} };
       cadInit(c); c.src = { file: P.name, sheet: P.aba, row: 0 }; runAnalysis(c); pl.cur.set(r.cod, c); }
     const hist = (c.emp?.hist || []).filter(h => h[0] !== data).concat([[data, r.mrrP]]).sort((a, b) => a[0].localeCompare(b[0])).slice(-24);
-    c.emp = { ...r, ausente: false, hist }; if (c.mrr !== r.mrrP) { c.mrr = r.mrrP; runAnalysis(c); } /* MRR oficial do cadastro = MRR pagante do Empodera */ touchC(c.key);
+    const prodAuto = empParseProd(r.prod).produtos.join(', '); if (!c.productsRaw || c.productsRaw === c.emp?.prodAuto) c.productsRaw = prodAuto; /* base instalada do Empodera alimenta o motor quando o cadastro não informa produtos */
+    c.emp = { ...r, ausente: false, hist, prodAuto }; c.mrr = r.mrrP; /* MRR oficial do cadastro = MRR pagante do Empodera */ touchC(c.key);
   }
   pl.ausentes.forEach(c => { c.emp.ausente = true; touchC(c.key); });
-  M.dataBase = data; M.fonte = P.name; M.importadoEm = nowISO();
+  M.dataBase = data; M.fonte = P.name; M.importadoEm = nowISO(); empReanalisar();
   const D = empDerive(); M.snaps = M.snaps.filter(s => s.data !== data).concat({ data, fonte: P.name, total: D.length, ativos: D.filter(d => d.ativo).length, mrrP: Math.round(empSum(D, d => d.e.mrrP) * 100) / 100, mrrC: Math.round(empSum(D, d => d.e.mrrC) * 100) / 100 }).sort((a, b) => a.data.localeCompare(b.data)).slice(-60);
   U.pend = null; U.tab = 'painel'; touchMeta(); render(); toast(`Importação aplicada: ${empPl(P.recs.length, 'cliente')} (${pl.novos.length} novos, ${pl.mud.length} com MRR alterado, ${pl.ausentes.length} ausentes).`);
 }
@@ -118,7 +123,25 @@ function empSetCfg(k, v) {
   else if (k === 'limiarMrr') { const n = empNum(v); if (n > 0) M.cfg.limiarMrr = n; }
   else if (k === 'limiarDias') { const n = Math.round(+v); if (n >= 30) M.cfg.limiarDias = n; }
   else if (k === 'baseRecencia' && ['produto', 'servico', 'recente'].includes(v)) M.cfg.baseRecencia = v;
-  touchMeta(); render();
+  empReanalisar(); touchMeta(); render();
+}
+/* Sinais do Empodera para a regra de retenção do motor de oportunidades (core.js → retentionSignals) */
+function empSinais(c) {
+  const e = c.emp, s = []; if (!e || e.ausente) return s; const M = empMeta(), pr = empParseProd(e.prod), src = `Empodera • ${M.fonte || 'Clientes_ESN'}`;
+  pr.tags.filter(t => t.sev).forEach(t => s.push({ cls: 'FATO', text: `Empodera: etiqueta "${t.l}" registrada na conta`, src }));
+  if (/^ativo/.test(norm(e.sit)) && e.uvp && (e.mrrP || 0) >= M.cfg.limiarMrr) { const d = Math.max(0, empDias(e.uvp, M.dataBase)); if (d > M.cfg.limiarDias) s.push({ cls: 'FATO', text: `Empodera: MRR pagante ${fmtBRL(e.mrrP)} e última venda de produto em ${fmtD(e.uvp)} (há ${empTempo(d)}) — quadrante Proteger`, src }); }
+  return s;
+}
+function empReanalisar() { Object.values(S.clients).forEach(c => { if (c.emp) runAnalysis(c); }); }
+function empBriefRows(c) {
+  const e = c.emp; if (!e) return null; const d = empDerive(true).find(x => x.key === c.key), g = c.gst || {};
+  return [['MRR pagante', fmtBRL(e.mrrP) + (d.gap > 0.009 ? ` (contratado ${fmtBRL(e.mrrC)})` : '')], ['Última venda de produto', e.uvp ? `${fmtD(e.uvp)} (há ${empTempo(d.dp)})` : 'sem data'], ['Última venda de serviço', e.uvs ? `${fmtD(e.uvs)} (há ${empTempo(d.ds)})` : 'sem data'], ['Quadrante de atenção', e.ausente ? 'fora da última importação' : d.quad], ['Produtos (etiqueta)', d.produtos.join(', ') || 'não informado'],
+    ...(d.tags.length ? [['Etiquetas', d.tags.map(t => t.l).join(', ')]] : []), ...(g.proximaAcao || g.dataAcao ? [['Próxima ação', (g.proximaAcao || 'sem descrição') + (g.dataAcao ? ' · ' + fmtD(g.dataAcao) : '')]] : []), ['Data-base', fmtD(empMeta().dataBase)]];
+}
+/* Visão da Carteira: ações de conta vencidas ou para hoje */
+function empHoje2() {
+  const hj = empHoje(), it = Object.values(S.clients).filter(c => c.gst?.dataAcao && c.gst.dataAcao <= hj).sort((a, b) => a.gst.dataAcao.localeCompare(b.gst.dataAcao)); if (!it.length) return '';
+  return `<div class="card" id="emphoje"><div class="row"><h3>Ações de conta para hoje</h3>${pill(it.length + (it.length > 1 ? ' ações' : ' ação'), 'warn')}</div>${it.slice(0, 6).map(c => `<button class="em-ag" data-a="openTab" data-k="${esc(c.key)}" data-v="gestao"><span class="${c.gst.dataAcao < hj ? 'em-late' : ''}"><b>${fmtD(c.gst.dataAcao).slice(0, 5)}</b><small>${c.gst.dataAcao < hj ? 'Vencida' : 'Hoje'}</small></span><span><b>${esc(c.name)}</b><small>${esc(c.gst.proximaAcao || 'Ação sem descrição')}</small></span>${c.gst.prioridade ? pill(c.gst.prioridade, c.gst.prioridade === 'Alta' ? 'warn' : 'off') : ''}</button>`).join('')}${it.length > 6 ? `<p class="sm muted">+ ${it.length - 6} — veja em Pendências documentais.</p>` : ''}</div>`;
 }
 /* ---------- gestão da conta (ficha do cliente) ---------- */
 function empGstSet(key, f, v) { const c = S.clients[key]; if (!c || !['prioridade', 'proximaAcao', 'dataAcao', 'oportunidade', 'potencial', 'contato'].includes(f)) return; const g = c.gst ||= {}; g[f] = f === 'potencial' ? empNum(v) : String(v || '').trim(); g.em = nowISO(); touchC(key); }
@@ -128,7 +151,6 @@ function empGestaoTab(c) {
   const g = c.gst || {}, k = kk(c), d = c.emp ? empDerive(true).find(x => x.key === c.key) : null, e = c.emp;
   const fld = (f, l, tp = 'text', w = '') => `<label class="em-fld ${w}"><span>${l}</span><input type="${tp}" data-c="gst" data-k="${k}" data-f="${f}" value="${esc(f === 'potencial' ? (g[f] ? g[f].toLocaleString('pt-BR') : '') : g[f] || '')}"${f === 'potencial' ? ' inputmode="decimal"' : ''}></label>`;
   const st = (l, v, s = '') => `<div class="kpi em-k"><div class="sm muted">${l}</div><b>${v}</b>${s ? `<div class="sm muted">${esc(s)}</div>` : ''}</div>`;
-  const ints = [...(g.interacoes || [])].sort((a, b) => b.data.localeCompare(a.data));
   return `${e ? `<div class="card"><div class="row"><h3>Posição no Empodera</h3>${d ? empQuadPill(d.quad) : ''}${e.ausente ? pill('fora da última importação', 'warn') : ''}<span class="sp"></span>${/^https?:\/\//.test(e.link || '') ? `<a class="btn ghost sm" href="${esc(e.link)}" target="_blank" rel="noopener noreferrer">Abrir no Empodera ↗</a>` : ''}</div>
   <div class="grid g4">${st('MRR pagante', fmtBRL(e.mrrP), d.gap > 0.009 ? 'Contratado ' + fmtBRL(e.mrrC) : '')}${st('Últ. venda produto', fmtD(e.uvp), e.uvp ? 'há ' + empTempo(d.dp) : '')}${st('Últ. venda serviço', fmtD(e.uvs), e.uvs ? 'há ' + empTempo(d.ds) : '')}${st('MRR do grupo', e.mrrG ? fmtBRL(e.mrrG) : '—', e.grupoEmp)}</div>
   ${d.produtos.length || d.tags.length ? `<div style="margin-top:8px">${d.produtos.map(p => pill(p, 'off')).join(' ')} ${d.tags.map(t => pill(t.l, t.sev ? 'warn' : 'off')).join(' ')}</div>` : ''}
@@ -136,7 +158,11 @@ function empGestaoTab(c) {
   <div class="card"><h3>Gestão da conta</h3><div class="em-form">
   <label class="em-fld"><span>Prioridade</span><select data-c="gst" data-k="${k}" data-f="prioridade">${['', 'Alta', 'Média', 'Baixa'].map(p => `<option value="${p}" ${p === (g.prioridade || '') ? 'selected' : ''}>${p || '—'}</option>`).join('')}</select></label>
   ${fld('dataAcao', 'Data da próxima ação', 'date')}${fld('proximaAcao', 'Próxima ação', 'text', 'wide')}${fld('oportunidade', 'Oportunidade em pauta', 'text', 'wide')}${fld('potencial', 'Potencial estimado (R$)')}${fld('contato', 'Contato principal')}</div></div>
-  <div class="card"><h3>Interações</h3><div class="row" style="gap:6px;flex-wrap:wrap"><input type="date" id="gi_data" value="${empHoje()}" aria-label="Data da interação"><select id="gi_tipo" aria-label="Tipo">${['Reunião', 'Visita', 'Ligação', 'E-mail', 'WhatsApp', 'Proposta', 'Outro'].map(t => `<option>${t}</option>`).join('')}</select><input type="text" id="gi_txt" placeholder="O que foi tratado" style="flex:1;min-width:200px" aria-label="Descrição"><button class="btn pri sm" data-a="gstAddI" data-k="${k}">Registrar</button></div>
+  <p class="sm muted">Interações e retornos combinados com o cliente ficam na aba <a href="#" data-a="ctab" data-v="reuniao">Reunião e retornos</a>${(g.interacoes || []).length ? ` (${g.interacoes.length} interação(ões) registrada(s))` : ''}.</p>`;
+}
+function empInterCard(c) {
+  const g = c.gst || {}, k = kk(c), ints = [...(g.interacoes || [])].sort((a, b) => b.data.localeCompare(a.data));
+  return `<div class="card"><h3>Interações</h3><p class="muted sm">Registro rápido de cada contato com o cliente (reunião, visita, ligação, mensagem).</p><div class="row" style="gap:6px;flex-wrap:wrap"><input type="date" id="gi_data" value="${empHoje()}" aria-label="Data da interação"><select id="gi_tipo" aria-label="Tipo">${['Reunião', 'Visita', 'Ligação', 'E-mail', 'WhatsApp', 'Proposta', 'Outro'].map(t => `<option>${t}</option>`).join('')}</select><input type="text" id="gi_txt" placeholder="O que foi tratado" style="flex:1;min-width:200px" aria-label="Descrição"><button class="btn pri sm" data-a="gstAddI" data-k="${k}">Registrar</button></div>
   ${ints.length ? `<table class="sm" style="margin-top:8px"><tbody>${ints.map(i => `<tr><td class="nw">${fmtD(i.data)} · ${esc(i.tipo)}</td><td>${esc(i.texto)}</td><td><button class="btn ghost sm" data-a="gstDelI" data-k="${k}" data-id="${esc(i.id)}" aria-label="Excluir interação">${ico('x', 14)}</button></td></tr>`).join('')}</tbody></table>` : '<p class="sm muted" style="margin:8px 0 0">Nenhuma interação registrada.</p>'}</div>`;
 }
 /* ---------- componentes ---------- */
@@ -144,7 +170,7 @@ const empQuadPill = q => `<span class="em-q em-q-${q.replace(' ', '')}">${q}</sp
 const empGo = f => `data-a="empGo" data-f='${esc(JSON.stringify(f))}'`;
 const empOpen = d => `data-a="open" data-k="${esc(d.key)}"`;
 const empChip = (d, x = '') => `<button class="em-chip" ${empOpen(d)}>${esc(d.nome)}${x ? ` <small>${esc(x)}</small>` : ''}</button>`;
-const empDt = (iso, dias) => iso ? `<div class="nw${dias > empMeta().cfg.limiarDias ? ' em-old' : ''}">${fmtD(iso)}<small>há ${empTempo(dias)}</small></div>` : '—';
+const empDt = (iso, dias) => iso ? `<div class="nw em-dt${dias > empMeta().cfg.limiarDias ? ' em-old' : ''}">${fmtD(iso)}<small>há ${empTempo(dias)}</small></div>` : '—';
 const empAcao = g => !g.proximaAcao && !g.dataAcao ? '<span class="muted">—</span>' : `<b>${esc(g.proximaAcao || 'Ação sem descrição')}</b>${g.dataAcao ? `<small class="${g.dataAcao < empHoje() ? 'em-late' : 'muted'}">${g.dataAcao < empHoje() ? 'Vencida · ' : ''}${fmtD(g.dataAcao)}</small>` : ''}`;
 function empBars(items, o = {}) {
   if (!items.length) return '<p class="sm muted">Sem dados para exibir.</p>'; const mx = Math.max(...items.map(i => i.v), 0) || 1, fmt = o.fmt || empBrlK;
