@@ -1121,25 +1121,48 @@ async function catDescobrir(db, env, f, n) {
   await catLog(db, f.id, 'descobrir', { lidas, novas, erros, detalhe: parou || `${rest} página(s) ainda por ler` });
   return { lidas, novas, erros, restantes: rest, parou };
 }
+/* relê páginas já revisadas (candidata/importada), das mais antigas para as mais novas, e sinaliza as que mudaram na fonte */
+async function catReler(db, env, f, n) {
+  const ctx = { sub: 0 }, rb = await catRobots(new URL(f.url).hostname, env, ctx); if (!rb.ok) return { parou: 'robots.txt indisponível: ' + rb.erro, relidas: 0, alteradas: 0, erros: 0 };
+  const fila = (await db.prepare("SELECT chave,url,hash FROM cat_paginas WHERE fonte=? AND estado IN ('candidata','importada') ORDER BY vista_em, rowid LIMIT ?").bind(f.id, Math.max(1, Math.min(CAT_CFG.lote, n | 0 || CAT_CFG.lote))).all()).results || [];
+  let relidas = 0, alteradas = 0, erros = 0;
+  for (const p of fila) {
+    if (relidas + erros) await catPausa(CAT_CFG.pausaMs); const agora = new Date().toISOString(), r = catRobotsOk(rb.reg, p.url) ? await catLer(p.url, env, ctx, rb.reg) : { erro: lkErr('bloqueada_robots', 'bloqueada pelo robots.txt') };
+    if (r.erro) { erros++; await db.prepare('UPDATE cat_paginas SET erro=?, vista_em=? WHERE chave=?').bind(catTxt('releitura — ' + r.erro.codigo + ': ' + r.erro.mensagem, 200), agora, p.chave).run(); continue; }
+    relidas++; const mudou = !!p.hash && p.hash !== r.hash; if (mudou) alteradas++;
+    await db.prepare('UPDATE cat_paginas SET erro=NULL, titulo=COALESCE(?,titulo), hash=?, filhos=?, vista_em=?, alterada_em=CASE WHEN ? THEN ? ELSE alterada_em END WHERE chave=?').bind(r.titulo || null, r.hash, r.links.length, agora, mudou ? 1 : 0, agora, p.chave).run();
+  }
+  await catLog(db, f.id, 'reler', { lidas: relidas, novas: alteradas, erros, detalhe: `${alteradas} página(s) alterada(s) na fonte` });
+  return { relidas, alteradas, erros, parou: '' };
+}
+async function catMapa(db) { return { paginas: (await db.prepare("SELECT chave,url,fonte,titulo,estado FROM cat_paginas WHERE vista_em IS NOT NULL AND estado<>'inacessivel' ORDER BY fonte, prof, rowid LIMIT 3000").all()).results || [] }; }
 async function catEstado(db, q) {
   const fontes = (await db.prepare('SELECT * FROM cat_fontes ORDER BY id').all()).results || [], cont = {};
   for (const r of ((await db.prepare("SELECT fonte, estado e, COUNT(*) n FROM cat_paginas GROUP BY fonte, estado").all()).results || [])) (cont[r.fonte] = cont[r.fonte] || {})[r.e] = r.n;
   const w = [], b = []; if (q.fonte) { w.push('fonte=?'); b.push(String(q.fonte)); } if (CAT_EST.includes(q.estado)) { w.push('estado=?'); b.push(q.estado); } const t = catTxt(q.q, 60); if (t) { w.push("(titulo LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')"); const k = '%' + t.replace(/[\\%_]/g, '\\$&') + '%'; b.push(k, k); }
+  if (q.mudou === true) w.push("alterada_em IS NOT NULL AND revisada_em IS NOT NULL AND alterada_em > revisada_em");
   const wh = w.length ? ' WHERE ' + w.join(' AND ') : '', pag = Math.max(0, q.pag | 0), tot = (await db.prepare('SELECT COUNT(*) n FROM cat_paginas' + wh).bind(...b).first()).n;
-  const paginas = (await db.prepare('SELECT chave,url,fonte,titulo,prof,estado,erro,filhos,vista_em FROM cat_paginas' + wh + ' ORDER BY fonte, prof, rowid LIMIT 100 OFFSET ?').bind(...b, pag * 100).all()).results || [];
+  const paginas = (await db.prepare('SELECT chave,url,fonte,pai,titulo,prof,estado,erro,filhos,vista_em,alterada_em,revisada_em FROM cat_paginas' + wh + ' ORDER BY fonte, prof, rowid LIMIT 100 OFFSET ?').bind(...b, pag * 100).all()).results || [];
+  /* trilha: títulos dos ancestrais (raiz → pai), no máximo maxProf níveis */
+  const anc = new Map(); let falta = [...new Set(paginas.map(p => p.pai).filter(Boolean))];
+  for (let i = 0; i <= CAT_CFG.maxProf && falta.length; i++) { const lote = falta.slice(0, 90), rs = (await db.prepare('SELECT chave,pai,titulo FROM cat_paginas WHERE chave IN (' + lote.map(() => '?').join(',') + ')').bind(...lote).all()).results || []; for (const r of rs) anc.set(r.chave, r); falta = [...new Set(rs.map(r => r.pai).filter(k => k && !anc.has(k)))]; }
+  for (const p of paginas) { const t = []; let k = p.pai, n = 0; while (k && anc.has(k) && n++ <= CAT_CFG.maxProf) { t.unshift(anc.get(k).titulo || ''); k = anc.get(k).pai; } p.trilha = t; p.mudou = !!(p.alterada_em && p.revisada_em && p.alterada_em > p.revisada_em); delete p.pai; }
+  const mud = {}; for (const r of ((await db.prepare('SELECT fonte, COUNT(*) n FROM cat_paginas WHERE alterada_em IS NOT NULL AND revisada_em IS NOT NULL AND alterada_em > revisada_em GROUP BY fonte').all()).results || [])) mud[r.fonte] = r.n;
   const exec = (await db.prepare('SELECT ts,fonte,op,lidas,novas,erros,detalhe FROM cat_exec ORDER BY id DESC LIMIT 12').all()).results || [];
-  return { fontes: fontes.map(f => ({ ...f, autenticado: !!f.autenticado, contagem: cont[f.id] || {} })), paginas, total: tot, pag, exec, limites: CAT_CFG };
+  return { fontes: fontes.map(f => ({ ...f, autenticado: !!f.autenticado, contagem: cont[f.id] || {}, alteradas: mud[f.id] || 0 })), paginas, total: tot, pag, exec, limites: CAT_CFG };
 }
 async function admCatalogo(req, env) {
   const db = admDb(env); await admInit(env); await catSeed(db); let q; try { q = await req.json(); } catch { q = {}; } const op = String(q.op || 'estado');
   const inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400);
   if (op === 'estado') return J({ ok: true, ...(await catEstado(db, q)) });
-  if (op === 'testar' || op === 'descobrir' || op === 'limpar') {
+  if (op === 'mapa') return J({ ok: true, ...(await catMapa(db)) });
+  if (op === 'testar' || op === 'descobrir' || op === 'limpar' || op === 'reler') {
     const f = await catFonte(db, q.fonte); if (!f) return inval('Fonte desconhecida.');
     if (op === 'limpar') { if (q.confirmar !== f.id) return inval('Confirmação ausente.'); const r = await db.prepare('DELETE FROM cat_paginas WHERE fonte=?').bind(f.id).run(); await catLog(db, f.id, 'limpar', { detalhe: (r.meta?.changes || 0) + ' página(s) removida(s) da fila' }); return J({ ok: true, removidas: r.meta?.changes || 0 }); }
-    if (op === 'descobrir' && f.estado !== 'ok') return inval('Teste a conexão da fonte antes de descobrir páginas (estado atual: ' + f.estado + ').');
+    if ((op === 'descobrir' || op === 'reler') && f.estado !== 'ok') return inval('Teste a conexão da fonte antes de descobrir páginas (estado atual: ' + f.estado + ').');
     const k = 'cat:' + f.id, u = CAT_MEM.rate.get(k) || 0; if (Date.now() - u < 2500) return J({ ok: false, erro: { codigo: 'muitas_requisicoes', mensagem: 'Aguarde alguns segundos entre as leituras da mesma fonte.' } }, 429); CAT_MEM.rate.set(k, Date.now());
     if (op === 'testar') return J({ ok: true, teste: await catTestar(db, env, f) });
+    if (op === 'reler') return J({ ok: true, releitura: await catReler(db, env, f, q.n) });
     return J({ ok: true, lote: await catDescobrir(db, env, f, q.n) });
   }
   if (op === 'revisar') {

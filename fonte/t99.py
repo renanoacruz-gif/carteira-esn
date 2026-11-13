@@ -26,14 +26,16 @@ ck('teste de conexão grava estado real (não ok) e data', cj['estado'] in ('ind
 ck('fonte inacessível: nenhuma página criada, leitura continua bloqueada', sum(cj['contagem'].values())==0 and ev(A,"document.querySelector('[data-a=admCatDesc][data-f=enxoval]').disabled"))
 ck('execução registrada', ev(A,"ADMV.cat.exec.some(x=>x.op==='testar'&&x.fonte==='enxoval'&&x.erros===1)"))
 # interface com fila simulada (resposta do servidor substituída)
-FIX={'ok':True,'fontes':[{'id':'enxoval','nome':'Enxoval de vendas','url':'https://enxoval.totvs.com/','estado':'autenticacao_necessaria','erro':'A página redireciona para login.','autenticado':False,'testada_em':'2026-11-13T12:00:00Z','ultima_sinc':None,'contagem':{}},{'id':'tdn','nome':'TDN — documentação oficial','url':'https://tdn.totvs.com/pages/viewpage.action?pageId=398756186','estado':'ok','erro':None,'autenticado':True,'testada_em':'2026-11-13T12:00:00Z','ultima_sinc':'2026-11-13T12:05:00Z','contagem':{'pendente':6,'lida':3,'candidata':1,'inacessivel':1}}],
- 'paginas':[{'chave':'k%d'%i,'url':'https://tdn.totvs.com/pages/viewpage.action?pageId=%d'%(100+i),'fonte':'tdn','titulo':t,'prof':1,'estado':e,'erro':er,'filhos':f,'vista_em':v} for i,(t,e,er,f,v) in enumerate([('Linha Protheus','lida',None,12,'2026-11-13T12:05:00Z'),('Linha RM <img src=x onerror=window.__xss=1>','lida',None,4,'2026-11-13T12:05:00Z'),('Linha Datasul','lida',None,7,'2026-11-13T12:05:00Z'),('TOTVS Fluig','candidata',None,2,'2026-11-13T12:05:00Z'),('Área restrita','inacessivel','autenticacao_necessaria: A página exige login.',None,'2026-11-13T12:05:00Z'),('Ainda não lida','pendente',None,None,None)])],
+FIX={'ok':True,'fontes':[{'id':'enxoval','nome':'Enxoval de vendas','url':'https://enxoval.totvs.com/','estado':'autenticacao_necessaria','erro':'A página redireciona para login.','autenticado':False,'testada_em':'2026-11-13T12:00:00Z','ultima_sinc':None,'contagem':{}},{'id':'tdn','nome':'TDN — documentação oficial','url':'https://tdn.totvs.com/pages/viewpage.action?pageId=398756186','estado':'ok','erro':None,'autenticado':True,'testada_em':'2026-11-13T12:00:00Z','ultima_sinc':'2026-11-13T12:05:00Z','contagem':{'pendente':6,'lida':3,'candidata':1,'inacessivel':1},'alteradas':1}],
+ 'paginas':[{'chave':'k%d'%i,'url':'https://tdn.totvs.com/pages/viewpage.action?pageId=%d'%(100+i),'fonte':'tdn','titulo':t,'prof':2,'estado':e,'erro':er,'filhos':f,'vista_em':v,'trilha':['Linhas de Produto','Linha Backoffice','Família Fiscal'],'mudou':i==3} for i,(t,e,er,f,v) in enumerate([('Linha Protheus','lida',None,12,'2026-11-13T12:05:00Z'),('Linha RM <img src=x onerror=window.__xss=1>','lida',None,4,'2026-11-13T12:05:00Z'),('Linha Datasul','lida',None,7,'2026-11-13T12:05:00Z'),('TOTVS Fluig','candidata',None,2,'2026-11-13T12:05:00Z'),('Área restrita','inacessivel','autenticacao_necessaria: A página exige login.',None,'2026-11-13T12:05:00Z'),('Ainda não lida','pendente',None,None,None)])],
  'total':6,'pag':0,'exec':[{'ts':'2026-11-13T12:05:00Z','fonte':'tdn','op':'descobrir','lidas':4,'novas':9,'erros':1,'detalhe':'6 página(s) ainda por ler'}],'limites':{'lote':5,'maxProf':4,'maxPaginas':1500}}
 sent=[]
 def cat(rt):
     q=json.loads(rt.request.post_data or '{}'); sent.append(q)
     if q.get('op')=='revisar': rt.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'alteradas':len(q['chaves'])}))
     elif q.get('op')=='descobrir': rt.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'lote':{'lidas':5,'novas':7,'erros':0,'restantes':8,'parou':''}}))
+    elif q.get('op')=='mapa': rt.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'paginas':[{'chave':'tdn.totvs.com/pages/viewpage.action?pageid=%d'%(100+i),'url':x['url'],'fonte':'tdn','titulo':x['titulo'],'estado':x['estado']} for i,x in enumerate(FIX['paginas']) if x['vista_em'] and x['estado']!='inacessivel']}))
+    elif q.get('op')=='reler': rt.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'releitura':{'relidas':2,'alteradas':1,'erros':0,'parou':''}}))
     else: rt.fulfill(status=200,content_type='application/json',body=json.dumps(FIX))
 A.route('**/api/adm/catalogo',cat)
 ev(A,"ADMV.catF.estado='';admCatLoad();0"); A.wait_for_timeout(900)
@@ -56,10 +58,33 @@ A.click('[data-a=admCatSelTodas]'); A.wait_for_timeout(300)
 ck('selecionar todas ignora a não lida; mais de 3 bloqueia o envio', '5 selecionada(s)' in tx() and ev(A,"document.querySelector('[data-a=admCatImportar]').disabled"))
 ev(A,"ADMV.catSel={k0:true,k3:true};render();0"); A.wait_for_timeout(300); A.click('[data-a=admCatImportar]'); A.wait_for_timeout(700)
 ck('abrir na importação: leva os links para "Importar por link" sem importar sozinho', ev(A,"UI.view")=='solucoes' and ev(A,"UI.lkUrls")=='https://tdn.totvs.com/pages/viewpage.action?pageId=100\nhttps://tdn.totvs.com/pages/viewpage.action?pageId=103' and ev(A,"document.querySelector('[data-i=lkurls]').value.includes('pageId=103')") and not any(s.get('op')=='importar' for s in sent))
+# rodada 2: hierarquia, cruzamento com a Base, alterações e cobertura
+for i,x in enumerate(FIX['paginas']): x['chave']='tdn.totvs.com/pages/viewpage.action?pageid=%d'%(100+i)
+ck('sugestão de hierarquia guardada para a importação (por chave da página)', ev(A,"JSON.stringify(UI.catHint)").count('Linha Backoffice')==2)
+r=ev(A,"""(async()=>{ const U='https://tdn.totvs.com/pages/viewpage.action?pageId=100'; UI.catHint={[normUrl(U)]:['Linhas de Produto','Linha Backoffice','Família Fiscal']}; await lkResponse({pedidoId:'l_t99',consultadoEm:'2026-11-13T12:00:00Z',resultados:[{urlOriginal:U,ok:true,autenticado:false,paginas:[{u:U,principal:true,titulo:'Apuração Fiscal X',html:'<h1>Apuração Fiscal X</h1><h2>Funcionalidades</h2><ul><li>Apuração de tributos</li></ul>'}],anexos:[],naoLidos:[]}]}); const it=UI.solImp.items.at(-1), c=it.cands[0].c; const o={linha:c.linha,cat:c.categoria,inf:it.lk.inferidos.join('|'),view:UI.view,nsol:S.solutions.filter(r=>/Apuração Fiscal X/.test(r.nome)).length}; UI.solImp=null; S.pesq=S.pesq.filter(x=>x.id!=='l_t99'); return JSON.stringify(o); })()"""); rj=json.loads(r)
+ck('importação vinda da fila: linha e categoria sugeridas pela hierarquia, visível na prévia, nada gravado', rj['linha']=='Linha Backoffice' and rj['cat']=='Família Fiscal' and 'hierarquia na fonte: Linhas de Produto › Linha Backoffice › Família Fiscal' in rj['inf'] and rj['nsol']==0, r)
+ev(A,"S.solutions.push(newSol({nome:'TOTVS Teste Catálogo',status:'Validado',linha:'Protheus',fontes:[{t:'TDN',u:'https://tdn.totvs.com/pages/viewpage.action?pageId=100'}]}), newSol({nome:'TOTVS Fluig Teste',fontes:[{t:'TDN',u:'https://tdn.totvs.com/pages/viewpage.action?pageId=103#x'}]}));UI.view='adm';ADMV.catF.estado='';ADMV.catSel={};admCatLoad();0"); A.wait_for_timeout(1200)
+ck('trilha da fonte exibida na fila', 'Linhas de Produto › Linha Backoffice › Família Fiscal' in tx())
+ck('página já presente na Base é reconhecida pelo endereço', tx().count('Na Base')>=2 and 'TOTVS Teste Catálogo — Validado' in tx() and 'TOTVS Fluig Teste — NECESSITA VALIDAÇÃO' in tx(), tx()[700:1100])
+ck('cobertura por fonte: na Base e validadas', 'Na Base: 2 de 4 lida(s) · validadas: 1' in tx())
+ck('alterações na fonte sinalizadas (fonte e linha)', '1 alterada(s) na fonte' in tx() and 'Alterada na fonte desde a revisão' in tx())
+ck('sincronizar oferece as 2 páginas ainda não marcadas', 'Sincronizar com a Base (2)' in tx())
+sent.clear(); A.click('[data-a=admCatSinc]'); A.wait_for_timeout(900)
+rv=[s for s in sent if s.get('op')=='revisar']
+ck('sincronização marca como importada só as que estão na Base', len(rv)==1 and rv[0]['estado']=='importada' and sorted(rv[0]['chaves'])==[FIX['paginas'][0]['chave'],FIX['paginas'][3]['chave']], rv)
+A.click('[data-a=admCatReler][data-f=tdn]'); A.wait_for_timeout(800)
+ck('verificar alterações envia a operação de releitura', any(s.get('op')=='reler' and s.get('fonte')=='tdn' for s in sent) and ev(A,"document.querySelector('[data-a=admCatReler][data-f=enxoval]')")==None)
+A.click('#adm-cat [data-c=admCatMud]'); A.wait_for_timeout(600)
+ck('filtro "só alteradas" vai ao servidor', any(s.get('op')=='estado' and s.get('mudou')==True for s in sent))
+csv=ev(A,"admCatCsv()")
+ck('CSV de cobertura: cabeçalho, 4 páginas, solução e status', csv.count('\r\n')==4 and 'Na Base de Soluções' in csv and '"TOTVS Teste Catálogo";"Validado";"Protheus"' in csv and csv.count('"não"')==2, csv[:300])
+ck('CSV neutraliza fórmulas', ev(A,"(()=>{const m=ADMV.catMapa;ADMV.catMapa=[{chave:'z',url:'https://tdn.totvs.com/z',fonte:'tdn',titulo:'=HYPERLINK(1)',estado:'lida'}];const c=admCatCsv();ADMV.catMapa=m;return c.includes(`\"'=HYPERLINK(1)\"`)})()"))
+ev(A,"S.solutions=S.solutions.filter(r=>!/Teste/.test(r.nome));ADMV.catF.mudou=false;0")
 ev(A,"UI.view='adm';render();0"); A.wait_for_timeout(500)
 A.select_option('#adm-cat [data-c=admCatEst]','candidata'); A.wait_for_timeout(600)
 A.fill('#adm-cat-q','fluig'); A.click('[data-a=admCatBuscar]'); A.wait_for_timeout(600)
-ck('filtro e busca vão ao servidor', sent[-1].get('op')=='estado' and sent[-1].get('estado')=='candidata' and sent[-1].get('q')=='fluig' and sent[-1].get('pag')==0, sent[-1])
+le=[x for x in sent if x.get('op')=='estado'][-1]
+ck('filtro e busca vão ao servidor', le.get('estado')=='candidata' and le.get('q')=='fluig' and le.get('pag')==0, le)
 ck('demais blocos do painel preservados', all(x in ev(A,"document.querySelector('#app').innerText") for x in ['Lista de previstos e convites','Privacidade e retenção']))
 ck('sem erro de script', not ea and not eu, (ea+eu)[:2])
 print('FALHAS:',len(F)); [print(' -',x) for x in F]; p.stop()

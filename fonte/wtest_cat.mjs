@@ -62,6 +62,22 @@ x = await call({ op: 'revisar', chaves: [chL[1]], estado: 'publicada' }); ok(x.s
 x = await call({ op: 'estado', estado: 'candidata', q: "Linhas' OR 1=1" }); ok(x.s === 200 && x.j.total === 0, 'busca com aspas tratada como texto');
 x = await call({ op: 'estado', estado: 'candidata', q: 'linhas' }); ok(x.j.total === 1 && x.j.paginas[0].titulo === 'Linhas de Produto', 'filtro por estado + busca');
 ok(x.j.exec.length >= 5 && x.j.exec.some(e => e.op === 'descobrir') && x.j.exec.some(e => e.op === 'testar' && e.fonte === 'enxoval' && e.erros === 1), 'registro das execuções');
+// trilha, mapa e detecção de alteração
+x = await call({ op: 'estado', fonte: 'tdn', estado: '' }); const bo = x.j.paginas.find(p => p.titulo === 'Backoffice');
+ok(bo && JSON.stringify(bo.trilha) === JSON.stringify(['Linhas de Produto', 'Linha Protheus']) && x.j.paginas.find(p => p.prof === 0).trilha.length === 0 && !('pai' in bo), 'trilha: ancestrais da raiz até o pai');
+x = await call({ op: 'mapa' }); ok(x.j.paginas.length === 3 && x.j.paginas.every(p => p.estado !== 'inacessivel' && p.chave && p.url), 'mapa: só páginas lidas, sem as inacessíveis');
+await call({ op: 'revisar', chaves: [bo.chave], estado: 'importada' });
+await espera(); seen = []; x = await call({ op: 'reler', fonte: 'tdn' });
+ok(x.s === 200 && x.j.releitura.relidas === 2 && x.j.releitura.alteradas === 0 && !seen.some(s => /pageId=20$/.test(s.u)), 'releitura: só candidata/importada; sem mudança, nada sinalizado');
+site[pg(11)] = () => html('Backoffice', '<p>Agora com novo módulo fiscal.</p>');
+await espera(); x = await call({ op: 'reler', fonte: 'tdn' }); ok(x.j.releitura.alteradas === 1, 'releitura: conteúdo diferente → 1 alterada');
+x = await call({ op: 'estado', estado: '', mudou: true }); ok(x.j.total === 1 && x.j.paginas[0].titulo === 'Backoffice' && x.j.paginas[0].mudou && x.j.paginas[0].estado === 'importada' && x.j.fontes.find(f => f.id === 'tdn').alteradas === 1, 'filtro "alteradas na fonte" e contagem por fonte; estado da revisão preservado');
+site[pg(11)] = () => new Response('x', { status: 500 });
+await espera(); x = await call({ op: 'reler', fonte: 'tdn' }); ok(x.j.releitura.erros === 1, 'releitura com falha conta erro');
+x = await call({ op: 'estado', estado: 'importada' }); ok(x.j.paginas[0].estado === 'importada' && /releitura/.test(x.j.paginas[0].erro), 'falha na releitura não muda o estado da revisão');
+await new Promise(r => setTimeout(r, 30)); await call({ op: 'revisar', chaves: [bo.chave], estado: 'importada' });
+x = await call({ op: 'estado', estado: '', mudou: true }); ok(x.j.total === 0, 'revisar de novo limpa o sinal de alteração');
+x = await call({ op: 'reler', fonte: 'enxoval' }); ok(x.s === 400, 'releitura bloqueada em fonte que exige login');
 // robots indisponível → não segue
 x = await call({ op: 'limpar', fonte: 'tdn' }); ok(x.s === 400, 'limpar exige confirmação');
 x = await call({ op: 'limpar', fonte: 'tdn', confirmar: 'tdn' }); ok(x.j.removidas === 4, 'limpar remove só a fila da fonte');
