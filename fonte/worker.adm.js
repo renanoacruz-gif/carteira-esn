@@ -39,7 +39,11 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS adm_cfg (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)',
   'CREATE TABLE IF NOT EXISTS sugestoes (id TEXT PRIMARY KEY, email TEXT NOT NULL, em TEXT NOT NULL, area TEXT NOT NULL, texto TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0)',
-  'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)'
+  'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS cat_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, url TEXT NOT NULL, estado TEXT NOT NULL, erro TEXT, autenticado INTEGER NOT NULL DEFAULT 0, testada_em TEXT, ultima_sinc TEXT)',
+  'CREATE TABLE IF NOT EXISTS cat_paginas (chave TEXT PRIMARY KEY, url TEXT NOT NULL, fonte TEXT NOT NULL, pai TEXT, titulo TEXT, prof INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL, erro TEXT, hash TEXT, filhos INTEGER, vista_em TEXT, alterada_em TEXT, revisada_em TEXT)',
+  'CREATE INDEX IF NOT EXISTS cat_pag_fe ON cat_paginas(fonte, estado, prof)',
+  'CREATE TABLE IF NOT EXISTS cat_exec (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, fonte TEXT NOT NULL, op TEXT NOT NULL, lidas INTEGER NOT NULL DEFAULT 0, novas INTEGER NOT NULL DEFAULT 0, erros INTEGER NOT NULL DEFAULT 0, detalhe TEXT)'
 ];
 const admDb = env => env && env.DB && typeof env.DB.prepare === 'function' ? env.DB : null;
 async function admInit(env) {
@@ -295,6 +299,109 @@ async function admConfig(req, env) {
   if ('principais' in q) { const p = (Array.isArray(q.principais) ? q.principais : []).filter(f => ADM_FUNCS[f] && ADM_FUNCS[f].util); if (!p.length) return J({ ok: false, erro: { codigo: 'valor_invalido', mensagem: 'Escolha ao menos um recurso principal.' } }, 400); n.principais = p; }
   await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('cfg', JSON.stringify(n)).run(); return J({ ok: true, config: n });
 }
+/* ===== Catálogo de soluções — fontes oficiais, descoberta em lotes e fila de revisão (somente administrador) =====
+   Nada é publicado sozinho: a descoberta só registra endereço, título e estado. O conteúdo recuperado é tratado como dado
+   (texto sem marcação, truncado), nunca como instrução. Credenciais ficam em segredos do Worker e não são devolvidas. */
+const CAT_FONTES = [['tdn', 'TDN — documentação oficial', 'https://tdn.totvs.com/pages/viewpage.action?pageId=398756186'], ['enxoval', 'Enxoval de vendas', 'https://enxoval.totvs.com/']];
+const CAT_CFG = { lote: 5, maxProf: 4, maxPaginas: 1500, maxFilhos: 250, pausaMs: 350, robotsTtlMs: 864e5 };
+const CAT_EST = ['pendente', 'lida', 'candidata', 'irrelevante', 'inacessivel', 'importada'], CAT_REV = ['lida', 'candidata', 'irrelevante', 'importada'];
+const CAT_MEM = { robots: new Map(), rate: new Map() };
+const catTxt = (t, n) => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+const catPausa = ms => new Promise(r => setTimeout(r, ms));
+async function catHash(t) { const b = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t))); let s = ''; for (let i = 0; i < 12; i++) s += b[i].toString(16).padStart(2, '0'); return s; }
+async function catSeed(db) { await db.batch(CAT_FONTES.map(f => db.prepare("INSERT OR IGNORE INTO cat_fontes(id,nome,url,estado) VALUES(?,?,?,'nao_testada')").bind(f[0], f[1], f[2]))); }
+/* robots.txt: grupo "*"; a regra mais longa vence (Allow ganha o empate). Sem arquivo (404) = liberado. Falha de rede = não segue. */
+function catRobotsParse(txt) {
+  const reg = []; let ativo = false, visto = false;
+  for (const l0 of String(txt).split(/\r?\n/)) { const l = l0.replace(/#.*/, '').trim(), m = /^([a-z-]+)\s*:\s*(.*)$/i.exec(l); if (!m) continue; const k = m[1].toLowerCase(), v = m[2].trim();
+    if (k === 'user-agent') { if (visto) { ativo = false; visto = false; } if (v === '*') ativo = true; } else if (k === 'allow' || k === 'disallow') { visto = true; if (ativo && v) reg.push([k === 'allow', v]); } }
+  return reg.slice(0, 400);
+}
+function catRobotsOk(reg, u) {
+  let x; try { x = new URL(u); } catch { return false; } const alvo = x.pathname + x.search; let melhor = null;
+  for (const [perm, pad] of reg) { let re; try { re = new RegExp('^' + pad.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')); } catch { continue; } if (re.test(alvo) && (!melhor || pad.length > melhor[1].length || (pad.length === melhor[1].length && perm))) melhor = [perm, pad]; }
+  return melhor ? melhor[0] : true;
+}
+async function catRobots(host, env, ctx) {
+  const c = CAT_MEM.robots.get(host); if (c && Date.now() - c.em < CAT_CFG.robotsTtlMs) return c;
+  const r = await lkFetch('https://' + host + '/robots.txt', env, ctx, 200000); let o;
+  if (r.erro) o = r.erro.codigo === 'nao_encontrado' ? { ok: true, reg: [], em: Date.now() } : r.erro.codigo === 'autenticacao_necessaria' ? { ok: true, reg: [], em: Date.now(), nota: 'robots.txt atrás de login' } : { ok: false, erro: r.erro.mensagem, em: 0 };
+  else o = { ok: true, reg: /html/.test(r.ct) ? [] : catRobotsParse(new TextDecoder().decode(r.bytes)), em: Date.now() };
+  if (o.ok) CAT_MEM.robots.set(host, o); return o;
+}
+/* lê uma página: título, impressão digital do texto e links internos (mesmo host). TDN: tenta também a lista de páginas-filhas do Confluence. */
+async function catLer(url, env, ctx, rb) {
+  const r = await lkFetch(url, env, ctx, LKCFG.maxHtml); if (r.erro) return { erro: r.erro, autenticado: !!r.autenticado };
+  if (!/html/.test(r.ct)) return { erro: lkErr('formato_nao_suportado', 'Não é uma página HTML.'), autenticado: r.autenticado };
+  const html = decodeHtml(r.bytes, r.ct); if (isLogin(html, r.final)) return { erro: lkErr('autenticacao_necessaria', 'A página exige login.'), autenticado: r.autenticado };
+  const reg = lkRegion(html), fin = new URL(r.final), texto = stripTags(reg.html), links = [], vis = new Set();
+  const add = (u, t) => { let x; try { x = new URL(u, r.final); } catch { return; } if (x.protocol !== 'https:' || x.hostname !== fin.hostname) return; x.hash = ''; if (LK_SKIP.test(x.href) || LK_DOC.test(x.href)) return; if (!catRobotsOk(rb, x.href)) return; const k = lkKey(x.href); if (vis.has(k) || k === lkKey(r.final)) return; vis.add(k); if (links.length < CAT_CFG.maxFilhos) links.push({ u: x.href, t: catTxt(t, 160), k }); };
+  const pid = TDN_HOST.test(fin.hostname) ? (fin.searchParams.get('pageId') || (/[?&"']pageId=(\d+)/.exec(html) || [])[1] || (/<meta[^>]+name=["']ajs-page-id["'][^>]+content=["'](\d+)/i.exec(html) || [])[1]) : null; let viaApi = false;
+  if (pid && /^\d+$/.test(pid)) { const api = 'https://' + fin.hostname + '/rest/api/content/' + pid + '/child/page?limit=200';
+    if (catRobotsOk(rb, api)) { const a = await lkFetch(api, env, ctx, 600000); if (!a.erro && /json/.test(a.ct)) { try { const j = JSON.parse(new TextDecoder().decode(a.bytes)); for (const it of (Array.isArray(j.results) ? j.results : [])) if (it && /^\d+$/.test(String(it.id))) add('/pages/viewpage.action?pageId=' + it.id, it.title); viaApi = true; } catch { /* resposta inesperada: segue só com os links da página */ } } } }
+  for (const l of lkLinks(reg.html, r.final)) add(l.u, l.t);
+  return { final: r.final, titulo: catTxt(reg.titulo, 200), hash: await catHash(texto.slice(0, 200000)), chars: texto.length, links, viaApi, autenticado: r.autenticado };
+}
+async function catFonte(db, id) { return db.prepare('SELECT * FROM cat_fontes WHERE id=?').bind(String(id || '')).first(); }
+async function catLog(db, fonte, op, o) { await db.prepare('INSERT INTO cat_exec(ts,fonte,op,lidas,novas,erros,detalhe) VALUES(?,?,?,?,?,?,?)').bind(new Date().toISOString(), fonte, op, o.lidas || 0, o.novas || 0, o.erros || 0, catTxt(o.detalhe, 300)).run(); await db.prepare('DELETE FROM cat_exec WHERE id NOT IN (SELECT id FROM cat_exec ORDER BY id DESC LIMIT 200)').run(); }
+async function catTestar(db, env, f) {
+  const ctx = { sub: 0 }, agora = new Date().toISOString(), host = new URL(f.url).hostname, rb = await catRobots(host, env, ctx);
+  let estado, erro = null, res = null;
+  if (!rb.ok) { estado = 'indisponivel'; erro = 'robots.txt: ' + rb.erro; }
+  else if (!catRobotsOk(rb.reg, f.url)) { estado = 'bloqueada_robots'; erro = 'O robots.txt da fonte não permite a leitura automática deste endereço.'; }
+  else { res = await catLer(f.url, env, ctx, rb.reg); if (res.erro) { estado = res.erro.codigo === 'autenticacao_necessaria' ? 'autenticacao_necessaria' : res.erro.codigo === 'nao_encontrado' ? 'nao_encontrada' : 'indisponivel'; erro = res.erro.mensagem; } else estado = 'ok'; }
+  await db.prepare('UPDATE cat_fontes SET estado=?, erro=?, autenticado=?, testada_em=? WHERE id=?').bind(estado, erro, res && res.autenticado ? 1 : 0, agora, f.id).run();
+  if (estado === 'ok') await db.prepare("INSERT OR IGNORE INTO cat_paginas(chave,url,fonte,pai,titulo,prof,estado) VALUES(?,?,?,NULL,?,0,'pendente')").bind(lkKey(f.url), f.url, f.id, res.titulo).run();
+  await catLog(db, f.id, 'testar', { lidas: estado === 'ok' ? 1 : 0, erros: estado === 'ok' ? 0 : 1, detalhe: estado === 'ok' ? `ok; ${res.links.length} link(s) internos${res.viaApi ? '; páginas-filhas via API' : ''}` : estado + ': ' + erro });
+  return { estado, erro, titulo: res && !res.erro ? res.titulo : '', links: res && !res.erro ? res.links.length : 0, via_api: !!(res && res.viaApi), autenticado: !!(res && res.autenticado), credencial_configurada: lkHasAuth(host, env) };
+}
+async function catDescobrir(db, env, f, n) {
+  const ctx = { sub: 0 }, host = new URL(f.url).hostname, rb = await catRobots(host, env, ctx); if (!rb.ok) return { parou: 'robots.txt indisponível: ' + rb.erro, lidas: 0, novas: 0, erros: 0 };
+  const lote = Math.max(1, Math.min(CAT_CFG.lote, n | 0 || CAT_CFG.lote)), fila = (await db.prepare("SELECT chave,url,prof FROM cat_paginas WHERE fonte=? AND estado='pendente' AND prof<=? ORDER BY prof, rowid LIMIT ?").bind(f.id, CAT_CFG.maxProf, lote).all()).results || [];
+  let total = (await db.prepare('SELECT COUNT(*) n FROM cat_paginas WHERE fonte=?').bind(f.id).first()).n, lidas = 0, novas = 0, erros = 0, parou = '';
+  for (const p of fila) {
+    if (lidas + erros) await catPausa(CAT_CFG.pausaMs); const agora = new Date().toISOString();
+    if (!catRobotsOk(rb.reg, p.url)) { await db.prepare("UPDATE cat_paginas SET estado='inacessivel', erro=?, vista_em=? WHERE chave=?").bind('bloqueada pelo robots.txt', agora, p.chave).run(); erros++; continue; }
+    const r = await catLer(p.url, env, ctx, rb.reg);
+    if (r.erro) { erros++; await db.prepare("UPDATE cat_paginas SET estado='inacessivel', erro=?, vista_em=? WHERE chave=?").bind(catTxt(r.erro.codigo + ': ' + r.erro.mensagem, 200), agora, p.chave).run(); if (r.erro.codigo === 'autenticacao_necessaria' && p.prof === 0) { parou = 'A fonte exige login.'; await db.prepare("UPDATE cat_fontes SET estado='autenticacao_necessaria', erro=? WHERE id=?").bind(r.erro.mensagem, f.id).run(); break; } continue; }
+    lidas++; const st = [];
+    if (p.prof < CAT_CFG.maxProf) for (const l of r.links) { if (total + st.length >= CAT_CFG.maxPaginas) { parou = `Limite de ${CAT_CFG.maxPaginas} páginas por fonte atingido.`; break; } st.push(db.prepare("INSERT OR IGNORE INTO cat_paginas(chave,url,fonte,pai,titulo,prof,estado) VALUES(?,?,?,?,?,?,'pendente')").bind(l.k, l.u, f.id, p.chave, l.t, p.prof + 1)); }
+    st.push(db.prepare("UPDATE cat_paginas SET estado='lida', erro=NULL, titulo=?, hash=?, filhos=?, vista_em=?, alterada_em=? WHERE chave=?").bind(r.titulo || null, r.hash, r.links.length, agora, agora, p.chave));
+    const out = await db.batch(st); for (let i = 0; i < out.length - 1; i++) novas += out[i]?.meta?.changes || 0; total += st.length - 1;
+  }
+  await db.prepare('UPDATE cat_fontes SET ultima_sinc=? WHERE id=?').bind(new Date().toISOString(), f.id).run();
+  const rest = (await db.prepare("SELECT COUNT(*) n FROM cat_paginas WHERE fonte=? AND estado='pendente' AND prof<=?").bind(f.id, CAT_CFG.maxProf).first()).n;
+  await catLog(db, f.id, 'descobrir', { lidas, novas, erros, detalhe: parou || `${rest} página(s) ainda por ler` });
+  return { lidas, novas, erros, restantes: rest, parou };
+}
+async function catEstado(db, q) {
+  const fontes = (await db.prepare('SELECT * FROM cat_fontes ORDER BY id').all()).results || [], cont = {};
+  for (const r of ((await db.prepare("SELECT fonte, estado e, COUNT(*) n FROM cat_paginas GROUP BY fonte, estado").all()).results || [])) (cont[r.fonte] = cont[r.fonte] || {})[r.e] = r.n;
+  const w = [], b = []; if (q.fonte) { w.push('fonte=?'); b.push(String(q.fonte)); } if (CAT_EST.includes(q.estado)) { w.push('estado=?'); b.push(q.estado); } const t = catTxt(q.q, 60); if (t) { w.push("(titulo LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')"); const k = '%' + t.replace(/[\\%_]/g, '\\$&') + '%'; b.push(k, k); }
+  const wh = w.length ? ' WHERE ' + w.join(' AND ') : '', pag = Math.max(0, q.pag | 0), tot = (await db.prepare('SELECT COUNT(*) n FROM cat_paginas' + wh).bind(...b).first()).n;
+  const paginas = (await db.prepare('SELECT chave,url,fonte,titulo,prof,estado,erro,filhos,vista_em FROM cat_paginas' + wh + ' ORDER BY fonte, prof, rowid LIMIT 100 OFFSET ?').bind(...b, pag * 100).all()).results || [];
+  const exec = (await db.prepare('SELECT ts,fonte,op,lidas,novas,erros,detalhe FROM cat_exec ORDER BY id DESC LIMIT 12').all()).results || [];
+  return { fontes: fontes.map(f => ({ ...f, autenticado: !!f.autenticado, contagem: cont[f.id] || {} })), paginas, total: tot, pag, exec, limites: CAT_CFG };
+}
+async function admCatalogo(req, env) {
+  const db = admDb(env); await admInit(env); await catSeed(db); let q; try { q = await req.json(); } catch { q = {}; } const op = String(q.op || 'estado');
+  const inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400);
+  if (op === 'estado') return J({ ok: true, ...(await catEstado(db, q)) });
+  if (op === 'testar' || op === 'descobrir' || op === 'limpar') {
+    const f = await catFonte(db, q.fonte); if (!f) return inval('Fonte desconhecida.');
+    if (op === 'limpar') { if (q.confirmar !== f.id) return inval('Confirmação ausente.'); const r = await db.prepare('DELETE FROM cat_paginas WHERE fonte=?').bind(f.id).run(); await catLog(db, f.id, 'limpar', { detalhe: (r.meta?.changes || 0) + ' página(s) removida(s) da fila' }); return J({ ok: true, removidas: r.meta?.changes || 0 }); }
+    if (op === 'descobrir' && f.estado !== 'ok') return inval('Teste a conexão da fonte antes de descobrir páginas (estado atual: ' + f.estado + ').');
+    const k = 'cat:' + f.id, u = CAT_MEM.rate.get(k) || 0; if (Date.now() - u < 2500) return J({ ok: false, erro: { codigo: 'muitas_requisicoes', mensagem: 'Aguarde alguns segundos entre as leituras da mesma fonte.' } }, 429); CAT_MEM.rate.set(k, Date.now());
+    if (op === 'testar') return J({ ok: true, teste: await catTestar(db, env, f) });
+    return J({ ok: true, lote: await catDescobrir(db, env, f, q.n) });
+  }
+  if (op === 'revisar') {
+    const ch = (Array.isArray(q.chaves) ? q.chaves : []).map(x => String(x)).filter(x => x.length <= 400).slice(0, 100); if (!ch.length || !CAT_REV.includes(q.estado)) return inval('Informe as páginas e um estado válido.');
+    const agora = new Date().toISOString(), out = await db.batch(ch.map(c => db.prepare('UPDATE cat_paginas SET estado=?, revisada_em=? WHERE chave=? AND vista_em IS NOT NULL').bind(q.estado, agora, c)));
+    return J({ ok: true, alteradas: out.reduce((a, r) => a + (r?.meta?.changes || 0), 0) });
+  }
+  return inval('Operação desconhecida.');
+}
 async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg; if (!admDb(env)) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503);
   try {
@@ -303,8 +410,9 @@ async function admRota(req, env, au, url) {
     if (url.pathname === '/api/adm/sugestoes' && /^(GET|POST)$/.test(req.method)) return admSugestoes(req, env, url);
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
+    if (url.pathname === '/api/adm/catalogo' && req.method === 'POST') return admCatalogo(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo };

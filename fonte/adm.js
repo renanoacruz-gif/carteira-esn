@@ -117,7 +117,7 @@ const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e 
 function telAvisoUmaVez() { if (!TEL.on) return; try { if (lsGet('adm.aviso') === '1') return; lsSet('adm.aviso', '1'); setTimeout(() => toast('Registramos eventos de uso (recurso, data, resultado), sem conteúdo de carteira. Detalhes em Configurações → Conta.'), 1500); } catch { /* ok */ } }
 
 /* ---------------- Painel Administrador ---------------- */
-const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '' };
+const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0 }, catBusy: '', catSel: {} };
 window.__PAINEL = false;
 function admPainelOn(v) {
   window.__PAINEL = v === true;
@@ -142,6 +142,7 @@ async function admLoad() {
     if (ADMV.func) p.set('func', ADMV.func);
     ADMV.data = await admApi('/api/adm/resumo?' + p.toString());
     try { ADMV.sug = await admApi('/api/adm/sugestoes'); } catch { ADMV.sug = { erro: true }; }
+    await admCatLoad(true);
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -207,7 +208,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -249,6 +250,48 @@ function admSugCard(s) {
   <p class="muted sm">Texto livre enviado por cada executivo em Conta → Sugerir melhoria (sem CNPJ nem valores). Apagadas automaticamente após 180 dias.</p>
   ${s.itens && s.itens.length ? `<div class="tw" style="max-height:320px"><table><thead><tr><th>Quando</th><th>Quem</th><th>Área</th><th>Sugestão</th><th></th></tr></thead><tbody>${s.itens.map(x => `<tr class="${x.lida ? 'muted' : ''}"><td class="nw">${esc(dtBR(x.em))}</td><td class="sm">${esc(x.email)}</td><td>${esc(SUG_L[x.area] || x.area)}</td><td class="sm">${esc(x.texto)}</td><td>${x.lida ? '' : `<button class="btn ghost sm" data-a="admSugLida" data-id="${esc(x.id)}">Marcar como lida</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhuma sugestão recebida.</p>'}</div>`;
 }
+/* ===== Catálogo de soluções: fontes oficiais, descoberta em lotes e fila de revisão ===== */
+const CAT_FEST = { nao_testada: ['Não testada', 'p-info'], ok: ['Acessível', 'p-ok'], autenticacao_necessaria: ['Exige login', 'p-warn'], indisponivel: ['Indisponível', 'p-bad'], nao_encontrada: ['Não encontrada', 'p-bad'], bloqueada_robots: ['Bloqueada pelo robots.txt', 'p-warn'] };
+const CAT_PEST = { pendente: 'Por ler', lida: 'Lida — aguarda revisão', candidata: 'Candidata', irrelevante: 'Irrelevante', inacessivel: 'Inacessível', importada: 'Importada' };
+async function admCatLoad(silencioso) { try { ADMV.cat = await admApi('/api/adm/catalogo', { op: 'estado', ...ADMV.catF }); } catch (e) { ADMV.cat = { erro: e.message }; } if (!silencioso && UI.view === 'adm') render(); }
+async function admCatOp(corpo, rotulo) {
+  if (ADMV.catBusy) return; ADMV.catBusy = rotulo; render(); let j = null;
+  try { j = await admApi('/api/adm/catalogo', corpo); } catch (e) { toast(e.message); }
+  ADMV.catBusy = ''; await admCatLoad(true); render(); return j;
+}
+function admCatCard() {
+  const c = ADMV.cat; if (!c) return '';
+  if (c.erro) return `<div class="card" id="adm-cat"><h3>Catálogo de soluções — fontes oficiais</h3><div class="alert d">Não foi possível carregar o catálogo: ${esc(c.erro)}</div></div>`;
+  const F = ADMV.catF, n = (f, e) => (f.contagem || {})[e] || 0, tot = f => Object.values(f.contagem || {}).reduce((a, b) => a + b, 0), busy = ADMV.catBusy ? 'disabled' : '';
+  const sel = Object.keys(ADMV.catSel).filter(k => ADMV.catSel[k] && c.paginas.some(p => p.chave === k));
+  const fontes = c.fontes.map(f => { const e = CAT_FEST[f.estado] || [f.estado, 'p-info'], t = tot(f), rev = n(f, 'candidata') + n(f, 'irrelevante') + n(f, 'importada');
+    return `<tr><td><b>${esc(f.nome)}</b><div class="sm muted" style="word-break:break-all">${esc(f.url)}</div></td><td><span class="pill ${e[1]}">${esc(e[0])}</span>${f.autenticado ? ' <span class="pill p-info">com credencial</span>' : ''}${f.erro ? `<div class="sm muted">${esc(f.erro)}</div>` : ''}<div class="sm muted">Teste: ${esc(f.testada_em ? fmtDate(f.testada_em) : 'nunca')} · Última leitura: ${esc(f.ultima_sinc ? fmtDate(f.ultima_sinc) : 'nunca')}</div></td>
+    <td class="sm">${t ? `${t} descoberta(s)<br>${n(f, 'pendente')} por ler · ${n(f, 'lida')} aguardam revisão<br>${n(f, 'candidata')} candidata(s) · ${n(f, 'importada')} importada(s) · ${n(f, 'irrelevante')} irrelevante(s)<br>${n(f, 'inacessivel')} inacessível(is) · revisadas: ${t ? Math.round(rev / t * 100) : 0}%` : '<span class="muted">Nada descoberto ainda.</span>'}</td>
+    <td><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-a="admCatTestar" data-f="${esc(f.id)}" ${busy}>Testar conexão</button><button class="btn sm pri" data-a="admCatDesc" data-f="${esc(f.id)}" ${busy || (f.estado === 'ok' && n(f, 'pendente') ? '' : 'disabled')}>Ler próximo lote (${c.limites.lote})</button>${t ? `<button class="btn sm ghost" data-a="admCatLimpar" data-f="${esc(f.id)}" ${busy}>Limpar fila</button>` : ''}</div></td></tr>`; }).join('');
+  const linhas = c.paginas.map(p => `<tr><td><input type="checkbox" data-c="admCatSel" data-k="${esc(p.chave)}" ${ADMV.catSel[p.chave] ? 'checked' : ''} ${p.vista_em ? '' : 'disabled'} aria-label="Selecionar página"></td><td>${esc(p.titulo || '(sem título)')}<div class="sm"><a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" style="word-break:break-all">${esc(p.url)}</a></div>${p.erro ? `<div class="sm muted">${esc(p.erro)}</div>` : ''}</td><td class="sm">${esc(p.fonte)} · nível ${p.prof}${p.filhos != null ? ` · ${p.filhos} link(s)` : ''}</td><td class="sm">${esc(CAT_PEST[p.estado] || p.estado)}</td></tr>`).join('');
+  const opt = (v, t, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(t)}</option>`;
+  return `<div class="card" id="adm-cat"><h3>Catálogo de soluções — fontes oficiais <span class="muted sm">(descoberta e revisão)</span></h3>
+  <p class="sm muted">A leitura é feita pelo servidor, em lotes pequenos, só nos domínios oficiais TOTVS e respeitando o robots.txt de cada fonte. Nada entra na Base de Soluções sozinho: cada página descoberta precisa da sua revisão, e a importação continua passando pela pré-visualização. Fonte que exige login não é contornada.</p>
+  ${ADMV.catBusy ? `<div class="alert i busy" role="status"><b>${esc(ADMV.catBusy)}</b></div>` : ''}
+  <div class="tw"><table><thead><tr><th>Fonte</th><th>Estado</th><th>Cobertura</th><th>Ações</th></tr></thead><tbody>${fontes}</tbody></table></div>
+  <h4 style="margin-top:14px">Fila de revisão <span class="muted sm">(${c.total} página(s) no filtro)</span></h4>
+  <div class="row" style="gap:8px;flex-wrap:wrap"><select data-c="admCatFonte" aria-label="Fonte">${opt('', 'Todas as fontes', F.fonte)}${c.fontes.map(f => opt(f.id, f.nome, F.fonte)).join('')}</select><select data-c="admCatEst" aria-label="Estado">${opt('', 'Todos os estados', F.estado)}${Object.entries(CAT_PEST).map(([k, v]) => opt(k, v, F.estado)).join('')}</select><input type="text" id="adm-cat-q" placeholder="Buscar por título ou endereço" value="${esc(F.q)}" style="min-width:220px"><button class="btn sm" data-a="admCatBuscar">Buscar</button></div>
+  ${c.paginas.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0"><span class="sm muted">${sel.length} selecionada(s):</span><button class="btn sm" data-a="admCatRev" data-e="candidata" ${sel.length ? '' : 'disabled'}>Marcar candidata</button><button class="btn sm" data-a="admCatRev" data-e="irrelevante" ${sel.length ? '' : 'disabled'}>Marcar irrelevante</button><button class="btn sm" data-a="admCatRev" data-e="importada" ${sel.length ? '' : 'disabled'}>Marcar importada</button><button class="btn sm ghost" data-a="admCatRev" data-e="lida" ${sel.length ? '' : 'disabled'}>Voltar para revisão</button><button class="btn sm pri" data-a="admCatImportar" ${sel.length && sel.length <= 3 ? '' : 'disabled'} title="Leva até 3 páginas para a importação por link da Base de Soluções">Abrir na importação (até 3)</button><button class="btn sm ghost" data-a="admCatSelTodas">Selecionar todas da página</button></div>
+  <div class="tw"><table><thead><tr><th></th><th>Página</th><th>Origem</th><th>Estado</th></tr></thead><tbody>${linhas}</tbody></table></div>
+  <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm ghost" data-a="admCatPag" data-d="-1" ${c.pag > 0 ? '' : 'disabled'}>Anterior</button><span class="sm muted">Página ${c.pag + 1} de ${Math.max(1, Math.ceil(c.total / 100))}</span><button class="btn sm ghost" data-a="admCatPag" data-d="1" ${(c.pag + 1) * 100 < c.total ? '' : 'disabled'}>Próxima</button></div>` : '<p class="sm muted">Nenhuma página neste filtro.</p>'}
+  ${c.exec.length ? `<details style="margin-top:10px"><summary class="sm">Últimas execuções</summary><ul class="sm">${c.exec.map(x => `<li>${esc(fmtDate(x.ts))} — ${esc(x.fonte)} · ${esc(x.op)}: ${x.lidas} lida(s), ${x.novas} nova(s), ${x.erros} erro(s)${x.detalhe ? ' — ' + esc(x.detalhe) : ''}</li>`).join('')}</ul></details>` : ''}</div>`;
+}
+const admCatSelecionadas = () => Object.keys(ADMV.catSel).filter(k => ADMV.catSel[k] && (ADMV.cat?.paginas || []).some(p => p.chave === k));
+const ADM_CAT_ACT = {
+  admCatTestar: async t => { const j = await admCatOp({ op: 'testar', fonte: t.dataset.f }, 'Testando a conexão com a fonte…'); if (j) toast(j.teste.estado === 'ok' ? `Fonte acessível: ${j.teste.links} link(s) internos encontrados.` : `Fonte não acessível: ${j.teste.erro || j.teste.estado}`); },
+  admCatDesc: async t => { const j = await admCatOp({ op: 'descobrir', fonte: t.dataset.f }, 'Lendo o próximo lote de páginas…'); if (j) toast(`${j.lote.lidas} lida(s), ${j.lote.novas} nova(s), ${j.lote.erros} erro(s).${j.lote.parou ? ' ' + j.lote.parou : ''}`); },
+  admCatLimpar: async t => { if (!confirm('Remover da fila todas as páginas descobertas desta fonte? A Base de Soluções não é alterada.')) return; const j = await admCatOp({ op: 'limpar', fonte: t.dataset.f, confirmar: t.dataset.f }, 'Limpando a fila…'); if (j) toast(`${j.removidas} página(s) removida(s) da fila.`); },
+  admCatRev: async t => { const ch = admCatSelecionadas(); if (!ch.length) return; const j = await admCatOp({ op: 'revisar', chaves: ch, estado: t.dataset.e }, 'Gravando a revisão…'); if (j) { ADMV.catSel = {}; toast(`${j.alteradas} página(s) atualizada(s).`); render(); } },
+  admCatImportar: () => { const ch = admCatSelecionadas(), us = (ADMV.cat?.paginas || []).filter(p => ch.includes(p.chave)).map(p => p.url).slice(0, 3); if (!us.length) return; UI.lkUrls = us.join('\n'); UI.view = 'solucoes'; render(); window.scrollTo(0, 0); toast('Links levados para "Importar por link". Confira e confirme a importação.'); },
+  admCatSelTodas: () => { for (const p of ADMV.cat?.paginas || []) if (p.vista_em) ADMV.catSel[p.chave] = true; render(); },
+  admCatBuscar: () => { ADMV.catF.q = document.getElementById('adm-cat-q')?.value || ''; ADMV.catF.pag = 0; admCatLoad(); },
+  admCatPag: t => { ADMV.catF.pag = Math.max(0, ADMV.catF.pag + (+t.dataset.d || 0)); admCatLoad(); }
+};
 const ADM_ACT = {
   admSugLida: async t => { try { await admApi('/api/adm/sugestoes', { id: t.dataset.id }); ADMV.sug = await admApi('/api/adm/sugestoes'); } catch (e) { toast(e.message); } render(); },
   admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
@@ -294,6 +337,8 @@ const ADM_ACT = {
 function admAviso() { if (ADMV.msg) toast(ADMV.msg.replace(/^!/, '')); } /* a mensagem do painel fica no topo; o aviso flutuante aparece onde a pessoa está */
 async function admCopiar(txt, ok) { try { await navigator.clipboard.writeText(txt); toast(ok); } catch { window.prompt('Copie o texto abaixo:', txt); } }
 function admChange(t, c, v) {
+  if (c === 'admCatFonte' || c === 'admCatEst') { ADMV.catF[c === 'admCatFonte' ? 'fonte' : 'estado'] = v; ADMV.catF.pag = 0; admCatLoad(); return true; }
+  if (c === 'admCatSel') { ADMV.catSel[t.dataset.k] = t.checked; render(); return true; }
   if (c === 'admDias') { ADMV.dias = +v || 30; ADMV.de = ADMV.ate = ''; ADMV.data = null; admLoad(); render(); return true; }
   if (c === 'admDe' || c === 'admAte') { ADMV[c === 'admDe' ? 'de' : 'ate'] = v; if (ADMV.de && ADMV.ate) { ADMV.data = null; admLoad(); } render(); return true; }
   if (c === 'admFunc') { ADMV.func = v; ADMV.data = null; admLoad(); render(); return true; }
