@@ -67,6 +67,11 @@ ck('KPI mensal ago: assinatura 1 oportunidade, R$4000', k['assinatura']['n'] == 
 g = {x['t']: x['ganho'] for x in k['porTipo']}
 ck('KPI mensal ago: ganho por tipo cdu=1000, rec=2000, serv=0 (só da ganha de agosto)', g == {'cdu': 1000, 'rec': 2000, 'serv': 0}, g)
 
+cb = ev(A, "fcCob(fcKPI('mensal','08',''))")
+ck('cobertura da meta: pipeline 9000 sobre falta 7000 (129%), nada a descoberto', cb['pipe'] == 9000 and round(cb['cob']) == 129 and cb['aposAssin'] == 3000 and cb['descoberto'] == 0, cb)
+cb0 = ev(A, "fcCob(fcKPI('mensal','09',''))")
+ck('cobertura sem falta (sem meta no mês): cobertura nula, sem divisão por zero', cb0['cob'] is None, cb0)
+
 # ---------- tipo de venda: meta x ganho filtrados por CDU / Recorrente / Serviços ----------
 ck('fcNormRev normaliza os tipos', ev(A, "[fcNormRev('CDU'),fcNormRev('Recorrente'),fcNormRev('Serviços'),fcNormRev('rec'),fcNormRev('TOTAL')]") == ['cdu', 'rec', 'serv', 'rec', None])
 ev(A, "S.meta.fcData.metas=[{nome:'Renan Oscar',tipo:'CDU',ano:0,mes:[0,0,0,0,4000,0,0,0,0],tri:[0,0,0,0]},{nome:'Renan Oscar',tipo:'Recorrente',ano:0,mes:[0,0,0,0,8000,0,0,0,0],tri:[0,0,0,0]},{nome:'Renan Oscar',tipo:'TOTAL',ano:0,mes:[0,0,0,0,99999,0,0,0,0],tri:[0,0,0,0]}]; 1")
@@ -132,6 +137,7 @@ ck('com dados: seletor de tipo de venda e bloco Meta × Ganho por tipo', 'fcftip
 ev(A, "UI.fc.tipo='rec'; render(); 1")
 ck('filtro Recorrente: oportunidade só-CDU some da tabela', 'Cliente Z' not in ev(A, "document.getElementById('app').innerHTML"))
 ev(A, "UI.fc.tipo=''; render(); 1"); html1 = ev(A, "document.getElementById('app').innerHTML")
+ck('com dados: card Cobertura da meta', 'Cobertura da meta' in html1)
 ck('com dados: mostra a tabela de oportunidades com a linha sincronizada', 'Cliente Z' in html1, len(html1))
 
 ev(A, "UI.view='geral'; render(); 1")  # sai da tela antes de terminar (não deixa UI.view preso em forecast p/ outros testes)

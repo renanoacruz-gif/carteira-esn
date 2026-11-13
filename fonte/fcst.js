@@ -76,6 +76,16 @@ function fcKPI(per, sel, tipo) {
   return { meta, realizado, atingimento, falta: Math.max(meta - realizado, 0), excedente: realizado > meta ? realizado - meta : 0,
     aberto: { n: aberto.length, v: soma(aberto) }, assinatura: { n: assin.length, v: soma(assin) }, perdida: { n: perdida.length, v: soma(perdida) }, porTipo, opps };
 }
+/* Cobertura da meta: quanto do que falta está coberto pelo pipeline do período (em assinatura + em aberto), sem ponderar probabilidade */
+function fcCob(k) { const pipe = k.aberto.v + k.assinatura.v; return { pipe, cob: k.falta > 0 ? pipe / k.falta * 100 : null, aposAssin: Math.max(k.falta - k.assinatura.v, 0), descoberto: Math.max(k.falta - pipe, 0), pot: Object.values(S.clients).reduce((s, c) => s + (c.gst?.potencial || 0), 0) }; }
+function fcCobCard(k) {
+  if (!(k.meta > 0)) return ''; const c = fcCob(k), pct = c.cob == null ? 100 : Math.min(100, Math.round(c.cob));
+  return `<div class="card"><div class="row"><h3>Cobertura da meta</h3><span class="sp"></span>${k.falta > 0 ? pill(c.cob >= 100 ? 'pipeline cobre o que falta' : 'pipeline não cobre o que falta', c.cob >= 100 ? 'ok' : 'warn') : pill('meta do período atingida', 'ok')}</div>
+  ${k.falta > 0 ? `<div class="grid g4">${fcKpiCard('Falta para a meta', fmtBRL(k.falta))}${fcKpiCard('Pipeline do período', fmtBRL(c.pipe), 'em assinatura + em aberto')}${fcKpiCard('Cobertura', Math.round(c.cob) + '%', 'pipeline ÷ falta')}${fcKpiCard('Sem cobertura', fmtBRL(c.descoberto), c.descoberto > 0 ? 'precisa de oportunidade nova' : 'nada a descoberto')}</div>
+  <div class="bar" style="margin:8px 0"><div class="tr" style="flex:1"><div class="fl" style="width:${pct}%"></div></div><div class="nv">${Math.round(c.cob)}%</div></div>
+  <p class="sm muted">Se tudo que está em assinatura fechar, ainda faltam <b>${fmtBRL(c.aposAssin)}</b>. A cobertura soma o valor cheio das oportunidades, sem ponderar chance de fechamento.</p>` : `<p class="sm muted">Excedente de ${fmtBRL(k.excedente)}; ainda há ${fmtBRL(c.pipe)} em assinatura e em aberto no período.</p>`}
+  ${c.pot > 0 ? `<p class="sm muted">Potencial estimado nas contas (aba Gestão da conta): <b>${fmtBRL(c.pot)}</b>. Não tem período definido e não entra na cobertura.</p>` : ''}</div>`;
+}
 /* ---------- UI ---------- */
 function fcSheetCard() {
   if (!window.__HOSTED__) return '<div class="alert sm">A sincronização com o Google Sheets só está disponível na versão hospedada.</div>';
@@ -87,7 +97,7 @@ function fcSheetCard() {
   ${linked ? `<div class="sm" style="margin-top:6px">Última sincronização: <b>${esc(shAgo(C.lastOk))}</b>${D ? ` • ${D.opps.length} oportunidade(s), ${D.metas.length} meta(s)` : ''}</div>` : ''}
   ${C.lastErr ? `<div class="alert b sm"><b>Falha em ${esc(shAgo(C.lastErr.at))}:</b> ${esc(C.lastErr.msg)}</div>` : ''}</div>`;
 }
-function fcKpiCard(l, v, sub = '') { return `<div class="kpi"><div class="sm muted">${esc(l)}</div><b>${v}</b>${sub ? `<div class="sm muted">${sub}</div>` : ''}</div>`; }
+function fcKpiCard(l, v, sub = '') { return `<div class="kpi em-k"><div class="sm muted">${esc(l)}</div><b>${v}</b>${sub ? `<div class="sm muted">${sub}</div>` : ''}</div>`; }
 function vForecast() {
   UI.fc ||= {}; const per = UI.fc.per || 'mensal';
   const sel = UI.fc.sel || (per === 'trimestral' ? 'Q1' : per === 'mensal' ? FC_TABS[0][1] : null);
@@ -104,7 +114,7 @@ function vForecast() {
   ${k.meta > 0 ? `<div class="bar" style="margin:8px 0 14px"><div class="tr" style="flex:1"><div class="fl" style="width:${barPct}%"></div></div><div class="nv">${barPct}%</div></div>` : ''}`;
   const sec2 = `<div class="grid g3">${fcKpiCard('Oportunidades em aberto', k.aberto.n, fmtBRL(k.aberto.v))}${fcKpiCard('Em assinatura', k.assinatura.n, fmtBRL(k.assinatura.v))}</div>
   <div class="card"><h3>Meta × Ganho por tipo de venda</h3>${k.porTipo.map(x => `<div class="bar"${tipo && tipo !== x.t ? ' style="opacity:.45"' : ''}><div class="lb"><b>${x.l}</b> — ${fmtBRL(x.ganho)} de ${x.meta > 0 ? fmtBRL(x.meta) : 'meta não configurada'}</div><div class="tr"><div class="fl" style="width:${x.pct == null ? 0 : Math.min(100, Math.round(x.pct))}%"></div></div><div class="nv">${x.pct == null ? '—' : Math.round(x.pct) + '%'}</div></div>`).join('')}</div>`;
-  return `${fcSheetCard()}${perSel}${kpis}${sec2}${fcTable(k.opps, tipo)}`;
+  return `${fcSheetCard()}${perSel}${kpis}${fcCobCard(k)}${sec2}${fcTable(k.opps, tipo)}`;
 }
 function fcTable(opps, tipo) {
   const f = UI.fc, q = norm(f.q || ''), st = f.st || '', val = o => tipo ? o[tipo] : o.total, sort = f.sort || 'data_desc', lim = f.lim || 150;
