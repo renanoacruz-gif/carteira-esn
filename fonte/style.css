@@ -847,3 +847,6 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 @media (max-width:720px){.em-k>b{white-space:normal;font-size:17px;overflow-wrap:anywhere}.fc-mg .bar{flex-wrap:wrap}.fc-mg .bar .lb{flex:1 0 100%;max-width:none;white-space:normal}}
 
 #atu-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:900;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:12px;background:var(--card);color:var(--txt);border:1px solid var(--bd2);box-shadow:0 8px 28px rgba(0,0,0,.28);font-size:14px}
+
+.pt-sc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}.pt-bar{display:inline-block;width:72px;height:6px;border-radius:4px;background:var(--bd);overflow:hidden}.pt-bar i{display:block;height:100%;background:var(--ciano2)}.pt-ex summary{cursor:pointer;color:var(--link)}.pt-ft{list-style:none;margin:6px 0 0;padding:0;font-size:12.5px}.pt-ft li{padding:3px 0}
+#app .pt-xp{white-space:normal;width:min(440px,70vw);overflow-wrap:anywhere}

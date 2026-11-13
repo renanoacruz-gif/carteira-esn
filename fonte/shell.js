@@ -27,7 +27,7 @@ const NAV = [
   ['clientes', 'Clientes', 'users', [['clientes', 'Clientes', 'users'], ['cliente', 'Cliente', 'user'], ['segmentos', 'Segmentos', 'pie'], ['consol', 'Consolidação', 'merge']]],
   ['oport', 'Oportunidades TOTVS', 'plan', [['oport', 'Oportunidades', 'plan'], ['plano', 'Acompanhamento (opcional)', 'merge']]],
   ['mercado', 'Inteligência de Mercado', 'trend', []],
-  ['solucoes', 'Base de Soluções', 'box', [['solucoes', 'Soluções', 'box'], ['refs', 'Releases e regulatório', 'doc']]],
+  ['solucoes', 'Base de Soluções', 'box', [['solucoes', 'Soluções', 'box'], ['portfolio', 'Portfólio TOTVS', 'box'], ['refs', 'Releases e regulatório', 'doc']]],
   ['importar', 'Importar e fichas', 'upload', [], true],
   ['pend', 'Pendências documentais', 'warn', []],
   ['cnpj', 'Consulta de CNPJ', 'search', []],
@@ -35,7 +35,7 @@ const NAV = [
   ['conta', 'Configurações', 'cog', [['conta', 'Conta e catálogo', 'shield'], ['ia', 'IA e provedores', 'cog'], ['dados', 'Gerenciamento de dados', 'shield'], ['criterios', 'Critérios', 'sliders'], ['base', 'Base TOTVS e limites', 'info']]]
 ];
 const navTop = v => NAV.find(([k, , , sub]) => k === (v === 'diag' ? 'cliente' : v) || sub.some(s => s[0] === (v === 'diag' ? 'cliente' : v))) || NAV[0]; const navTopOld = v => NAV.find(([k, , , sub]) => k === v || sub.some(s => s[0] === v)) || NAV[0];
-const VIEW_TITLE = { forecast: 'Meu Forecast', mrr: 'Carteira & MRR', oport: 'Oportunidades TOTVS', mercado: 'Inteligência de Mercado', pend: 'Central de Pendências', cnpj: 'Consulta de CNPJ', importar: 'Importar e fichas', geral: 'Visão da carteira', clientes: 'Clientes', cliente: 'Cliente', diag: 'Diagnóstico da oportunidade', segmentos: 'Segmentos', plano: 'Acompanhamento (opcional)', criterios: 'Critérios de análise', solucoes: 'Base de Soluções', refs: 'Releases e regulatório', consol: 'Consolidação de clientes', conta: 'Conta e catálogo compartilhado', integra: 'Integrações', dados: 'Gerenciamento de dados', ia: 'Configurações de IA', base: 'Base TOTVS e limites' };
+const VIEW_TITLE = { portfolio: 'Portfólio TOTVS', forecast: 'Meu Forecast', mrr: 'Carteira & MRR', oport: 'Oportunidades TOTVS', mercado: 'Inteligência de Mercado', pend: 'Central de Pendências', cnpj: 'Consulta de CNPJ', importar: 'Importar e fichas', geral: 'Visão da carteira', clientes: 'Clientes', cliente: 'Cliente', diag: 'Diagnóstico da oportunidade', segmentos: 'Segmentos', plano: 'Acompanhamento (opcional)', criterios: 'Critérios de análise', solucoes: 'Base de Soluções', refs: 'Releases e regulatório', consol: 'Consolidação de clientes', conta: 'Conta e catálogo compartilhado', integra: 'Integrações', dados: 'Gerenciamento de dados', ia: 'Configurações de IA', base: 'Base TOTVS e limites' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento: só nesta sessão */ } };
 UI.sbCol = lsGet('sb.col') === '1'; UI.sbOpen = false;
 const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
@@ -45,6 +45,7 @@ function viewSub(v) {
   if (v === 'geral') return n ? `${n} cliente(s) • última análise ${fmtDate(S.meta.lastAnalysis)}` : 'Sem dados importados';
   if (v === 'clientes') return n ? `${n} cliente(s) na carteira` : 'Sem dados importados';
   if (v === 'solucoes') return `${activeSols().length} registro(s) ativo(s)`;
+  if (v === 'portfolio') return 'Onde cada solução pode ser vendida na sua carteira';
   if (v === 'plano') return n ? 'Responsável e prazo são opcionais: apoio à análise, não um CRM' : 'Sem dados importados';
   if (v === 'oport') return n ? 'Onde há oportunidades, por que fazem sentido e o que validar' : 'Sem dados importados';
   if (v === 'mrr') return S.meta.emp?.fonte ? `Data-base ${fmtD(S.meta.emp.dataBase)} • ${S.meta.emp.fonte}` : 'Importe a planilha Clientes_ESN do Empodera';
