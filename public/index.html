@@ -530,7 +530,7 @@ html,body{background:var(--w)}.shell{display:block;padding:0}.main-col,main{disp
 /* Tabelas: cabeçalho mais discreto, linhas mais arejadas */
 #app th{text-transform:none;letter-spacing:.01em;font-size:var(--fs-sm);font-weight:600;border-bottom:1px solid var(--bd-soft);border-top:0;background:transparent}
 #app td{padding:12px 10px;border-bottom-color:var(--bd-soft)}
-#app .tw{border:1px solid var(--bd-soft);box-shadow:var(--sh-soft);border-radius:var(--r-lg);overflow:hidden}
+#app .tw{border:1px solid var(--bd-soft);box-shadow:var(--sh-soft);border-radius:var(--r-lg);overflow:auto} /* auto, não hidden: a .tw tem altura máxima e precisa rolar (listas longas ficavam cortadas) */
 /* Rótulos de definição (opp dt, stl) e kicker */
 #app .opp dt,#app .stl{text-transform:none;letter-spacing:.01em;font-size:var(--fs-sm);font-weight:600}
 /* Filtros: grade ordenada em vez de nuvem de selects */
