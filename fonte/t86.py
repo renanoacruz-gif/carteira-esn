@@ -8,6 +8,7 @@ L = [('1111001000-6','SMS FULL TOTVS TRAD',100.0),('7P11001018','ID FLUIG 1 AO 5
 for cod, nome, v in L: ws.append(['T00001','CLIENTE TESTE','CONT01','575843','VCTO DIA 05',cod,nome,1,'UN',v,v,'10/2026',v])
 wb.save(fx)
 pg, errs = open_h('t86%s@totvs.com.br' % uuid.uuid4().hex[:8]); ev(pg, "window.confirm=()=>true;0")
+ev(pg, "fnSolCob('tit','');0"); pg.wait_for_timeout(300)  # a Base de Soluções é compartilhada: parte do padrão do tipo, mesmo que uma execução anterior tenha alterado
 pg.click('[data-a=nav][data-v=importar]'); pg.set_input_files('#f-cart', D+'carteira.xlsx'); pg.wait_for_timeout(500); pg.click('[data-a=impPrev]'); pg.wait_for_timeout(300); pg.click('[data-a=impGo]'); pg.wait_for_timeout(2500)
 pg.click('[data-a=nav][data-v=importar]'); pg.set_input_files('#f-fic', fx); pg.wait_for_timeout(2500)
 its = lambda: {i['cod']: i for i in ev(pg, "S.clients['c_T00001'].fichas[0].items.map(i=>({cod:i.cod,nome:i.nome,kind:i.kind,mode:i.kindMode,sol:i.solId||''}))")}
@@ -33,5 +34,7 @@ ck('modelo de cobrança do produto muda a natureza do item', its()['AUT.01.00111
 ev(pg, "fnDel('ZZ990001');0"); pg.wait_for_timeout(300)
 ck('remover a ligação devolve o item à lista', ev(pg, "fnPend().map(p=>p.cod)") == ['ZZ990001'])
 ck('ficha em texto (sem código) segue pelas regras de texto', ev(pg, "fnIdent({desc:'Mensalidade de suporte'}).kind") == 'recorrente' and ev(pg, "fnIdent({desc:'ISS retido'}).kind") == 'imposto')
+ev(pg, "fnSolCob('tit','');0"); pg.wait_for_timeout(600)  # devolve o modelo de cobrança ao padrão para não contaminar a base compartilhada
+ck('modelo de cobrança volta ao padrão do tipo ao final', ev(pg, "solCobranca(S.solutions.find(s=>s.id==='tit'))") == 'recorrente')
 ck('sem erros de página', not errs, errs)
 print('FALHAS', F); p.stop()
