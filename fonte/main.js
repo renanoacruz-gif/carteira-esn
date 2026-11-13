@@ -47,6 +47,9 @@ const ACT = {
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
   fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''),
+  empTab: t => { empUI().tab = t.dataset.v; render(); window.scrollTo(0, 0); }, empGo: t => { const U = empUI(); U.f = { ...EMP_F0(), ...JSON.parse(t.dataset.f) }; U.tab = 'lista'; render(); window.scrollTo(0, 0); }, empBase: t => empSetCfg('baseRecencia', t.dataset.v),
+  empSort: t => { const U = empUI(), k = t.dataset.k; U.sort = U.sort.k === k ? { k, dir: -U.sort.dir } : { k, dir: ['mrrP', 'gap', 'tags'].includes(k) ? -1 : 1 }; render(); }, empClear: () => { empUI().f = EMP_F0(); render(); }, empXlsx: () => empXlsx(),
+  empApply: () => empAplicar($('#emp_data')?.value), empCancel: () => { empUI().pend = null; render(); }, gstAddI: t => empGstAddI(t.dataset.k), gstDelI: t => empGstDelI(t.dataset.k, t.dataset.id),
   fcMore: () => { UI.fc ||= {}; UI.fc.lim = (UI.fc.lim || 150) + 150; render(); },
   briefOpen: t => { const c = S.clients[t.dataset.k]; UI.ctab = 'briefing'; if (c && !briefFichas(c).length) toast('Para gerar o briefing é necessário anexar a ficha de faturamento do cliente.'); render(); }, briefPdf: t => briefExport(t.dataset.k),
   refOk: t => refApprove(t.dataset.id), refNo: t => refDiscard(t.dataset.id), refAll: () => refApproveOfficial(), recArq: t => recArchive(t.dataset.col, t.dataset.id),
@@ -182,6 +185,10 @@ document.addEventListener('change', async e => {
     case 'mrrRef': { if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return toast('Use AAAA-MM.'); if (S.meta.mrrComp) { S.meta.mrrComp = v || null; touchMeta(); } setRefComp(v); break; }
     case 'act': setAct(t.dataset.id, t.dataset.k || null, { [t.dataset.f]: v }); break;
     case 'wt': { S.meta.weights[t.dataset.k] = Math.max(0, +v || 0); reanalyzeAll(); render(); break; }
+    case 'empfile': if (files?.length) { await empArquivo(files[0]); t.value = ''; } break;
+    case 'empcfg': empSetCfg(t.dataset.k, v); break;
+    case 'empf': empUI().f[t.dataset.k] = v; render(); break;
+    case 'gst': empGstSet(t.dataset.k, t.dataset.f, v); break;
     case 'fcmes': case 'fctri': { UI.fc ||= {}; UI.fc.sel = v; render(); break; }
     case 'fcfst': case 'fcftipo': { UI.fc ||= {}; UI.fc[c.slice(3)] = v; render(); break; }
     case 'fcsort': { UI.fc ||= {}; UI.fc.sort = v; render(); break; }
@@ -202,6 +209,7 @@ document.addEventListener('input', e => {
   if (t.dataset.i === 'prodq') { UI.prodQ = t.value; deb('prodq', () => reRender('[data-i=prodq]')); }
   if (t.dataset.i === 'solq') { UI.solQ = t.value; deb('solq', () => reRender('[data-i=solq]')); }
   if (t.dataset.i === 'pq') { UI.plan.q = t.value; deb('pq', () => reRender('[data-i=pq]')); }
+  if (t.dataset.i === 'empq') { empUI().f.q = t.value; deb('empq', () => reRender('[data-i=empq]')); }
   if (t.dataset.i === 'fcq') { UI.fc ||= {}; UI.fc.q = t.value; deb('fcq', () => reRender('[data-i=fcq]')); }
 });
 ['dragover', 'dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => {
