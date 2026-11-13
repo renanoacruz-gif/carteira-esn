@@ -5,7 +5,7 @@ logo='data:image/png;base64,'+r('logo_w.b64').strip()
 logo_s='data:image/png;base64,'+r('logo_s.b64').strip()
 import json
 extra='const WORKER_SRC = '+json.dumps(r('worker.src.js')).replace('</','<\\/')+';\nconst WORKER_README = '+json.dumps(r('worker.README.md'))+';\nconst WORKER_TOML = '+json.dumps(r('worker.wrangler.toml'))+';\n'
-js=extra+'\n'.join(r(f) for f in ['vend.js','kb.js','refpkg.js','ref24.js','core.js','sol.js','cons.js','cad.js','unif.js','store.js','store2.js','consol.js','ai.js','lk.js','tdn.js','prod.js','filt.js','dados.js','lote.js','shell.js','acct.js','integ.js','bk.js','ia2.js','hosted.js','cnpj.js','mercado.js','mkvis.js','solmat.js','pend.js','ocr.js','cliedit.js','pg.js','sem.js','cov.js','val.js','icap.js','sinais.js','raiox.js','ui.js','ui2.js','ui3.js','ui4.js','ui5.js','oport.js','prints.js','pdfx.js','brief.js','sheet.js','fcst.js','emp.js','orig.js','fsin.js','fnat.js','cmp.js','rel.js','tk.js','util.js','radar.js','dor.js','dt.js','adm.js','lembrete.js','onb.js','onda2.js','onda3.js','refresh.js','oppsol.js','cockpit.js','refresh3d.js','theme.js','clean.js','motion.js','tabbar.js','mobile.js','main.js'])
+js=extra+'\n'.join(r(f) for f in ['vend.js','kb.js','refpkg.js','ref24.js','core.js','sol.js','cons.js','cad.js','unif.js','store.js','store2.js','consol.js','ai.js','lk.js','tdn.js','prod.js','filt.js','dados.js','lote.js','shell.js','atual.js','acct.js','integ.js','bk.js','ia2.js','hosted.js','cnpj.js','mercado.js','mkvis.js','solmat.js','pend.js','ocr.js','cliedit.js','pg.js','sem.js','cov.js','val.js','icap.js','sinais.js','raiox.js','ui.js','ui2.js','ui3.js','ui4.js','ui5.js','oport.js','prints.js','pdfx.js','brief.js','sheet.js','fcst.js','emp.js','orig.js','fsin.js','fnat.js','cmp.js','rel.js','tk.js','util.js','radar.js','dor.js','dt.js','adm.js','lembrete.js','onb.js','onda2.js','onda3.js','refresh.js','oppsol.js','cockpit.js','refresh3d.js','theme.js','clean.js','motion.js','tabbar.js','mobile.js','main.js'])
 h=r('index.tpl.html').replace('{{CSS}}',r('style.css')).replace('{{LOGO_W}}',logo).replace('{{LOGO_S}}',logo_s).replace('{{JS}}',js)
 open(d+'index.html','w').write(h); print(len(h))
 
@@ -45,6 +45,12 @@ os.makedirs(hd+'public/vendor',exist_ok=True)
 for f in os.listdir(d+'vendor'):
     if f.endswith('.js'): shutil.copy(d+'vendor/'+f,hd+'public/vendor/'+f)
 shutil.copy(d+'_headers',hd+'public/_headers')
+wk=r('worker.src.js').replace('/*__ADM__*/', r('worker.adm.js')).replace('/*__PUSH__*/', r('worker.push.js'))
+# versão publicada: impressão digital do pacote (página + servidor); a página compara com /api/versao para avisar que há atualização
+import hashlib
+assert hh.count("'__BUILD__'")==1 and wk.count("'__BUILD__'")==1
+BUILD=hashlib.sha256((hh+wk).encode()).hexdigest()[:12]
+hh=hh.replace("'__BUILD__'","'"+BUILD+"'"); wk=wk.replace("'__BUILD__'","'"+BUILD+"'")
 open(hd+'public/index.html','w').write(hh)
-open(hd+'src/worker.js','w').write(r('worker.src.js').replace('/*__ADM__*/', r('worker.adm.js')).replace('/*__PUSH__*/', r('worker.push.js')))
+open(hd+'src/worker.js','w').write(wk)
 open(hd+'schema.sql','w').write(r('worker.schema.sql'))

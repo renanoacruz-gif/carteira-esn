@@ -147,7 +147,7 @@ const ACCT_ACT = {
 };
 function vConta() {
   const nCl = clients().length, sh = S.solutions.filter(r => !r._priv), pv = privSols(), outros = sh.filter(r => r.alteradoPor && r.alteradoPor !== ME.id && r.alteradoPor !== SYS_AUTHOR).length;
-  let h = `<div class="card"><h3>Gestão de Carteira TOTVS ESN — sua conta</h3>
+  let h = `<div class="card"><h3>Gestão de Carteira TOTVS ESN — sua conta</h3>${window.__HOSTED__ ? `<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px"><button type="button" class="btn" data-a="atuGo">Atualizar ferramenta</button><span class="sm muted">Carrega a versão mais recente${ATU.nova ? ' — <b>há uma nova versão disponível</b>' : ''}. Não precisa reinstalar o atalho na tela inicial; seus dados são gravados antes.</span></div>` : ''}
   <div class="grid g3"><div class="kpi"><div class="sm muted">Conta ativa</div><b>${esc(ME.ok ? (ME.nome || 'Conta da plataforma') : 'Sem conta (modo memória)')}</b>${ME.ok ? `<div class="sm muted">id …${esc(ME.id.slice(-6))}</div>` : ''}</div>
   <div class="kpi"><div class="sm muted">Perfil</div><b>Executivo de Soluções e Negócios</b><div class="sm muted">perfil único: Executivo Comercial</div></div>
   <div class="kpi"><div class="sm muted">Sua carteira</div><b>${nCl} cliente(s)</b><div class="sm muted">privada: só esta conta lê e grava</div></div></div>
