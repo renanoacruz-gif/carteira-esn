@@ -261,7 +261,24 @@ async function admSugestoes(req, env, url) {
 async function admRoster(req, env, au) {
   const db = admDb(env); await admInit(env); let q; try { q = await req.json(); } catch { return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'JSON inválido.' } }, 400); }
   const dom = '@' + DOMAIN_OK(env), agora = new Date().toISOString(); const lim = (await db.prepare('SELECT COUNT(*) c FROM adm_roster').first())?.c || 0;
-  if (q.op === 'remove') { const e = String(q.email || '').toLowerCase(); await db.prepare('DELETE FROM adm_roster WHERE email=?').bind(e).run(); return J({ ok: true }); }
+  if (q.op === 'remove') { const e = String(q.email || '').toLowerCase(); await db.prepare('DELETE FROM adm_roster WHERE email=?').bind(e).run();
+    /* tudo=true: remove também o registro de acesso (a pessoa some da lista; se entrar de novo, reaparece como "fora da lista"). Não bloqueia o login nem toca na carteira dela. */
+    if (q.tudo === true) await db.prepare('DELETE FROM usuarios WHERE email=?').bind(e).run(); return J({ ok: true }); }
+  if (q.op === 'edit') {
+    const e = String(q.email || '').trim().toLowerCase(), nome = String(q.nome || '').trim().slice(0, 80), novo = String(q.novo_email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(e)) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'E-mail inválido.' } }, 400);
+    const acessou = !!(await db.prepare('SELECT 1 x FROM usuarios WHERE email=?').bind(e).first()), naLista = !!(await db.prepare('SELECT 1 x FROM adm_roster WHERE email=?').bind(e).first());
+    if (!acessou && !naLista) return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Pessoa não encontrada.' } }, 404);
+    if (novo && novo !== e) {
+      if (acessou) return J({ ok: false, erro: { codigo: 'email_fixo', mensagem: 'O e-mail de quem já acessou vem do login corporativo e não pode ser alterado.' } }, 400);
+      if (!EMAIL_RE.test(novo) || !novo.endsWith(dom)) return J({ ok: false, erro: { codigo: 'dominio', mensagem: 'Use um e-mail ' + dom + '.' } }, 400);
+      if (await db.prepare('SELECT 1 x FROM adm_roster WHERE email=?').bind(novo).first()) return J({ ok: false, erro: { codigo: 'duplicado', mensagem: 'Já existe alguém com esse e-mail na lista.' } }, 400);
+      await db.prepare('UPDATE adm_roster SET email=?, nome=? WHERE email=?').bind(novo, nome, e).run(); return J({ ok: true, email: novo });
+    }
+    if (naLista) await db.prepare('UPDATE adm_roster SET nome=? WHERE email=?').bind(nome, e).run();
+    if (acessou && nome) await db.prepare('UPDATE usuarios SET nome=? WHERE email=?').bind(nome, e).run();
+    return J({ ok: true, email: e });
+  }
   if (q.op !== 'add' && q.op !== 'import') return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Operação inválida.' } }, 400);
   const itens = (Array.isArray(q.itens) ? q.itens : []).slice(0, 300), bons = [], ruins = [];
   itens.forEach(x => { const e = String(x?.email || '').trim().toLowerCase(); if (EMAIL_RE.test(e) && e.endsWith(dom)) bons.push({ email: e, nome: String(x?.nome || '').trim().slice(0, 80) }); else ruins.push(String(x?.email || '').slice(0, 60)); });
