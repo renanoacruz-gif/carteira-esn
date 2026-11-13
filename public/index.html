@@ -846,6 +846,7 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 .em-stat{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}.em-stat div{font-size:12.5px;color:var(--txt2)}.em-stat b{display:block;font-size:18px;color:var(--txt)}.em-prev{border:2px solid var(--ciano2)}
 .em-k>b{display:block;font-size:20px;line-height:1.25;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .em-v>.grid,.em-v>.card,.em-v>.em-kpis,.em-v>.em-quads{margin-bottom:14px}.em-v>.grid>.card{margin:0}
+.em-dt small{display:block;font-size:11.5px;color:var(--txt2)}.em-dt.em-old small{color:var(--lar);font-weight:600}
 </style>
 <script>try{var t=localStorage.getItem('rf.theme');if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -2001,6 +2002,7 @@ const NPS_LOW = 6;
 function retentionSignals(c) {
   const s = [];
   const ch = norm(c.churn || ''); if (ch && !/^(0|nao|n|no|false|baixo|-|nenhum)$/.test(ch)) s.push({ cls: 'FATO', text: `Planilha: campo churn/risco = "${c.churn}"`, src: `Planilha • linha ${c.src?.row || '?'}` });
+  empSinais(c).forEach(x => s.push(x));
   const n = parseNum(c.nps); if (n != null && n <= 10 && n <= NPS_LOW) s.push({ cls: 'FATO', text: `Planilha: NPS = ${n} (≤ ${NPS_LOW} na escala 0–10 presumida — NECESSITA VALIDAÇÃO da escala)`, src: `Planilha • linha ${c.src?.row || '?'}` });
   return s;
 }
@@ -3244,6 +3246,7 @@ async function loadPortfolio(file) {
     const buf = await readBuf(file); const t = await readTable(file, buf);
     const sheets = t.sheets.filter(s => s.rows.some(r => r.some(c => String(c).trim() !== '')));
     if (!sheets.length) throw new Error('Arquivo sem dados.');
+    if (empPreparar(file.name, sheets, true)) { log(`"${file.name}" reconhecida como exportação Clientes_ESN do Empodera: encaminhada para Carteira & MRR.`, 'ok'); UI.busy = ''; UI.view = 'mrr'; render(); return; }
     const si = 0, h = detectHeader(sheets[si].rows);
     UI.wiz = { name: file.name, sheets, si, h, map: autoMap((sheets[si].rows[h] || []).map(String)) };
     log(`Carteira "${file.name}" lida: ${sheets.length} aba(s). Confira o mapeamento de colunas.`, 'ok');
@@ -4729,9 +4732,7 @@ const IC = {
 const ico = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
 /* 8 destinos de primeiro nível; telas internas ficam como subitens do destino ativo */
 const NAV = [
-  ['geral', 'Visão da Carteira', 'dash', []],
-  ['forecast', 'Meu Forecast', 'flag', []],
-  ['mrr', 'Carteira & MRR', 'coin', []],
+  ['geral', 'Visão da Carteira', 'dash', [['geral', 'Visão geral', 'dash'], ['mrr', 'Carteira & MRR', 'coin'], ['forecast', 'Meu Forecast', 'flag']]],
   ['clientes', 'Clientes', 'users', [['clientes', 'Clientes', 'users'], ['cliente', 'Cliente', 'user'], ['segmentos', 'Segmentos', 'pie'], ['consol', 'Consolidação', 'merge']]],
   ['oport', 'Oportunidades TOTVS', 'plan', [['oport', 'Oportunidades', 'plan'], ['plano', 'Acompanhamento (opcional)', 'merge']]],
   ['mercado', 'Inteligência de Mercado', 'trend', []],
@@ -5855,6 +5856,7 @@ function pendItems() {
     (c.conflicts || []).forEach(x => add('conf', c, 'Divergência planilha × ficha', x.text));
     (c.cadConf || []).filter(x => !x.res).forEach(x => add('conf', c, `Conflito de cadastro: ${x.campo}`, `${x.de} → ${x.para} (${x.fonte})`));
     if (mrrOf(c).div) add('conf', c, 'MRR divergente entre ficha e planilha', 'Definir a fonte do MRR na competência.');
+    { const g = c.gst; if (g?.dataAcao) { if (g.dataAcao < hoje) add('acao', c, 'Próxima ação da conta vencida', `${g.proximaAcao || 'Ação sem descrição'} • prazo ${fmtD(g.dataAcao)}`, { prazo: g.dataAcao }); else if (g.dataAcao <= em7) add('prox', c, 'Próxima ação da conta', `${g.proximaAcao || 'Ação sem descrição'} • prazo ${fmtD(g.dataAcao)}`, { prazo: g.dataAcao }); } }
     if (['inferido', 'ausente', 'nao_mapeado'].includes(c.segInfo?.mode)) add('seg', c, 'Segmento não confirmado', c.segInfo.ev || '');
     c.opps.filter(o => oppAtiva(c, o)).forEach(o => {
       const d = decGet(c, o.ruleId);
@@ -7040,7 +7042,7 @@ function vGeral(forExport) {
   const tipos = s.count(s.opps, o => o.tipo), prio = s.count(s.opps, o => o.prio), conf = s.count(s.opps, o => o.conf), segd = s.count(s.cs, c => segName(c.segInfo.id) || 'Sem segmento definido');
   const k = (v, l, n = '', c = '') => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div><div class="n">${n}</div></div>`;
   let h = `<div class="grid g4">${k(s.n, 'Clientes importados', 'FATO • planilha')}${k(s.withF, 'Com ficha confirmada', `${s.pct(s.withF, s.n)}% da carteira`, 'm')}${k(S.inbox.length + s.cs.filter(c => c.doc.k === 'sugerida').length, 'Fichas/docs pendentes', 'sugeridas ou sem cliente', 'w')}${k(s.need.length, 'Clientes a validar', 'conflito, vínculo sugerido ou segmento inferido', 'r')}${(() => { const R = radarData(); return k(R.ident.length, 'Oportunidades identificadas', `${R.hip.length} hipótese(s) de investigação (não contadas como oportunidade)`, 'm'); })()}</div>`;
-  h += (forExport ? '' : hojeCard() + radarCard()) + segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard() + dtCard() + rnvCard() + riscoCard() + semanaCard() + buscaCard());
+  h += (forExport ? '' : empHoje2() + hojeCard() + radarCard()) + segCard(forExport) + covCard(s, forExport) + consPanel(s, forExport) + (forExport ? '' : remindCard() + dtCard() + rnvCard() + riscoCard() + semanaCard() + buscaCard());
   h += `<div class="grid g2" style="margin-top:14px"><div class="card"><h3>Qualidade dos dados</h3>${bars(s.dq.map(([l, v]) => [l, v, `${v}/${s.n} (${s.pct(v, s.n)}%)`]))}</div>
   <div class="card"><h3>Distribuição por segmento</h3>${bars(segd.map(([l, v]) => [l, v, `${v} (${s.pct(v, s.n)}%)`]))}<p class="muted sm">${s.cs.filter(c => c.segInfo.mode === 'inferido').length} cliente(s) com segmento ${chip('INFERÊNCIA')}.</p></div></div>
   <div class="card"><h3>Faturamento recorrente identificado em fichas</h3>`;
@@ -8629,6 +8631,7 @@ function briefBlocks(M) {
   B.push({ k: 'note', tone: 'alert', t: 'Impacto no modelo de precificação (ROL): a ficha de faturamento não informa a Receita Operacional Líquida do cliente/grupo. Qualquer enquadramento por faixa de ROL NECESSITA VALIDAÇÃO com dado do cliente; o faturamento anual declarado serve apenas como indicador de porte.' });
   B.push({ k: 'kpis', items: [{ l: `Total bruto (VAL_TOTAL)${M.comp ? ' · ' + M.comp.split('-').reverse().join('/') : ''}`, v: brBRL(M.bruto) }, { l: 'Total líquido (VAL_LIQD)', v: M.liq == null ? 'não consta' : brBRL(M.liq), tone: M.liq == null ? 'alert' : null }, { l: 'Itens faturados', v: String(M.n) }, { l: 'Ticket médio por item', v: brBRL(M.ticket) }] });
   if (M.docTot) { const okB = M.bruto != null && M.docTot.total != null && Math.abs(M.docTot.total - M.bruto) <= Math.max(1, Math.abs(M.bruto) * 0.005); P(`Conferência: linha de total da ficha = ${brBRL(M.docTot.total)} · soma dos itens = ${brBRL(M.bruto)} → ${okB ? 'confere' : 'DIFERE; validar itens excluídos, descontos ou linhas não lidas'}.`, okB ? 'ok' : 'alert'); }
+  { const er = empBriefRows(c); if (er) { H('Posição na carteira (Empodera)'); B.push({ k: 'kv', rows: er }); } }
   /* 02 */
   sec('02', 'Proposta Vigente & Portfólio');
   B.push({ k: 'kv', rows: [['Contrato(s)', M.meta.contrato.length ? M.meta.contrato.join(' · ') : (c.contratos || []).map(x => x.ident).filter(x => x && x !== 'principal').join(' · ') || 'não consta na ficha'], ['Proposta(s) vigente(s)', M.meta.proposta.length ? M.meta.proposta.join(' · ') : 'não consta na ficha'], ['Condição de pagamento', M.meta.cond.length ? M.meta.cond.join(' · ') : 'não consta na ficha']] });
@@ -8938,6 +8941,9 @@ if (typeof window !== 'undefined') { setTimeout(fcTick, 11000); setInterval(fcTi
 function fcFindCliente(q) { q = String(q || '').trim(); if (!q) return null; const qn = norm(q).replace(/[^a-z0-9]/g, ''); return Object.values(S.clients).find(x => (x.code && norm(x.code).replace(/[^a-z0-9]/g, '') === qn) || (x.cnpj && x.cnpj === digits(q)) || normName(x.name) === normName(q)) || null; }
 function fcLink(oppId, clientKey) { S.meta.fcLink ||= {}; if (clientKey) S.meta.fcLink[oppId] = clientKey; else delete S.meta.fcLink[oppId]; touchMeta(); render(); }
 function fcLinkConfirm(oppId, q) { const c = fcFindCliente(q); if (!c) return toast('Cliente não encontrado por código, CNPJ ou razão social exata.'); fcLink(oppId, c.key); }
+/* Sugestão de vínculo: só quando o nome da planilha é idêntico (normalizado) ao nome, fantasia ou razão social de UM único cliente; o executivo confirma */
+function fcNomeIdx() { const m = new Map(), put = (n, k) => { n = normName(n || ''); if (n) (m.get(n) || m.set(n, new Set()).get(n)).add(k); }; Object.values(S.clients).forEach(c => { put(c.name, c.key); put(c.emp?.fantasia, c.key); put(c.emp?.razao, c.key); }); return m; }
+const fcSug = (o, idx) => { const h = idx.get(normName(o.cliente)); return h && h.size === 1 ? S.clients[[...h][0]] : null; };
 const fcClienteOf = o => { const k = S.meta.fcLink?.[o.id]; return k ? S.clients[k] : null; };
 /* Metas: casa pelo primeiro nome do usuário logado na aba META; sem correspondência, usa todas as linhas (igual à ferramenta original). */
 function fcMetaRows(tipo) { const metas = (S.meta.fcData?.metas || []).filter(m => { const t = fcNormRev(m.tipo); return t && (!tipo || t === tipo); }); if (!metas.length) return []; const first = norm((ME.nome || '').trim().split(/\s+/)[0] || ''); if (!first) return metas; const hit = metas.filter(m => norm(m.nome).includes(first)); return hit.length ? hit : metas; }
@@ -8989,7 +8995,7 @@ function fcTable(opps, tipo) {
   rows = rows.sort((a, b) => sort === 'valor_asc' ? val(a) - val(b) : sort === 'valor_desc' ? val(b) - val(a) : sort === 'data_asc' ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data));
   const total = rows.length; rows = rows.slice(0, lim);
   const catChip = o => ['cdu', 'rec', 'serv'].filter(k => o[k] > 0).map(k => pill({ cdu: 'CDU', rec: 'Recorrente', serv: 'Serviços' }[k], 'ok')).join(' ') || '—';
-  const clienteCel = o => { const c = fcClienteOf(o); return c ? `<a href="#" data-a="open" data-k="${esc(c.key)}">${esc(c.name)}</a> <button class="btn ghost sm" data-a="fcLinkOff" data-id="${o.id}" data-tip="Desvincular">${ico('x', 14)}</button>`
+  const NI = fcNomeIdx(), clienteCel = o => { const c = fcClienteOf(o), sg = c ? null : fcSug(o, NI); if (sg) return `<span class="muted">${esc(o.cliente)}</span> <span class="sm">Sugestão: <b>${esc(sg.name)}</b>${sg.code ? ' (' + esc(sg.code) + ')' : ''}</span> <button class="btn pri sm" data-a="fcLinkSug" data-id="${o.id}" data-k="${esc(sg.key)}">Confirmar</button>`; return c ? `<a href="#" data-a="open" data-k="${esc(c.key)}">${esc(c.name)}</a> <button class="btn ghost sm" data-a="fcLinkOff" data-id="${o.id}" data-tip="Desvincular">${ico('x', 14)}</button>`
     : `<span class="muted">${esc(o.cliente)}</span> <input id="fcl_${o.id}" type="text" placeholder="código, CNPJ ou razão social exata" style="width:180px" class="sm"> <button class="btn ghost sm" data-a="fcLinkGo" data-id="${o.id}">Vincular</button>`; };
   return `<div class="card"><div class="row"><h3>Oportunidades (${total})</h3><span class="sp"></span></div>
   <div class="row" style="gap:6px;flex-wrap:wrap"><input data-i="fcq" type="search" placeholder="Buscar cliente ou produto…" value="${esc(f.q || '')}" style="min-width:220px">
@@ -9092,11 +9098,15 @@ function empPlano(recs) {
   const ausentes = Object.values(S.clients).filter(c => c.emp && !c.emp.ausente && !inc.has(empCodKey(c.emp.cod)));
   return { cur, novos, primeira, mud, ausentes, mrrNovo: empSum(recs, r => r.mrrP), mrrAntes: empSum(Object.values(S.clients).filter(c => c.emp && !c.emp.ausente), c => c.emp.mrrP) };
 }
+/* Reconhece a exportação Clientes_ESN e abre a prévia; silencioso=true devolve false (em vez de erro) quando não é a planilha do Empodera */
+function empPreparar(nome, sheets, silencioso) {
+  let res; try { res = empLer(sheets); } catch (e) { if (silencioso) return false; throw e; }
+  if (!res.recs.length) { if (silencioso) return false; throw new Error('A planilha não tem clientes com código.'); }
+  const U = empUI(), m = nome.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/); U.pend = { name: nome, aba: res.aba, recs: res.recs, data: m ? m[3] + '-' + m[2] + '-' + m[1] : empHoje() }; U.tab = 'dados'; return true;
+}
 async function empArquivo(file) {
-  if (!file) return; const U = empUI();
-  try { const t = await readTable(file, await file.arrayBuffer()), res = empLer(t.sheets); if (!res.recs.length) throw new Error('A planilha não tem clientes com código.');
-    const m = file.name.match(/(\d{2})[_.-](\d{2})[_.-](\d{4})/); U.pend = { name: file.name, aba: res.aba, recs: res.recs, data: m ? m[3] + '-' + m[2] + '-' + m[1] : empHoje() }; U.tab = 'dados';
-  } catch (e) { toast(e.message || 'Arquivo não reconhecido.'); }
+  if (!file) return;
+  try { empPreparar(file.name, (await readTable(file, await file.arrayBuffer())).sheets); } catch (e) { toast(e.message || 'Arquivo não reconhecido.'); }
   render();
 }
 function empAplicar(data) {
@@ -9107,10 +9117,11 @@ function empAplicar(data) {
       c = S.clients[key] = { key, code: r.cod, name: r.fantasia || r.razao || r.cod, cnpj: r.cnpj.length === 14 ? r.cnpj : '', cnpjRaw: '', seg: r.seg, city: r.cidade, size: '', mrr: r.mrrP || null, productsRaw: '', churn: '', nps: '', notes: '', uf: r.uf, regime: '', release: '', fichas: [], docs: [], mgmt: {}, act: {} };
       cadInit(c); c.src = { file: P.name, sheet: P.aba, row: 0 }; runAnalysis(c); pl.cur.set(r.cod, c); }
     const hist = (c.emp?.hist || []).filter(h => h[0] !== data).concat([[data, r.mrrP]]).sort((a, b) => a[0].localeCompare(b[0])).slice(-24);
-    c.emp = { ...r, ausente: false, hist }; if (c.mrr !== r.mrrP) { c.mrr = r.mrrP; runAnalysis(c); } /* MRR oficial do cadastro = MRR pagante do Empodera */ touchC(c.key);
+    const prodAuto = empParseProd(r.prod).produtos.join(', '); if (!c.productsRaw || c.productsRaw === c.emp?.prodAuto) c.productsRaw = prodAuto; /* base instalada do Empodera alimenta o motor quando o cadastro não informa produtos */
+    c.emp = { ...r, ausente: false, hist, prodAuto }; c.mrr = r.mrrP; /* MRR oficial do cadastro = MRR pagante do Empodera */ touchC(c.key);
   }
   pl.ausentes.forEach(c => { c.emp.ausente = true; touchC(c.key); });
-  M.dataBase = data; M.fonte = P.name; M.importadoEm = nowISO();
+  M.dataBase = data; M.fonte = P.name; M.importadoEm = nowISO(); empReanalisar();
   const D = empDerive(); M.snaps = M.snaps.filter(s => s.data !== data).concat({ data, fonte: P.name, total: D.length, ativos: D.filter(d => d.ativo).length, mrrP: Math.round(empSum(D, d => d.e.mrrP) * 100) / 100, mrrC: Math.round(empSum(D, d => d.e.mrrC) * 100) / 100 }).sort((a, b) => a.data.localeCompare(b.data)).slice(-60);
   U.pend = null; U.tab = 'painel'; touchMeta(); render(); toast(`Importação aplicada: ${empPl(P.recs.length, 'cliente')} (${pl.novos.length} novos, ${pl.mud.length} com MRR alterado, ${pl.ausentes.length} ausentes).`);
 }
@@ -9120,7 +9131,25 @@ function empSetCfg(k, v) {
   else if (k === 'limiarMrr') { const n = empNum(v); if (n > 0) M.cfg.limiarMrr = n; }
   else if (k === 'limiarDias') { const n = Math.round(+v); if (n >= 30) M.cfg.limiarDias = n; }
   else if (k === 'baseRecencia' && ['produto', 'servico', 'recente'].includes(v)) M.cfg.baseRecencia = v;
-  touchMeta(); render();
+  empReanalisar(); touchMeta(); render();
+}
+/* Sinais do Empodera para a regra de retenção do motor de oportunidades (core.js → retentionSignals) */
+function empSinais(c) {
+  const e = c.emp, s = []; if (!e || e.ausente) return s; const M = empMeta(), pr = empParseProd(e.prod), src = `Empodera • ${M.fonte || 'Clientes_ESN'}`;
+  pr.tags.filter(t => t.sev).forEach(t => s.push({ cls: 'FATO', text: `Empodera: etiqueta "${t.l}" registrada na conta`, src }));
+  if (/^ativo/.test(norm(e.sit)) && e.uvp && (e.mrrP || 0) >= M.cfg.limiarMrr) { const d = Math.max(0, empDias(e.uvp, M.dataBase)); if (d > M.cfg.limiarDias) s.push({ cls: 'FATO', text: `Empodera: MRR pagante ${fmtBRL(e.mrrP)} e última venda de produto em ${fmtD(e.uvp)} (há ${empTempo(d)}) — quadrante Proteger`, src }); }
+  return s;
+}
+function empReanalisar() { Object.values(S.clients).forEach(c => { if (c.emp) runAnalysis(c); }); }
+function empBriefRows(c) {
+  const e = c.emp; if (!e) return null; const d = empDerive(true).find(x => x.key === c.key), g = c.gst || {};
+  return [['MRR pagante', fmtBRL(e.mrrP) + (d.gap > 0.009 ? ` (contratado ${fmtBRL(e.mrrC)})` : '')], ['Última venda de produto', e.uvp ? `${fmtD(e.uvp)} (há ${empTempo(d.dp)})` : 'sem data'], ['Última venda de serviço', e.uvs ? `${fmtD(e.uvs)} (há ${empTempo(d.ds)})` : 'sem data'], ['Quadrante de atenção', e.ausente ? 'fora da última importação' : d.quad], ['Produtos (etiqueta)', d.produtos.join(', ') || 'não informado'],
+    ...(d.tags.length ? [['Etiquetas', d.tags.map(t => t.l).join(', ')]] : []), ...(g.proximaAcao || g.dataAcao ? [['Próxima ação', (g.proximaAcao || 'sem descrição') + (g.dataAcao ? ' · ' + fmtD(g.dataAcao) : '')]] : []), ['Data-base', fmtD(empMeta().dataBase)]];
+}
+/* Visão da Carteira: ações de conta vencidas ou para hoje */
+function empHoje2() {
+  const hj = empHoje(), it = Object.values(S.clients).filter(c => c.gst?.dataAcao && c.gst.dataAcao <= hj).sort((a, b) => a.gst.dataAcao.localeCompare(b.gst.dataAcao)); if (!it.length) return '';
+  return `<div class="card" id="emphoje"><div class="row"><h3>Ações de conta para hoje</h3>${pill(it.length + (it.length > 1 ? ' ações' : ' ação'), 'warn')}</div>${it.slice(0, 6).map(c => `<button class="em-ag" data-a="openTab" data-k="${esc(c.key)}" data-v="gestao"><span class="${c.gst.dataAcao < hj ? 'em-late' : ''}"><b>${fmtD(c.gst.dataAcao).slice(0, 5)}</b><small>${c.gst.dataAcao < hj ? 'Vencida' : 'Hoje'}</small></span><span><b>${esc(c.name)}</b><small>${esc(c.gst.proximaAcao || 'Ação sem descrição')}</small></span>${c.gst.prioridade ? pill(c.gst.prioridade, c.gst.prioridade === 'Alta' ? 'warn' : 'off') : ''}</button>`).join('')}${it.length > 6 ? `<p class="sm muted">+ ${it.length - 6} — veja em Pendências documentais.</p>` : ''}</div>`;
 }
 /* ---------- gestão da conta (ficha do cliente) ---------- */
 function empGstSet(key, f, v) { const c = S.clients[key]; if (!c || !['prioridade', 'proximaAcao', 'dataAcao', 'oportunidade', 'potencial', 'contato'].includes(f)) return; const g = c.gst ||= {}; g[f] = f === 'potencial' ? empNum(v) : String(v || '').trim(); g.em = nowISO(); touchC(key); }
@@ -9130,7 +9159,6 @@ function empGestaoTab(c) {
   const g = c.gst || {}, k = kk(c), d = c.emp ? empDerive(true).find(x => x.key === c.key) : null, e = c.emp;
   const fld = (f, l, tp = 'text', w = '') => `<label class="em-fld ${w}"><span>${l}</span><input type="${tp}" data-c="gst" data-k="${k}" data-f="${f}" value="${esc(f === 'potencial' ? (g[f] ? g[f].toLocaleString('pt-BR') : '') : g[f] || '')}"${f === 'potencial' ? ' inputmode="decimal"' : ''}></label>`;
   const st = (l, v, s = '') => `<div class="kpi em-k"><div class="sm muted">${l}</div><b>${v}</b>${s ? `<div class="sm muted">${esc(s)}</div>` : ''}</div>`;
-  const ints = [...(g.interacoes || [])].sort((a, b) => b.data.localeCompare(a.data));
   return `${e ? `<div class="card"><div class="row"><h3>Posição no Empodera</h3>${d ? empQuadPill(d.quad) : ''}${e.ausente ? pill('fora da última importação', 'warn') : ''}<span class="sp"></span>${/^https?:\/\//.test(e.link || '') ? `<a class="btn ghost sm" href="${esc(e.link)}" target="_blank" rel="noopener noreferrer">Abrir no Empodera ↗</a>` : ''}</div>
   <div class="grid g4">${st('MRR pagante', fmtBRL(e.mrrP), d.gap > 0.009 ? 'Contratado ' + fmtBRL(e.mrrC) : '')}${st('Últ. venda produto', fmtD(e.uvp), e.uvp ? 'há ' + empTempo(d.dp) : '')}${st('Últ. venda serviço', fmtD(e.uvs), e.uvs ? 'há ' + empTempo(d.ds) : '')}${st('MRR do grupo', e.mrrG ? fmtBRL(e.mrrG) : '—', e.grupoEmp)}</div>
   ${d.produtos.length || d.tags.length ? `<div style="margin-top:8px">${d.produtos.map(p => pill(p, 'off')).join(' ')} ${d.tags.map(t => pill(t.l, t.sev ? 'warn' : 'off')).join(' ')}</div>` : ''}
@@ -9138,7 +9166,11 @@ function empGestaoTab(c) {
   <div class="card"><h3>Gestão da conta</h3><div class="em-form">
   <label class="em-fld"><span>Prioridade</span><select data-c="gst" data-k="${k}" data-f="prioridade">${['', 'Alta', 'Média', 'Baixa'].map(p => `<option value="${p}" ${p === (g.prioridade || '') ? 'selected' : ''}>${p || '—'}</option>`).join('')}</select></label>
   ${fld('dataAcao', 'Data da próxima ação', 'date')}${fld('proximaAcao', 'Próxima ação', 'text', 'wide')}${fld('oportunidade', 'Oportunidade em pauta', 'text', 'wide')}${fld('potencial', 'Potencial estimado (R$)')}${fld('contato', 'Contato principal')}</div></div>
-  <div class="card"><h3>Interações</h3><div class="row" style="gap:6px;flex-wrap:wrap"><input type="date" id="gi_data" value="${empHoje()}" aria-label="Data da interação"><select id="gi_tipo" aria-label="Tipo">${['Reunião', 'Visita', 'Ligação', 'E-mail', 'WhatsApp', 'Proposta', 'Outro'].map(t => `<option>${t}</option>`).join('')}</select><input type="text" id="gi_txt" placeholder="O que foi tratado" style="flex:1;min-width:200px" aria-label="Descrição"><button class="btn pri sm" data-a="gstAddI" data-k="${k}">Registrar</button></div>
+  <p class="sm muted">Interações e retornos combinados com o cliente ficam na aba <a href="#" data-a="ctab" data-v="reuniao">Reunião e retornos</a>${(g.interacoes || []).length ? ` (${g.interacoes.length} interação(ões) registrada(s))` : ''}.</p>`;
+}
+function empInterCard(c) {
+  const g = c.gst || {}, k = kk(c), ints = [...(g.interacoes || [])].sort((a, b) => b.data.localeCompare(a.data));
+  return `<div class="card"><h3>Interações</h3><p class="muted sm">Registro rápido de cada contato com o cliente (reunião, visita, ligação, mensagem).</p><div class="row" style="gap:6px;flex-wrap:wrap"><input type="date" id="gi_data" value="${empHoje()}" aria-label="Data da interação"><select id="gi_tipo" aria-label="Tipo">${['Reunião', 'Visita', 'Ligação', 'E-mail', 'WhatsApp', 'Proposta', 'Outro'].map(t => `<option>${t}</option>`).join('')}</select><input type="text" id="gi_txt" placeholder="O que foi tratado" style="flex:1;min-width:200px" aria-label="Descrição"><button class="btn pri sm" data-a="gstAddI" data-k="${k}">Registrar</button></div>
   ${ints.length ? `<table class="sm" style="margin-top:8px"><tbody>${ints.map(i => `<tr><td class="nw">${fmtD(i.data)} · ${esc(i.tipo)}</td><td>${esc(i.texto)}</td><td><button class="btn ghost sm" data-a="gstDelI" data-k="${k}" data-id="${esc(i.id)}" aria-label="Excluir interação">${ico('x', 14)}</button></td></tr>`).join('')}</tbody></table>` : '<p class="sm muted" style="margin:8px 0 0">Nenhuma interação registrada.</p>'}</div>`;
 }
 /* ---------- componentes ---------- */
@@ -9146,7 +9178,7 @@ const empQuadPill = q => `<span class="em-q em-q-${q.replace(' ', '')}">${q}</sp
 const empGo = f => `data-a="empGo" data-f='${esc(JSON.stringify(f))}'`;
 const empOpen = d => `data-a="open" data-k="${esc(d.key)}"`;
 const empChip = (d, x = '') => `<button class="em-chip" ${empOpen(d)}>${esc(d.nome)}${x ? ` <small>${esc(x)}</small>` : ''}</button>`;
-const empDt = (iso, dias) => iso ? `<div class="nw${dias > empMeta().cfg.limiarDias ? ' em-old' : ''}">${fmtD(iso)}<small>há ${empTempo(dias)}</small></div>` : '—';
+const empDt = (iso, dias) => iso ? `<div class="nw em-dt${dias > empMeta().cfg.limiarDias ? ' em-old' : ''}">${fmtD(iso)}<small>há ${empTempo(dias)}</small></div>` : '—';
 const empAcao = g => !g.proximaAcao && !g.dataAcao ? '<span class="muted">—</span>' : `<b>${esc(g.proximaAcao || 'Ação sem descrição')}</b>${g.dataAcao ? `<small class="${g.dataAcao < empHoje() ? 'em-late' : 'muted'}">${g.dataAcao < empHoje() ? 'Vencida · ' : ''}${fmtD(g.dataAcao)}</small>` : ''}`;
 function empBars(items, o = {}) {
   if (!items.length) return '<p class="sm muted">Sem dados para exibir.</p>'; const mx = Math.max(...items.map(i => i.v), 0) || 1, fmt = o.fmt || empBrlK;
@@ -10595,6 +10627,7 @@ function tabReuniao(c) {
   <p class="muted sm">Combinados com este cliente, com a data que você definir. Retornos vencidos ou que vencem hoje entram na Central de Pendências e, se o lembrete diário estiver ativo, no número do aviso (só o número).</p>
   ${rs.length ? `<div class="tw"><table><thead><tr><th>Retorno</th><th>Prazo</th><th>Responsável</th><th>Situação</th><th></th></tr></thead><tbody>${rs.map(linha).join('')}</tbody></table></div>` : '<p class="muted sm">Nenhum retorno registrado.</p>'}
   <div class="row" style="margin-top:8px"><input type="text" id="rt-texto" placeholder="O que ficou combinado (ex.: enviar proposta revisada)" style="min-width:280px;flex:1" maxlength="300"><input type="date" id="rt-prazo"><input type="text" id="rt-resp" placeholder="Responsável" style="min-width:120px" maxlength="80"><button class="btn" data-a="rtAdd" data-k="${kk(c)}">Adicionar retorno</button></div></div>`;
+  h += empInterCard(c);
   h += `<div class="card"><h3>Pós-reunião: ata → retornos</h3>
   <p class="muted sm">Cole a ata ou suas anotações. <b>Antes de qualquer envio, CNPJ, CPF, valores em reais, e-mails e telefones são trocados por marcadores</b> e você vê o texto exato que será enviado. A leitura usa a sua chave de IA (Configurações → IA e provedores); nada é salvo sem a sua revisão.</p>
   <textarea id="reu-ata" rows="6" style="width:100%" placeholder="Cole aqui a ata da reunião…">${esc(REU.ata)}</textarea>
@@ -11598,7 +11631,7 @@ const ACT = {
   execMode: t => { UI.execMode = t.dataset.v; render(); }, execPdf: t => execExport(t.dataset.k),
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
-  fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''),
+  fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''), fcLinkSug: t => { if (S.clients[t.dataset.k]) fcLink(t.dataset.id, t.dataset.k); },
   empTab: t => { empUI().tab = t.dataset.v; render(); window.scrollTo(0, 0); }, empGo: t => empIr(JSON.parse(t.dataset.f)), empBase: t => empSetCfg('baseRecencia', t.dataset.v),
   empXlsx: () => empXlsx(),
   empApply: () => empAplicar($('#emp_data')?.value), empCancel: () => { empUI().pend = null; render(); }, gstAddI: t => empGstAddI(t.dataset.k), gstDelI: t => empGstDelI(t.dataset.k, t.dataset.id),

@@ -46,7 +46,7 @@ const ACT = {
   execMode: t => { UI.execMode = t.dataset.v; render(); }, execPdf: t => execExport(t.dataset.k),
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
-  fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''),
+  fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''), fcLinkSug: t => { if (S.clients[t.dataset.k]) fcLink(t.dataset.id, t.dataset.k); },
   empTab: t => { empUI().tab = t.dataset.v; render(); window.scrollTo(0, 0); }, empGo: t => empIr(JSON.parse(t.dataset.f)), empBase: t => empSetCfg('baseRecencia', t.dataset.v),
   empXlsx: () => empXlsx(),
   empApply: () => empAplicar($('#emp_data')?.value), empCancel: () => { empUI().pend = null; render(); }, gstAddI: t => empGstAddI(t.dataset.k), gstDelI: t => empGstDelI(t.dataset.k, t.dataset.id),

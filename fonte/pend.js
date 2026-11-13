@@ -18,6 +18,7 @@ function pendItems() {
     (c.conflicts || []).forEach(x => add('conf', c, 'Divergência planilha × ficha', x.text));
     (c.cadConf || []).filter(x => !x.res).forEach(x => add('conf', c, `Conflito de cadastro: ${x.campo}`, `${x.de} → ${x.para} (${x.fonte})`));
     if (mrrOf(c).div) add('conf', c, 'MRR divergente entre ficha e planilha', 'Definir a fonte do MRR na competência.');
+    { const g = c.gst; if (g?.dataAcao) { if (g.dataAcao < hoje) add('acao', c, 'Próxima ação da conta vencida', `${g.proximaAcao || 'Ação sem descrição'} • prazo ${fmtD(g.dataAcao)}`, { prazo: g.dataAcao }); else if (g.dataAcao <= em7) add('prox', c, 'Próxima ação da conta', `${g.proximaAcao || 'Ação sem descrição'} • prazo ${fmtD(g.dataAcao)}`, { prazo: g.dataAcao }); } }
     if (['inferido', 'ausente', 'nao_mapeado'].includes(c.segInfo?.mode)) add('seg', c, 'Segmento não confirmado', c.segInfo.ev || '');
     c.opps.filter(o => oppAtiva(c, o)).forEach(o => {
       const d = decGet(c, o.ruleId);

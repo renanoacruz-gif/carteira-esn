@@ -58,6 +58,9 @@ if (typeof window !== 'undefined') { setTimeout(fcTick, 11000); setInterval(fcTi
 function fcFindCliente(q) { q = String(q || '').trim(); if (!q) return null; const qn = norm(q).replace(/[^a-z0-9]/g, ''); return Object.values(S.clients).find(x => (x.code && norm(x.code).replace(/[^a-z0-9]/g, '') === qn) || (x.cnpj && x.cnpj === digits(q)) || normName(x.name) === normName(q)) || null; }
 function fcLink(oppId, clientKey) { S.meta.fcLink ||= {}; if (clientKey) S.meta.fcLink[oppId] = clientKey; else delete S.meta.fcLink[oppId]; touchMeta(); render(); }
 function fcLinkConfirm(oppId, q) { const c = fcFindCliente(q); if (!c) return toast('Cliente não encontrado por código, CNPJ ou razão social exata.'); fcLink(oppId, c.key); }
+/* Sugestão de vínculo: só quando o nome da planilha é idêntico (normalizado) ao nome, fantasia ou razão social de UM único cliente; o executivo confirma */
+function fcNomeIdx() { const m = new Map(), put = (n, k) => { n = normName(n || ''); if (n) (m.get(n) || m.set(n, new Set()).get(n)).add(k); }; Object.values(S.clients).forEach(c => { put(c.name, c.key); put(c.emp?.fantasia, c.key); put(c.emp?.razao, c.key); }); return m; }
+const fcSug = (o, idx) => { const h = idx.get(normName(o.cliente)); return h && h.size === 1 ? S.clients[[...h][0]] : null; };
 const fcClienteOf = o => { const k = S.meta.fcLink?.[o.id]; return k ? S.clients[k] : null; };
 /* Metas: casa pelo primeiro nome do usuário logado na aba META; sem correspondência, usa todas as linhas (igual à ferramenta original). */
 function fcMetaRows(tipo) { const metas = (S.meta.fcData?.metas || []).filter(m => { const t = fcNormRev(m.tipo); return t && (!tipo || t === tipo); }); if (!metas.length) return []; const first = norm((ME.nome || '').trim().split(/\s+/)[0] || ''); if (!first) return metas; const hit = metas.filter(m => norm(m.nome).includes(first)); return hit.length ? hit : metas; }
@@ -109,7 +112,7 @@ function fcTable(opps, tipo) {
   rows = rows.sort((a, b) => sort === 'valor_asc' ? val(a) - val(b) : sort === 'valor_desc' ? val(b) - val(a) : sort === 'data_asc' ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data));
   const total = rows.length; rows = rows.slice(0, lim);
   const catChip = o => ['cdu', 'rec', 'serv'].filter(k => o[k] > 0).map(k => pill({ cdu: 'CDU', rec: 'Recorrente', serv: 'Serviços' }[k], 'ok')).join(' ') || '—';
-  const clienteCel = o => { const c = fcClienteOf(o); return c ? `<a href="#" data-a="open" data-k="${esc(c.key)}">${esc(c.name)}</a> <button class="btn ghost sm" data-a="fcLinkOff" data-id="${o.id}" data-tip="Desvincular">${ico('x', 14)}</button>`
+  const NI = fcNomeIdx(), clienteCel = o => { const c = fcClienteOf(o), sg = c ? null : fcSug(o, NI); if (sg) return `<span class="muted">${esc(o.cliente)}</span> <span class="sm">Sugestão: <b>${esc(sg.name)}</b>${sg.code ? ' (' + esc(sg.code) + ')' : ''}</span> <button class="btn pri sm" data-a="fcLinkSug" data-id="${o.id}" data-k="${esc(sg.key)}">Confirmar</button>`; return c ? `<a href="#" data-a="open" data-k="${esc(c.key)}">${esc(c.name)}</a> <button class="btn ghost sm" data-a="fcLinkOff" data-id="${o.id}" data-tip="Desvincular">${ico('x', 14)}</button>`
     : `<span class="muted">${esc(o.cliente)}</span> <input id="fcl_${o.id}" type="text" placeholder="código, CNPJ ou razão social exata" style="width:180px" class="sm"> <button class="btn ghost sm" data-a="fcLinkGo" data-id="${o.id}">Vincular</button>`; };
   return `<div class="card"><div class="row"><h3>Oportunidades (${total})</h3><span class="sp"></span></div>
   <div class="row" style="gap:6px;flex-wrap:wrap"><input data-i="fcq" type="search" placeholder="Buscar cliente ou produto…" value="${esc(f.q || '')}" style="min-width:220px">

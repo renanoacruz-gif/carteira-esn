@@ -842,3 +842,4 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 .em-stat{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}.em-stat div{font-size:12.5px;color:var(--txt2)}.em-stat b{display:block;font-size:18px;color:var(--txt)}.em-prev{border:2px solid var(--ciano2)}
 .em-k>b{display:block;font-size:20px;line-height:1.25;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .em-v>.grid,.em-v>.card,.em-v>.em-kpis,.em-v>.em-quads{margin-bottom:14px}.em-v>.grid>.card{margin:0}
+.em-dt small{display:block;font-size:11.5px;color:var(--txt2)}.em-dt.em-old small{color:var(--lar);font-weight:600}
