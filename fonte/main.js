@@ -85,7 +85,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ATU_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ATU_ACT, PT_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;
@@ -108,7 +108,7 @@ document.addEventListener('change', async e => {
   if (c === 'prtxt') { prTexto(t.dataset.id, v); return; }
   if (c === 'lkopt') { LK_OPT()[t.dataset.f] = Math.max(0, +v || 0); return; }
   if (c === 'valOrig' && files?.length) { valOrig(t.dataset.k, t.dataset.id, files[0]); t.value = ''; return; }
-  if (admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
+  if (ptChange(c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
   switch (c) {
     case 'attach': await ingest(files, t.dataset.t, t.dataset.k); t.value = ''; break;
     case 'wsheet': { const w = UI.wiz; w.si = +v; w.h = detectHeader(w.sheets[w.si].rows); w.map = autoMap((w.sheets[w.si].rows[w.h] || []).map(String)); render(); break; }
@@ -207,6 +207,8 @@ document.addEventListener('input', e => {
   if (t.dataset.i === 'pbulk') { UI.planBulk = t.value; return; }
   if (t.dataset.i === 'lkurls') { UI.lkUrls = t.value; return; }
   if (t.dataset.i === 'prodq') { UI.prodQ = t.value; deb('prodq', () => reRender('[data-i=prodq]')); }
+  if (t.dataset.i === 'ptq') { const U = ptUI(); U.q = t.value; U.pag = 0; deb('ptq', () => reRender('[data-i=ptq]')); return; }
+  if (t.dataset.i === 'ptcq') { ptUI().cq = t.value; deb('ptcq', () => reRender('[data-i=ptcq]')); return; }
   if (t.dataset.i === 'solq') { UI.solQ = t.value; deb('solq', () => reRender('[data-i=solq]')); }
   if (t.dataset.i === 'pq') { UI.plan.q = t.value; deb('pq', () => reRender('[data-i=pq]')); }
   if (t.dataset.i === 'fcq') { UI.fc ||= {}; UI.fc.q = t.value; deb('fcq', () => reRender('[data-i=fcq]')); }
