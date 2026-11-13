@@ -693,7 +693,7 @@ async function handleInner(req, env0, ctx) {
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
-  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: '4d1f0def7093' });
+  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: 'fc06dc89e737' });
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
   if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);

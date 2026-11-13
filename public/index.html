@@ -854,6 +854,7 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 
 .pt-sc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}.pt-bar{display:inline-block;width:72px;height:6px;border-radius:4px;background:var(--bd);overflow:hidden}.pt-bar i{display:block;height:100%;background:var(--ciano2)}.pt-ex summary{cursor:pointer;color:var(--link)}.pt-ft{list-style:none;margin:6px 0 0;padding:0;font-size:12.5px}.pt-ft li{padding:3px 0}
 #app .pt-xp{white-space:normal;width:min(440px,70vw);overflow-wrap:anywhere}
+.pt-cand{border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-top:10px}.pt-h{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--txt2);margin-top:8px}
 </style>
 <script>try{var t=localStorage.getItem('rf.theme');if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -2166,6 +2167,7 @@ const TIPOS = { produto: 'Produto', modulo: 'Módulo', plataforma: 'Plataforma',
 const REF_ST = { confirmada: 'Confirmada', corrigida: 'Corrigida (com fonte)', ambigua: 'Ambígua', nao_localizada: 'Não localizada', pendente: 'Validação pendente' };
 const REF_STK = { confirmada: 'ok', corrigida: 'info', ambigua: 'warn', nao_localizada: 'bad', pendente: 'off' };
 const STATUS_SOL = ['Validado', 'Em revisão', 'NECESSITA VALIDAÇÃO'];
+const CICLO_SOL = ['', 'Ativa', 'Em descontinuação', 'Descontinuada'];
 const NEED_LABEL = { fiscal: 'Fiscal/tributário', sst: 'SST/RH', financeiro: 'Financeiro/Techfin', processos: 'Processos/Documentos', producao: 'Produção/Manutenção', analytics: 'Indicadores/CRM', logistica: 'Logística', sustentacao: 'Sustentação/Nuvem', treinamento: 'Treinamento/Adoção', nfse: 'NFS-e', obras: 'Obras', pdv: 'Varejo/Frente de loja', qualidade: 'Qualidade industrial', vendasb2b: 'Vendas B2B/distribuição', terceirizacao: 'Terceirização de serviços', osfcampo: 'Ordens de serviço em campo', posvendaimob: 'Pós-venda imobiliário', agrocomercial: 'Comercialização/originação agrícola', tms_frete: 'TMS/gestão de frete', saude_regulatorio: 'Indicadores ANS/TISS', saude_hospitalar: 'Gestão hospitalar', educacional_academico: 'Gestão acadêmica/captação de alunos', educacional_documentos: 'Jornada digital do aluno (documentos/segurança/comunicação)', educacional_evasao: 'Prevenção de evasão escolar' };
 const OFFICIAL_HOST = /(^|\.)(totvs\.com|totvs\.com\.br|tdn\.totvs\.com|tdn\.totvs\.com\.br|centraldeatendimento\.totvs\.com|espacolegislacao\.totvs\.com|carol\.ai)$/i;
 const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2180,7 +2182,7 @@ const TIPO_SEED = { protheus: 'produto', cfgtrib: 'modulo', transmite: 'compleme
   rubeus: 'complementar', gestao_estagio: 'complementar', school_guardian: 'complementar', doc_xpress: 'complementar', meu_educonnect: 'complementar', sponte: 'produto' };
 
 function newSol(o = {}) {
-  return { id: 's_' + uid(), nome: '', tipo: 'produto', categoria: '', linha: '', segmentos: [], necessidades: [], dores: [], funcionalidades: [], prerequisitos: [], integracoes: [], fontes: [], termos: [], termosRe: '', fornecedor: 'TOTVS', disponibilidade: '', limites: '', obs: '', status: 'NECESSITA VALIDAÇÃO', oficial: false, arquivado: false, origem: 'manual', atualizadoEm: today(), rev: 1, pend: [], hist: [], sigla: '', refId: '', codOferta: '', grupo: '', refStatus: '', refNota: '', finalidade: '', processos: [], lacunas: [], notasInt: [], ...o };
+  return { id: 's_' + uid(), nome: '', tipo: 'produto', categoria: '', linha: '', segmentos: [], necessidades: [], dores: [], funcionalidades: [], prerequisitos: [], integracoes: [], fontes: [], termos: [], termosRe: '', fornecedor: 'TOTVS', disponibilidade: '', limites: '', obs: '', status: 'NECESSITA VALIDAÇÃO', oficial: false, arquivado: false, origem: 'manual', atualizadoEm: today(), rev: 1, pend: [], hist: [], sigla: '', refId: '', codOferta: '', grupo: '', refStatus: '', refNota: '', finalidade: '', processos: [], lacunas: [], notasInt: [], ciclo: '', entrega: '', comercial: '', dependencias: [], complementares: [], ...o };
 }
 function seedSolutions() {
   return KB.solutions.map(s => {
@@ -3454,7 +3456,7 @@ function solChanged(r, motivo) {
 function solDraft(r) { // rascunho de edição (textos multilinha)
   return { id: r?.id || null, nome: r?.nome || '', tipo: r?.tipo || 'produto', categoria: r?.categoria || '', linha: r?.linha || '', segmentos: [...(r?.segmentos || [])], necessidades: [...(r?.necessidades || [])],
     termos: (r?.termos || []).join(', '), dores: (r?.dores || []).map(x => x.t).join('\n'), funcionalidades: (r?.funcionalidades || []).map(x => x.t).join('\n'), prerequisitos: preToLines(r?.prerequisitos), financeira: !!r?.financeira,
-    integracoes: intToLines(r?.integracoes), fontes: fontesToLines(r?.fontes), fornecedor: r?.fornecedor || 'TOTVS', disponibilidade: r?.disponibilidade || '', limites: r?.limites || '', status: r?.status || 'NECESSITA VALIDAÇÃO', oficial: !!r?.oficial, ackDup: false, sigla: r?.sigla || '', refId: r?.refId || '', codOferta: r?.codOferta || '', grupo: r?.grupo || '', refStatus: r?.refStatus || '', refNota: r?.refNota || '', finalidade: r?.finalidade || '', processos: (r?.processos || []).join('\n') };
+    integracoes: intToLines(r?.integracoes), fontes: fontesToLines(r?.fontes), fornecedor: r?.fornecedor || 'TOTVS', disponibilidade: r?.disponibilidade || '', limites: r?.limites || '', status: r?.status || 'NECESSITA VALIDAÇÃO', oficial: !!r?.oficial, ackDup: false, sigla: r?.sigla || '', refId: r?.refId || '', codOferta: r?.codOferta || '', grupo: r?.grupo || '', refStatus: r?.refStatus || '', refNota: r?.refNota || '', finalidade: r?.finalidade || '', processos: (r?.processos || []).join('\n'), ciclo: r?.ciclo || '', entrega: r?.entrega || '', comercial: r?.comercial || '', dependencias: (r?.dependencias || []).join('\n'), complementares: (r?.complementares || []).join('; ') };
 }
 function solErrors(d) {
   const e = []; if (!d.nome.trim()) e.push('Nome é obrigatório.');
@@ -3465,12 +3467,13 @@ function solErrors(d) {
   if (['corrigida', 'ambigua', 'nao_localizada'].includes(d.refStatus) && !String(d.refNota || '').trim()) e.push('Situação de validação corrigida/ambígua/não localizada exige a explicação com a fonte (campo "Nota de validação").'); return e;
 }
 function applyDraft(r, d) {
-  const old = JSON.stringify([r.nome, r.tipo, r.categoria, r.linha, r.segmentos, r.necessidades, r.termos, r.dores.map(x => x.t), r.funcionalidades.map(x => x.t), r.prerequisitos.map(x => x.t), intToLines(r.integracoes), fontesToLines(r.fontes), r.fornecedor, r.disponibilidade, r.limites, r.status, r.oficial, r.sigla, r.refId, r.codOferta, r.grupo, r.refStatus, r.refNota, r.finalidade, r.processos]);
+  const old = JSON.stringify([r.nome, r.tipo, r.categoria, r.linha, r.segmentos, r.necessidades, r.termos, r.dores.map(x => x.t), r.funcionalidades.map(x => x.t), r.prerequisitos.map(x => x.t), intToLines(r.integracoes), fontesToLines(r.fontes), r.fornecedor, r.disponibilidade, r.limites, r.status, r.oficial, r.sigla, r.refId, r.codOferta, r.grupo, r.refStatus, r.refNota, r.finalidade, r.processos, r.ciclo || '', r.entrega || '', r.comercial || '', r.dependencias || [], r.complementares || []]);
   r.nome = d.nome.trim(); r.tipo = d.tipo; r.categoria = d.categoria.trim(); r.linha = d.linha.trim(); r.segmentos = d.segmentos; r.necessidades = d.necessidades; r.termos = d.termos.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
   r.dores = lines2items(d.dores, r.dores); r.funcionalidades = lines2items(d.funcionalidades, r.funcionalidades); r.prerequisitos = preFromLines(d.prerequisitos, r.prerequisitos); r.financeira = !!d.financeira;
   r.integracoes = intFromLines(d.integracoes, r.integracoes); r.fontes = fontesFromLines(d.fontes, r.fontes); r.fornecedor = d.fornecedor.trim(); r.disponibilidade = d.disponibilidade.trim(); r.limites = d.limites.trim(); r.status = d.status; r.oficial = !!d.oficial && (r.tipo !== 'servico' || r.fontes.some(f => f.u && isOfficialUrl(f.u)));
   r.sigla = (d.sigla || '').trim().toUpperCase(); r.refId = (d.refId || '').trim(); r.codOferta = (d.codOferta || '').trim(); r.grupo = (d.grupo || '').trim(); r.refStatus = d.refStatus || ''; r.refNota = (d.refNota || '').trim(); r.finalidade = (d.finalidade || '').trim(); r.processos = String(d.processos || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
-  const now = JSON.stringify([r.nome, r.tipo, r.categoria, r.linha, r.segmentos, r.necessidades, r.termos, r.dores.map(x => x.t), r.funcionalidades.map(x => x.t), r.prerequisitos.map(x => x.t), intToLines(r.integracoes), fontesToLines(r.fontes), r.fornecedor, r.disponibilidade, r.limites, r.status, r.oficial, r.sigla, r.refId, r.codOferta, r.grupo, r.refStatus, r.refNota, r.finalidade, r.processos]);
+  r.ciclo = CICLO_SOL.includes(d.ciclo) ? d.ciclo : ''; r.entrega = String(d.entrega || '').trim().slice(0, 120); r.comercial = String(d.comercial || '').trim().slice(0, 120); r.dependencias = String(d.dependencias || '').split(/\n+/).map(x => x.trim().slice(0, 200)).filter(Boolean).slice(0, 20); r.complementares = String(d.complementares || '').split(/[;\n]+/).map(x => x.trim().slice(0, 120)).filter(Boolean).slice(0, 20);
+  const now = JSON.stringify([r.nome, r.tipo, r.categoria, r.linha, r.segmentos, r.necessidades, r.termos, r.dores.map(x => x.t), r.funcionalidades.map(x => x.t), r.prerequisitos.map(x => x.t), intToLines(r.integracoes), fontesToLines(r.fontes), r.fornecedor, r.disponibilidade, r.limites, r.status, r.oficial, r.sigla, r.refId, r.codOferta, r.grupo, r.refStatus, r.refNota, r.finalidade, r.processos, r.ciclo || '', r.entrega || '', r.comercial || '', r.dependencias || [], r.complementares || []]);
   return old !== now;
 }
 function solSave() {
@@ -4861,7 +4864,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = '4d1f0def7093';
+const BUILD = 'fc06dc89e737';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -7329,6 +7332,8 @@ function solForm() {
   <div class="grid g3">${inp('sigla', 'Sigla oficial (não force SIGA quando não existir)', 'ex.: SIGAFIN')}${inp('refId', 'Identificador interno', 'ex.: MEU-RH')}${inp('codOferta', 'Código de oferta', 'ex.: 0069')}${inp('grupo', 'Grupo', 'Backoffice e Gestão, Indústria…')}
   <label class="sm">Situação da validação da referência<select data-c="sf" data-f="refStatus" style="width:100%">${optS('', '—', d.refStatus)}${Object.entries(REF_ST).map(([k, l]) => optS(k, l, d.refStatus)).join('')}</select></label>${inp('refNota', 'Nota de validação (correção/ambiguidade com fonte)')}</div>
   <div class="grid g2">${ta('finalidade', 'Finalidade de negócio (oficial)', '', 2)}${ta('processos', 'Processos atendidos (um por linha)', '', 2)}</div>
+  <div class="grid g3"><label class="sm">Situação do ciclo de vida<select data-c="sf" data-f="ciclo" style="width:100%">${CICLO_SOL.map(x => optS(x, x || 'não informada', d.ciclo)).join('')}</select></label>${inp('entrega', 'Modalidade de entrega (só se confirmada na fonte)', 'ex.: SaaS, on-premises')}${inp('comercial', 'Modelo de comercialização (só se confirmado)', 'ex.: assinatura, CDU')}</div>
+  <div class="grid g2">${ta('dependencias', 'Dependências de implantação (uma por linha)', '', 2)}${ta('complementares', 'Soluções complementares (nomes como estão na Base, separados por ;)', '', 2)}</div>
   <div class="grid g2"><div><span class="sm">Segmentos atendidos</span><div class="row sm" style="flex-wrap:wrap">${KB.segments.map(g => `<label><input type="checkbox" data-c="sfm" data-f="segmentos" data-v="${g.id}" ${d.segmentos.includes(g.id) ? 'checked' : ''}> ${esc(g.nome)}</label>`).join('')}</div></div>
   <div><span class="sm">Necessidades que a solução atende (liga a solução às oportunidades)</span><div class="row sm" style="flex-wrap:wrap">${Object.keys(NEED_LABEL).map(n => `<label><input type="checkbox" data-c="sfm" data-f="necessidades" data-v="${n}" ${d.necessidades.includes(n) ? 'checked' : ''}> ${esc(NEED_LABEL[n])}</label>`).join('')}</div></div></div>
   <div class="grid g2">${ta('dores', 'Dores resolvidas (uma por linha)', '')}${ta('funcionalidades', 'Funcionalidades documentadas (uma por linha)', '')}${ta('prerequisitos', 'Pré-requisitos (um por linha; opcional: [obrigatorio] ou [recomendado] e {funcionalidade/integração a que se aplica})', 'Release 12.1.33 ou superior [obrigatorio] {App Análise de Créditos}')}${ta('integracoes', 'Integrações (uma por linha: Sistema = confirmada | não integra | não verificada, opcional | nativa, conector, api, desenvolvimento, nao_documentada)', 'Protheus = confirmada | nativa')}</div>
@@ -7358,6 +7363,7 @@ function solDetail(r) {
   return `<div class="card"><div class="row"><h3>${esc(r.nome)}</h3>${pill(TIPOS[r.tipo], 'info')}${pill(r.status, ST_SOL[r.status] || 'off')}${r.oficial ? pill('oferta oficial TOTVS', 'ok') : (r.tipo === 'servico' ? pill('não confirmada como oferta oficial TOTVS', 'warn') : '')}${r.arquivado ? pill('arquivada', 'off') : ''}${r._priv ? pill('privada — não publicada', 'warn') : pill('catálogo compartilhado', 'info')}<span class="sp"></span>
   <button class="btn sm" data-a="solEdit" data-id="${r.id}">Editar</button><button class="btn ghost sm" data-a="solArq" data-id="${r.id}" data-on="${r.arquivado ? '' : '1'}">${r.arquivado ? 'Restaurar' : 'Arquivar'}</button><button class="btn ghost sm" data-a="pesqProd" data-id="${r.id}">Atualizar informações deste produto (IA)</button><button class="btn ghost sm" data-a="solClose">Fechar</button></div>
   <p class="sm muted">Linha: ${esc(r.linha || '—')} • Categoria: ${esc(r.categoria || '—')} • Fornecedor: ${esc(r.fornecedor || '—')} • Disponibilidade comercial: ${esc(r.disponibilidade || '—')} • Origem: ${esc(r.origem)} • Atualizado em ${esc(r.atualizadoEm)} (rev ${r.rev}) • ${afet} cliente(s) com diagnóstico ligado a esta solução</p>
+  ${r.ciclo || r.entrega || r.comercial || (r.dependencias || []).length || (r.complementares || []).length ? `<p class="sm muted">${[r.ciclo && 'Ciclo de vida: ' + esc(r.ciclo), r.entrega && 'Entrega: ' + esc(r.entrega), r.comercial && 'Comercialização: ' + esc(r.comercial), (r.dependencias || []).length && 'Dependências: ' + esc(r.dependencias.join('; ')), (r.complementares || []).length && 'Complementares: ' + esc(r.complementares.join('; '))].filter(Boolean).join(' • ')}</p>` : ''}
   <p class="autor">${r._priv ? 'Registro privado desta conta — ainda não publicado no catálogo.' : `Criada por <b>${esc(who(r.criadoPor))}</b>${r.alteradoEm ? ` • última alteração por <b>${esc(who(r.alteradoPor))}</b> em ${esc(dtBR(r.alteradoEm))}` : ''}`}</p>
   <p class="sm">Segmentos: ${r.segmentos.map(id => esc(segName(id) || id)).join(', ') || '—'} • Necessidades: ${r.necessidades.map(n => esc(NEED_LABEL[n] || n)).join(', ') || '—'} • Termos: ${esc((r.termos || []).join(', ') || r.termosRe || '—')}</p>
   ${solOfficialHead(r)}
@@ -7486,7 +7492,7 @@ function vCliente(all) {
   let h = `<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" data-a="nav" data-v="clientes">← Clientes</button><h2>${esc(c.name)}</h2>${fPill(c)} ${docPill(c)}${shForaPill(c)}<span class="sp"></span><button class="btn ghost" data-a="pesqCli" data-k="${kk(c)}">Pesquisar soluções para este cliente</button><button class="btn ghost" data-a="expCli" data-k="${kk(c)}">Relatório do cliente (HTML)</button><button class="btn" data-a="briefOpen" data-k="${kk(c)}">Briefing pré-reunião</button><button class="btn pri" data-a="ctab" data-v="diagnostico">Gerar diagnóstico executivo</button></div>
   ${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
   if (!all) h += `<div class="ctabs">${CTABS.map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const T = { portfolio: () => ptTab(c), gestao: () => empGestaoTab(c), validacao: () => valTab(c), raiox: () => rxTab(c), resumo: () => resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
+  const T = { portfolio: () => ptTab(c), gestao: () => empGestaoTab(c), validacao: () => valTab(c), raiox: () => rxTab(c), resumo: () => resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c) + ptDiagCard(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
   if (all) h += ['raiox', 'resumo', 'cadastro', 'fichas', 'contratacao', 'tecnologia', 'regulatorio', 'roi', 'ecossistema'].map(k => `<h2 style="margin:18px 0 6px">${CTABS.find(x => x[0] === k)[1]}</h2>` + T[k]()).join('');
   else h += T[tab]();
   return h;
@@ -8670,6 +8676,7 @@ function briefBlocks(M) {
   B.push({ k: 'kpis', items: [{ l: `Total bruto (VAL_TOTAL)${M.comp ? ' · ' + M.comp.split('-').reverse().join('/') : ''}`, v: brBRL(M.bruto) }, { l: 'Total líquido (VAL_LIQD)', v: M.liq == null ? 'não consta' : brBRL(M.liq), tone: M.liq == null ? 'alert' : null }, { l: 'Itens faturados', v: String(M.n) }, { l: 'Ticket médio por item', v: brBRL(M.ticket) }] });
   if (M.docTot) { const okB = M.bruto != null && M.docTot.total != null && Math.abs(M.docTot.total - M.bruto) <= Math.max(1, Math.abs(M.bruto) * 0.005); P(`Conferência: linha de total da ficha = ${brBRL(M.docTot.total)} · soma dos itens = ${brBRL(M.bruto)} → ${okB ? 'confere' : 'DIFERE; validar itens excluídos, descontos ou linhas não lidas'}.`, okB ? 'ok' : 'alert'); }
   { const er = empBriefRows(c); if (er) { H('Posição na carteira (Empodera)'); B.push({ k: 'kv', rows: er }); } }
+  { const pr = ptBriefRows(c); if (pr) { H('Soluções candidatas (Portfólio TOTVS — uso interno, validar antes de apresentar)'); B.push({ k: 'kv', rows: pr }); } }
   /* 02 */
   sec('02', 'Proposta Vigente & Portfólio');
   B.push({ k: 'kv', rows: [['Contrato(s)', M.meta.contrato.length ? M.meta.contrato.join(' · ') : (c.contratos || []).map(x => x.ident).filter(x => x && x !== 'principal').join(' · ') || 'não consta na ficha'], ['Proposta(s) vigente(s)', M.meta.proposta.length ? M.meta.proposta.join(' · ') : 'não consta na ficha'], ['Condição de pagamento', M.meta.cond.length ? M.meta.cond.join(' · ') : 'não consta na ficha']] });
@@ -9488,7 +9495,8 @@ function ptCtx(c) {
   const hip = new Map(); for (const h of c.dorHip || []) if (!hip.has(h.solId)) hip.set(h.solId, h);
   const segId = c.segInfo?.id || '', sg = segId ? KB.segments.find(s => s.id === segId) : null;
   const temNomes = (c.productsIdent || []).map(p => norm(p.nome));
-  return { c, ident, opp, hip, segId, segNome: sg?.nome || (segId && typeof segName === 'function' ? segName(segId) : '') || '', segApl: new Set((sg?.aplicacoes || []).map(a => a.sol)), linhas: baseLines(c), temNomes, rej: c.prodDec || {} };
+  const tem = (c.productsIdent || []).filter(p => p.nivel !== 'texto' || p.conf).map(p => S.solutions.find(r => r.id === p.id)).filter(Boolean);
+  return { tem, c, ident, opp, hip, segId, segNome: sg?.nome || (segId && typeof segName === 'function' ? segName(segId) : '') || '', segApl: new Set((sg?.aplicacoes || []).map(a => a.sol)), linhas: baseLines(c), temNomes, rej: c.prodDec || {} };
 }
 function ptClass(X, r) {
   const c = X.c, p = X.ident.get(r.id), linhaSol = ptLinhaDe(r), F = {}, set = (k, pts, motivo) => { F[k] = { pts, motivo }; };
@@ -9510,7 +9518,8 @@ function ptClass(X, r) {
   else if (!X.linhas.length) set('compat', 8, 'Linha de ERP do cliente não identificada — validar.');
   else set('compat', 10, `Compatibilidade com ${X.linhas.join(', ')} não registrada na Base — validar antes de afirmar.`);
   const par = ints.find(i => i.estado === 'confirmada' && X.temNomes.some(n => n && norm(i.sistema) && (n.includes(norm(i.sistema)) || norm(i.sistema).includes(n))));
-  if (par) set('compl', 15, `Integra com ${par.sistema}, que o cliente já tem.`); else if (linhaSol && X.linhas.includes(linhaSol)) set('compl', 8, `Complementa a linha ${linhaSol} já contratada.`); else set('compl', 0, 'Sem integração registrada com o que o cliente já tem.');
+  const nmSol = normName(r.nome), cpl = X.tem.find(t => t.id !== r.id && ((t.complementares || []).some(n => normName(n) === nmSol) || (r.complementares || []).some(n => normName(n) === normName(t.nome))));
+  if (cpl) set('compl', 15, `Registrada na Base como complementar de ${cpl.nome}, que o cliente já tem.`); else if (par) set('compl', 15, `Integra com ${par.sistema}, que o cliente já tem.`); else if (linhaSol && X.linhas.includes(linhaSol)) set('compl', 8, `Complementa a linha ${linhaSol} já contratada.`); else set('compl', 0, 'Sem integração registrada com o que o cliente já tem.');
   if (c.emp?.ausente) set('viab', 0, 'Cliente ausente da última base da carteira.'); else if (c.emp && (c.emp.mrrP || 0) > 0) set('viab', 10, 'Cliente ativo na carteira, com receita recorrente.'); else if (c.emp) set('viab', 5, 'Cliente na carteira, sem receita recorrente registrada.'); else set('viab', 5, 'Sem dados da carteira (Empodera) para avaliar.');
   const of = !!r.oficial || (r.fontes || []).some(f => f.u && isOfficialUrl(f.u));
   if (r.status === 'Validado') set('mat', of ? 10 : 7, of ? 'Registro validado, com fonte oficial.' : 'Registro validado, sem fonte oficial vinculada.'); else if (r.status === 'Em revisão') set('mat', of ? 6 : 4, 'Registro em revisão.'); else set('mat', 2, 'Registro ainda não validado.');
@@ -9518,6 +9527,7 @@ function ptClass(X, r) {
   /* 3) classe para o que o cliente não tem */
   if (!cls) {
     if (incompat) { cls = 'incompativel'; porque = incompat; }
+    else if (r.ciclo === 'Descontinuada') { cls = 'nao_ident'; porque = 'Solução marcada como descontinuada na Base: não recomendar.'; }
     else if (X.rej[r.id]?.st === 'rejeitado') { cls = 'nao_ident'; porque = 'Você marcou que este cliente não tem esta solução.'; }
     else if (sinal && r.status === 'NECESSITA VALIDAÇÃO') { cls = 'validar'; porque = 'Há indício de aderência, mas o registro da solução ainda não foi validado.'; }
     else if (sinal && F.compat.pts < 20 && !h && !o) { cls = 'validar'; porque = 'Aderente ao segmento; compatibilidade técnica ainda não registrada.'; }
@@ -9571,6 +9581,33 @@ function ptTab(c) {
   <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">${chip('', 'Todas')}${PT_ORD.filter(k => n(k)).map(k => chip(k, PT_CLS[k][0])).join('')}<span class="sp"></span><input type="text" data-i="ptcq" value="${esc(U.cq || '')}" placeholder="Buscar solução" style="min-width:200px"></div>
   ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b><div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
 }
+/* ---------- Diagnóstico e briefing: soluções candidatas, só com conteúdo registrado ---------- */
+function ptCandidatas(c, n = 5) { return ptCliente(c).filter(x => x.cls === 'potencial' || x.cls === 'validar').sort(ptRank).slice(0, n); }
+function ptFicha(c, x) {
+  const r = x.r, F = Object.fromEntries(x.fatores.map(f => [f.k, f])), it = a => (a || []).map(i => typeof i === 'string' ? i : i.t).filter(Boolean), dores = it(r.dores).slice(0, 2), linhas = baseLines(c);
+  const of = (r.fontes || []).filter(f => f.u && isOfficialUrl(f.u)).slice(0, 2), pend = [];
+  if (r.status !== 'Validado') pend.push('Registro da solução ainda não validado na Base.');
+  if (!of.length) pend.push('Sem fonte oficial vinculada ao registro.');
+  if (F.compat.pts < 20) pend.push(F.compat.motivo);
+  if (!it(r.prerequisitos).length) pend.push('Pré-requisitos técnicos não registrados.');
+  const fin = String(r.finalidade || '').trim().slice(0, 240); if (!dores.length && !fin) pend.push('Problema de negócio que a solução resolve não registrado.'); else if (!dores.length) pend.push('Dores específicas não registradas (só a finalidade geral).');
+  if (!c.segInfo?.id) pend.push('Segmento do cliente não classificado.');
+  const perg = dores.map(t => `Como vocês tratam hoje: “${String(t).slice(0, 120)}”?`);
+  if (F.compat.pts < 20) perg.push(linhas.length ? `Qual a versão e o ambiente atual de ${linhas.join(', ')}?` : 'Qual ERP e versão estão em uso hoje?');
+  if (!perg.length) perg.push('Que processo desta área mais consome tempo ou gera retrabalho hoje?');
+  const acao = x.cls === 'validar' ? 'Validar conteúdo e compatibilidade na fonte oficial antes de apresentar.' : F.dor.pts ? 'Levar as perguntas de descoberta à próxima conversa e registrar o retorno na ficha.' : 'Confirmar a dor com o cliente antes de avançar.';
+  return { r, dores, fin, evid: [x.porque, ...['segmento', 'dor', 'compat', 'compl'].filter(k => F[k].pts > 0).map(k => F[k].motivo)], pre: it(r.prerequisitos).slice(0, 3), dep: (r.dependencias || []).slice(0, 3), restr: [r.limites, r.ciclo === 'Em descontinuação' && 'Solução em descontinuação.'].filter(Boolean), pend, perg, of, acao };
+}
+function ptDiagCard(c) {
+  const cs = ptCandidatas(c, 5); if (!cs.length) return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno)</span></h3><p class="sm muted">Nenhuma solução da Base tem indício registrado de aderência a este cliente. Registre dores na busca “dor → solução”, classifique o segmento ou complete os registros da Base.</p></div>`;
+  const li = (a, vazio) => a.length ? `<ul class="sm" style="margin:2px 0 0 16px">${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : `<div class="sm muted">${esc(vazio)}</div>`;
+  return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno — ${cs.length} de maior aderência)</span></h3>
+  <p class="sm muted">Consulta toda a Base de Soluções. Mostra só o que está registrado; o que não se sabe aparece em “Pendências”. Nenhum benefício, preço, integração ou retorno é presumido.</p>
+  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${ptBarra(x)}<span class="sp"></span><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
+    <div class="grid g2" style="margin-top:6px"><div><div class="pt-h">Dor que resolve (registrada)</div>${li(f.dores, f.fin ? '' : 'Não registrada na Base.')}${!f.dores.length && f.fin ? `<div class="sm">Finalidade registrada: ${esc(f.fin)}</div>` : ''}<div class="pt-h">Evidência de aderência</div>${li(f.evid, '—')}<div class="pt-h">Pré-requisitos e dependências registrados</div>${li([...f.pre, ...f.dep], 'Não registrados.')}${f.restr.length ? `<div class="pt-h">Restrições registradas</div>${li(f.restr, '')}` : ''}</div>
+    <div><div class="pt-h">Pendências (ainda não conhecido)</div>${li(f.pend, 'Nenhuma pendência de informação.')}<div class="pt-h">Perguntas de descoberta</div>${li(f.perg, '')}<div class="pt-h">Fonte oficial</div>${f.of.length ? `<ul class="sm" style="margin:2px 0 0 16px">${f.of.map(o => `<li><a href="${esc(o.u)}" target="_blank" rel="noopener noreferrer">${esc(o.t || o.u)}</a></li>`).join('')}</ul>` : '<div class="sm muted">Sem fonte oficial vinculada.</div>'}<div class="pt-h">Próxima ação</div><div class="sm">${esc(f.acao)}</div></div></div>${ptExpl(x)}</div>`; }).join('')}</div>`;
+}
+function ptBriefRows(c) { const cs = ptCandidatas(c, 3); return cs.length ? cs.map(x => [x.r.nome, `${PT_CLS[x.cls][0]} · aderência ${x.score}/100 — ${x.porque} Próxima ação: ${ptFicha(c, x).acao}`]) : null; }
 const PT_ACT = {
   ptSel: t => { const U = ptUI(); U.sel = t.dataset.id; U.cls = ''; render(); window.scrollTo(0, 0); },
   ptVoltar: () => { ptUI().sel = ''; render(); },
