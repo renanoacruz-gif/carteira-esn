@@ -13,7 +13,8 @@ function ptCtx(c) {
   const hip = new Map(); for (const h of c.dorHip || []) if (!hip.has(h.solId)) hip.set(h.solId, h);
   const segId = c.segInfo?.id || '', sg = segId ? KB.segments.find(s => s.id === segId) : null;
   const temNomes = (c.productsIdent || []).map(p => norm(p.nome));
-  return { c, ident, opp, hip, segId, segNome: sg?.nome || (segId && typeof segName === 'function' ? segName(segId) : '') || '', segApl: new Set((sg?.aplicacoes || []).map(a => a.sol)), linhas: baseLines(c), temNomes, rej: c.prodDec || {} };
+  const tem = (c.productsIdent || []).filter(p => p.nivel !== 'texto' || p.conf).map(p => S.solutions.find(r => r.id === p.id)).filter(Boolean);
+  return { tem, c, ident, opp, hip, segId, segNome: sg?.nome || (segId && typeof segName === 'function' ? segName(segId) : '') || '', segApl: new Set((sg?.aplicacoes || []).map(a => a.sol)), linhas: baseLines(c), temNomes, rej: c.prodDec || {} };
 }
 function ptClass(X, r) {
   const c = X.c, p = X.ident.get(r.id), linhaSol = ptLinhaDe(r), F = {}, set = (k, pts, motivo) => { F[k] = { pts, motivo }; };
@@ -35,7 +36,8 @@ function ptClass(X, r) {
   else if (!X.linhas.length) set('compat', 8, 'Linha de ERP do cliente não identificada — validar.');
   else set('compat', 10, `Compatibilidade com ${X.linhas.join(', ')} não registrada na Base — validar antes de afirmar.`);
   const par = ints.find(i => i.estado === 'confirmada' && X.temNomes.some(n => n && norm(i.sistema) && (n.includes(norm(i.sistema)) || norm(i.sistema).includes(n))));
-  if (par) set('compl', 15, `Integra com ${par.sistema}, que o cliente já tem.`); else if (linhaSol && X.linhas.includes(linhaSol)) set('compl', 8, `Complementa a linha ${linhaSol} já contratada.`); else set('compl', 0, 'Sem integração registrada com o que o cliente já tem.');
+  const nmSol = normName(r.nome), cpl = X.tem.find(t => t.id !== r.id && ((t.complementares || []).some(n => normName(n) === nmSol) || (r.complementares || []).some(n => normName(n) === normName(t.nome))));
+  if (cpl) set('compl', 15, `Registrada na Base como complementar de ${cpl.nome}, que o cliente já tem.`); else if (par) set('compl', 15, `Integra com ${par.sistema}, que o cliente já tem.`); else if (linhaSol && X.linhas.includes(linhaSol)) set('compl', 8, `Complementa a linha ${linhaSol} já contratada.`); else set('compl', 0, 'Sem integração registrada com o que o cliente já tem.');
   if (c.emp?.ausente) set('viab', 0, 'Cliente ausente da última base da carteira.'); else if (c.emp && (c.emp.mrrP || 0) > 0) set('viab', 10, 'Cliente ativo na carteira, com receita recorrente.'); else if (c.emp) set('viab', 5, 'Cliente na carteira, sem receita recorrente registrada.'); else set('viab', 5, 'Sem dados da carteira (Empodera) para avaliar.');
   const of = !!r.oficial || (r.fontes || []).some(f => f.u && isOfficialUrl(f.u));
   if (r.status === 'Validado') set('mat', of ? 10 : 7, of ? 'Registro validado, com fonte oficial.' : 'Registro validado, sem fonte oficial vinculada.'); else if (r.status === 'Em revisão') set('mat', of ? 6 : 4, 'Registro em revisão.'); else set('mat', 2, 'Registro ainda não validado.');
@@ -43,6 +45,7 @@ function ptClass(X, r) {
   /* 3) classe para o que o cliente não tem */
   if (!cls) {
     if (incompat) { cls = 'incompativel'; porque = incompat; }
+    else if (r.ciclo === 'Descontinuada') { cls = 'nao_ident'; porque = 'Solução marcada como descontinuada na Base: não recomendar.'; }
     else if (X.rej[r.id]?.st === 'rejeitado') { cls = 'nao_ident'; porque = 'Você marcou que este cliente não tem esta solução.'; }
     else if (sinal && r.status === 'NECESSITA VALIDAÇÃO') { cls = 'validar'; porque = 'Há indício de aderência, mas o registro da solução ainda não foi validado.'; }
     else if (sinal && F.compat.pts < 20 && !h && !o) { cls = 'validar'; porque = 'Aderente ao segmento; compatibilidade técnica ainda não registrada.'; }
@@ -96,6 +99,33 @@ function ptTab(c) {
   <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">${chip('', 'Todas')}${PT_ORD.filter(k => n(k)).map(k => chip(k, PT_CLS[k][0])).join('')}<span class="sp"></span><input type="text" data-i="ptcq" value="${esc(U.cq || '')}" placeholder="Buscar solução" style="min-width:200px"></div>
   ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b><div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
 }
+/* ---------- Diagnóstico e briefing: soluções candidatas, só com conteúdo registrado ---------- */
+function ptCandidatas(c, n = 5) { return ptCliente(c).filter(x => x.cls === 'potencial' || x.cls === 'validar').sort(ptRank).slice(0, n); }
+function ptFicha(c, x) {
+  const r = x.r, F = Object.fromEntries(x.fatores.map(f => [f.k, f])), it = a => (a || []).map(i => typeof i === 'string' ? i : i.t).filter(Boolean), dores = it(r.dores).slice(0, 2), linhas = baseLines(c);
+  const of = (r.fontes || []).filter(f => f.u && isOfficialUrl(f.u)).slice(0, 2), pend = [];
+  if (r.status !== 'Validado') pend.push('Registro da solução ainda não validado na Base.');
+  if (!of.length) pend.push('Sem fonte oficial vinculada ao registro.');
+  if (F.compat.pts < 20) pend.push(F.compat.motivo);
+  if (!it(r.prerequisitos).length) pend.push('Pré-requisitos técnicos não registrados.');
+  const fin = String(r.finalidade || '').trim().slice(0, 240); if (!dores.length && !fin) pend.push('Problema de negócio que a solução resolve não registrado.'); else if (!dores.length) pend.push('Dores específicas não registradas (só a finalidade geral).');
+  if (!c.segInfo?.id) pend.push('Segmento do cliente não classificado.');
+  const perg = dores.map(t => `Como vocês tratam hoje: “${String(t).slice(0, 120)}”?`);
+  if (F.compat.pts < 20) perg.push(linhas.length ? `Qual a versão e o ambiente atual de ${linhas.join(', ')}?` : 'Qual ERP e versão estão em uso hoje?');
+  if (!perg.length) perg.push('Que processo desta área mais consome tempo ou gera retrabalho hoje?');
+  const acao = x.cls === 'validar' ? 'Validar conteúdo e compatibilidade na fonte oficial antes de apresentar.' : F.dor.pts ? 'Levar as perguntas de descoberta à próxima conversa e registrar o retorno na ficha.' : 'Confirmar a dor com o cliente antes de avançar.';
+  return { r, dores, fin, evid: [x.porque, ...['segmento', 'dor', 'compat', 'compl'].filter(k => F[k].pts > 0).map(k => F[k].motivo)], pre: it(r.prerequisitos).slice(0, 3), dep: (r.dependencias || []).slice(0, 3), restr: [r.limites, r.ciclo === 'Em descontinuação' && 'Solução em descontinuação.'].filter(Boolean), pend, perg, of, acao };
+}
+function ptDiagCard(c) {
+  const cs = ptCandidatas(c, 5); if (!cs.length) return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno)</span></h3><p class="sm muted">Nenhuma solução da Base tem indício registrado de aderência a este cliente. Registre dores na busca “dor → solução”, classifique o segmento ou complete os registros da Base.</p></div>`;
+  const li = (a, vazio) => a.length ? `<ul class="sm" style="margin:2px 0 0 16px">${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : `<div class="sm muted">${esc(vazio)}</div>`;
+  return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno — ${cs.length} de maior aderência)</span></h3>
+  <p class="sm muted">Consulta toda a Base de Soluções. Mostra só o que está registrado; o que não se sabe aparece em “Pendências”. Nenhum benefício, preço, integração ou retorno é presumido.</p>
+  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${ptBarra(x)}<span class="sp"></span><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
+    <div class="grid g2" style="margin-top:6px"><div><div class="pt-h">Dor que resolve (registrada)</div>${li(f.dores, f.fin ? '' : 'Não registrada na Base.')}${!f.dores.length && f.fin ? `<div class="sm">Finalidade registrada: ${esc(f.fin)}</div>` : ''}<div class="pt-h">Evidência de aderência</div>${li(f.evid, '—')}<div class="pt-h">Pré-requisitos e dependências registrados</div>${li([...f.pre, ...f.dep], 'Não registrados.')}${f.restr.length ? `<div class="pt-h">Restrições registradas</div>${li(f.restr, '')}` : ''}</div>
+    <div><div class="pt-h">Pendências (ainda não conhecido)</div>${li(f.pend, 'Nenhuma pendência de informação.')}<div class="pt-h">Perguntas de descoberta</div>${li(f.perg, '')}<div class="pt-h">Fonte oficial</div>${f.of.length ? `<ul class="sm" style="margin:2px 0 0 16px">${f.of.map(o => `<li><a href="${esc(o.u)}" target="_blank" rel="noopener noreferrer">${esc(o.t || o.u)}</a></li>`).join('')}</ul>` : '<div class="sm muted">Sem fonte oficial vinculada.</div>'}<div class="pt-h">Próxima ação</div><div class="sm">${esc(f.acao)}</div></div></div>${ptExpl(x)}</div>`; }).join('')}</div>`;
+}
+function ptBriefRows(c) { const cs = ptCandidatas(c, 3); return cs.length ? cs.map(x => [x.r.nome, `${PT_CLS[x.cls][0]} · aderência ${x.score}/100 — ${x.porque} Próxima ação: ${ptFicha(c, x).acao}`]) : null; }
 const PT_ACT = {
   ptSel: t => { const U = ptUI(); U.sel = t.dataset.id; U.cls = ''; render(); window.scrollTo(0, 0); },
   ptVoltar: () => { ptUI().sel = ''; render(); },
