@@ -1,0 +1,122 @@
+# t98 — Carteira & MRR: importação da planilha Clientes_ESN (Empodera) no cadastro único,
+# derivação (quadrantes, recência, produtos/etiquetas), qualidade, histórico, gestão da conta e telas
+import sys, time, json; sys.path.insert(0, '/home/claude/test')
+from t40_lib import *
+A, errs = open_h('qa.t98.%d@totvs.com.br' % time.time())
+A.wait_for_timeout(500)
+
+# ---------- utilidades ----------
+for v, exp in [('1.234,56', 1234.56), ('R$ 2.000,00', 2000), (1500.456, 1500.46), ('', 0), ('-', 0), ('12.5', 12.5)]:
+    r = ev(A, "empNum(%s)" % json.dumps(v)); ck('empNum(%r)' % (v,), abs(r - exp) < 0.001, r)
+ck('empDate dd/mm/aaaa', ev(A, "empDate('05/03/2024')") == '2024-03-05')
+ck('empDate serial Excel (45292 = 01/01/2024)', ev(A, "empDate(45292)") == '2024-01-01')
+ck('empDate objeto Date à meia-noite local', ev(A, "empDate(new Date(2025, 6, 9))") == '2025-07-09')
+ck('empDate vazio', ev(A, "empDate('')") is None)
+pp = ev(A, "empParseProd('PROTHEUS, RH | Restrito, TECHFIN | CONSIGNADO, Retenção 2025, -')")
+ck('empParseProd separa produtos', pp['produtos'] == ['PROTHEUS', 'RH', 'TECHFIN CONSIGNADO'], pp['produtos'])
+ck('empParseProd separa etiquetas com severidade', [(t['k'], t['sev']) for t in pp['tags']] == [['restrito', 'crit'], ['retencao 2025', 'serious']] or [(t['k'], t['sev']) for t in pp['tags']] == [('restrito', 'crit'), ('retencao 2025', 'serious')], pp['tags'])
+
+# ---------- cliente pré-existente no Analisador (mesmo código da planilha) ----------
+ev(A, """(()=>{ const c = S.clients['c_T100'] = { key:'c_T100', code:'T100', name:'NOME DO ANALISADOR', cnpj:'', cnpjRaw:'', seg:'Indústria', city:'', size:'', mrr:777, productsRaw:'', churn:'', nps:'', notes:'nota antiga', uf:'', regime:'', release:'', fichas:[], docs:[], mgmt:{}, act:{} }; cadInit(c); runAnalysis(c); return 1; })()""")
+
+IMP = """(async (rows, nome) => { await vend('xlsx'); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Relatório'], [], rows[0], ...rows.slice(1)]), 'Clientes');
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }); await empArquivo(new File([buf], nome)); return UI.emp.pend ? UI.emp.pend.recs.length : -1; })(%s, %s)"""
+H = ['Cód', 'NOME RAZÃO SOCIAL', 'NOME FANTASIA', 'CNPJ', 'SITUAÇÃO', 'SITUAÇÃO (PROTHEUS)', 'SEGMENTO', 'PRODUTO (ETIQUETA EMPODERA)', 'ESTADO', 'CIDADE', 'MRR CONTRATADO', 'MRR PAGANTE', 'MRR PAGANTE SOMA GRUPO EMP', 'ÚLTIMA VENDA PRODUTO', 'ÚLTIMA VENDA SERVIÇO', 'LINK EMPODERA']
+R1 = [H,
+  ['T100', 'ALFA SA', 'Alfa', '11222333000144', 'ATIVO', 'ATIVO', 'MANUFATURA', 'PROTHEUS, RH', 'PR', 'CURITIBA', 30000, 25000, 40000, '10/01/2023', '01/09/2025', 'https://empodera.example/alfa'],
+  ['T200', 'BETA LTDA', 'Beta', '22333444000155', 'ATIVO', 'INATIVO', 'SERVICOS', 'PROTHEUS | Restrito', 'PR', 'PINHAIS', 50000, 50000, 50000, '01/08/2025', '', ''],
+  ['T300', 'GAMA ME', '#N/A', '33444555000166', 'ATIVO', 'ATIVO', 'VAREJO', '-', 'PR', 'CURITIBA', 800, 800, 800, '15/02/2022', '', ''],
+  ['T400', 'DELTA SA', 'Delta', '44555666000177', 'ATIVO', 'ATIVO', 'VAREJO', 'FLUIG', 'SC', 'JOINVILLE', '1.500,00', '1.500,00', 0, '20/09/2025', '', ''],
+  ['T500', 'EPSILON', 'Epsilon', '55666777000188', 'INATIVO', 'INATIVO', 'LOGISTICA', '', 'PR', 'CURITIBA', 0, 0, 0, '', '', ''],
+  ['T600', 'ZETA', 'Zeta', '66777888000199', 'ATIVO', 'ATIVO', 'LOGISTICA', 'RM', 'PR', 'CURITIBA', 0, 0, 0, '', '', '']]
+n = ev(A, IMP % (json.dumps(R1), json.dumps('Clientes_ESN_01_10_2025.xlsx')))
+ck('planilha lida: 6 clientes (cabeçalho achado abaixo de linhas de título)', n == 6, n)
+ck('data-base sugerida pelo nome do arquivo', ev(A, "UI.emp.pend.data") == '2025-10-01')
+pl = ev(A, "(()=>{ const p = empPlano(UI.emp.pend.recs); return { novos: p.novos.length, primeira: p.primeira.length, mud: p.mud.length, aus: p.ausentes.length }; })()")
+ck('prévia: 5 novos, 1 já cadastrado (casado pelo código), 0 ausentes', pl == {'novos': 5, 'primeira': 1, 'mud': 0, 'aus': 0}, pl)
+ck('prévia não altera nada antes de aplicar', ev(A, "Object.keys(S.clients).length") == 1)
+ev(A, "UI.view = 'mrr'; render(); 1"); ck('prévia aparece na tela', 'Aplicar importação' in ev(A, "document.getElementById('app').innerHTML"))
+ev(A, "empAplicar('2025-10-01')")
+
+ck('cadastro único: 6 clientes no Analisador', ev(A, "Object.keys(S.clients).length") == 6)
+c1 = ev(A, "(()=>{ const c = S.clients['c_T100']; return { name: c.name, mrr: c.mrr, notes: c.notes, seg: c.seg, mrrP: c.emp.mrrP, mrrC: c.emp.mrrC, uvp: c.emp.uvp, uvs: c.emp.uvs, fant: c.emp.fantasia }; })()")
+ck('cliente existente: cadastro do Analisador preservado', c1['name'] == 'NOME DO ANALISADOR' and c1['mrr'] == 777 and c1['notes'] == 'nota antiga' and c1['seg'] == 'Indústria', c1)
+ck('cliente existente: bloco Empodera preenchido', c1['mrrP'] == 25000 and c1['mrrC'] == 30000 and c1['uvp'] == '2023-01-10' and c1['uvs'] == '2025-09-01' and c1['fant'] == 'Alfa', c1)
+c4 = ev(A, "(()=>{ const c = Object.values(S.clients).find(c => c.code === 'T400'); return { name: c.name, cnpj: c.cnpj, seg: c.seg, uf: c.uf, mrr: c.mrr, mrrP: c.emp.mrrP, opps: Array.isArray(c.opps) }; })()")
+ck('cliente novo criado com cadastro e análise', c4 == {'name': 'Delta', 'cnpj': '44555666000177', 'seg': 'VAREJO', 'uf': 'SC', 'mrr': 1500, 'mrrP': 1500, 'opps': True}, c4)
+ck('#N/A no nome fantasia vira vazio (usa razão social)', ev(A, "empDerive().find(d => d.cod === 'T300').nome") == 'GAMA ME')
+
+# ---------- derivação ----------
+D = {d['cod']: d for d in ev(A, "empDerive().map(d => ({ cod: d.cod, quad: d.quad, ativo: d.ativo, dp: d.dp, gap: d.gap, bucket: d.bucket.k, tags: d.tags.map(t => t.k), produtos: d.produtos }))")}
+ck('quadrantes: Proteger / Expandir / Reativar / Nutrir / Inativo / Sem data', [D[k]['quad'] for k in ['T100', 'T200', 'T300', 'T400', 'T500', 'T600']] == ['Proteger', 'Expandir', 'Reativar', 'Nutrir', 'Inativo', 'Sem data'], {k: v['quad'] for k, v in D.items()})
+ck('dias desde a última venda de produto pela data-base', D['T200']['dp'] == 61, D['T200']['dp'])
+ck('gap contratado − pagante', D['T100']['gap'] == 5000 and D['T200']['gap'] == 0, (D['T100']['gap'], D['T200']['gap']))
+ck('etiqueta Restrito separada do produto', D['T200']['tags'] == ['restrito'] and D['T200']['produtos'] == ['PROTHEUS'], D['T200'])
+T = ev(A, "(()=>{ const t = empTotais(empDerive()); return { n: t.n, ativos: t.ativos, mrrP: t.mrrP, ticket: t.ticket, pag: t.pagantes }; })()")
+ck('totais: 6 clientes, 5 ativos, MRR 77.300, 4 pagantes', T['n'] == 6 and T['ativos'] == 5 and T['mrrP'] == 77300 and T['pag'] == 4 and abs(T['ticket'] - 15460) < 0.01, T)
+ev(A, "empSetCfg('baseRecencia', 'recente')")
+ck('base "mais recente": T100 deixa de ser Proteger (serviço em 09/2025)', ev(A, "empDerive().find(d => d.cod === 'T100').quad") == 'Expandir')
+ev(A, "empSetCfg('baseRecencia', 'produto'); empSetCfg('limiarMrr', '60.000')")
+ck('limiar de MRR 60 mil: T200 vira Nutrir e T100 Reativar', ev(A, "empDerive().filter(d => ['T100','T200'].includes(d.cod)).map(d => d.quad).sort()") == ['Nutrir', 'Reativar'])
+ev(A, "empSetCfg('limiarMrr', '20000'); empSetCfg('limiarDias', '10')"); ck('limiar de dias inválido (<30) é ignorado', ev(A, "S.meta.emp.cfg.limiarDias") == 365)
+
+# ---------- qualidade ----------
+Q = {r['id']: r['cods'] for r in ev(A, "empRegras().map(r => ({ id: r.id, cods: r.itens.map(d => d.cod).sort() }))")}
+ck('qualidade: situação divergente', Q['sitdiv'] == ['T200'], Q['sitdiv'])
+ck('qualidade: ativo sem MRR', Q['semmrr'] == ['T600'], Q['semmrr'])
+ck('qualidade: nome fantasia ausente', Q['nome'] == ['T300'], Q['nome'])
+ck('qualidade: contratado > pagante', Q['gap'] == ['T100'], Q['gap'])
+ck('qualidade: grupo com MRR fora', Q['grupo'] == ['T100'], Q['grupo'])
+ck('qualidade: sem etiqueta de produto (ativos)', Q['semprod'] == ['T300'], Q['semprod'])
+ck('contador de qualidade ignora regras informativas', ev(A, "empQualN()") == 3, ev(A, "empQualN()"))
+
+# ---------- filtros e telas ----------
+ev(A, "UI.view = 'mrr'; 1")
+for tab, txt in [('painel', 'Top 5 clientes'), ('visao', 'Leituras da carteira'), ('recencia', 'Matriz MRR'), ('lista', 'Limpar filtros'), ('produtos', 'Matriz cliente × produto'), ('qualidade', 'Situação Empodera × Protheus'), ('dados', 'Parâmetros da análise')]:
+    ev(A, "UI.emp.tab = %r; render(); 1" % tab); A.wait_for_timeout(60)
+    ck('aba %s renderiza' % tab, txt in ev(A, "document.getElementById('app').innerHTML"))
+ev(A, "UI.emp.f = { ...EMP_F0(), quad: 'Proteger' }; 1"); ck('filtro por quadrante', ev(A, "empLinhas().map(d => d.cod)") == ['T100'])
+ev(A, "UI.emp.f = { ...EMP_F0(), sit: 'todos', seg: 'VAREJO' }; 1"); ck('filtro por segmento, ordenado por MRR', ev(A, "empLinhas().map(d => d.cod)") == ['T400', 'T300'])
+ev(A, "UI.emp.f = { ...EMP_F0(), prod: 'restrito' }; 1"); ck('filtro por etiqueta', ev(A, "empLinhas().map(d => d.cod)") == ['T200'])
+ev(A, "UI.emp.f = { ...EMP_F0(), q: 'joinville' }; 1"); ck('busca por cidade', ev(A, "empLinhas().map(d => d.cod)") == ['T400'])
+ev(A, "UI.emp.f = EMP_F0(); 1")
+
+# ---------- gestão da conta na ficha existente ----------
+ev(A, "empGstSet('c_T100', 'prioridade', 'Alta'); empGstSet('c_T100', 'proximaAcao', ' Visitar o diretor '); empGstSet('c_T100', 'dataAcao', '2020-01-01'); empGstSet('c_T100', 'potencial', '12.000,00'); empGstSet('c_T100', 'campoInvalido', 'x'); 1")
+g = ev(A, "S.clients['c_T100'].gst")
+ck('gestão gravada no cliente (campo desconhecido ignorado)', g['prioridade'] == 'Alta' and g['proximaAcao'] == 'Visitar o diretor' and g['potencial'] == 12000 and 'campoInvalido' not in g, g)
+ev(A, "UI.sel = 'c_T100'; UI.view = 'cliente'; UI.ctab = 'gestao'; render(); 1"); A.wait_for_timeout(100)
+hf = ev(A, "document.getElementById('app').innerHTML")
+ck('ficha existente tem a aba Gestão da conta com a posição do Empodera', 'Gestão da conta' in hf and 'Posição no Empodera' in hf and 'Abrir no Empodera' in hf)
+ev(A, "document.getElementById('gi_txt').value = 'Reunião de alinhamento'; empGstAddI('c_T100'); 1")
+ck('interação registrada', ev(A, "S.clients['c_T100'].gst.interacoes.map(i => i.texto)") == ['Reunião de alinhamento'])
+ev(A, "empGstDelI('c_T100', S.clients['c_T100'].gst.interacoes[0].id); 1"); ck('interação excluída', ev(A, "S.clients['c_T100'].gst.interacoes.length") == 0)
+ev(A, "UI.view = 'mrr'; UI.emp.tab = 'visao'; render(); 1"); hv = ev(A, "document.getElementById('app').innerHTML")
+ck('agenda mostra a próxima ação vencida', 'Visitar o diretor' in hv and 'Vencida' in hv)
+
+# ---------- segunda importação: MRR alterado, ausente marcado (não apagado), histórico ----------
+R2 = [H] + [r[:] for r in R1[1:] if r[0] != 'T400']
+R2[1][11] = 28000
+n2 = ev(A, IMP % (json.dumps(R2), json.dumps('Clientes_ESN_01_11_2025.xlsx')))
+pl2 = ev(A, "(()=>{ const p = empPlano(UI.emp.pend.recs); return { novos: p.novos.length, mud: p.mud.length, aus: p.ausentes.map(c => c.code), antes: p.mrrAntes, novo: p.mrrNovo }; })()")
+ck('2ª importação: 0 novos, 1 MRR alterado, T400 ausente', n2 == 5 and pl2['novos'] == 0 and pl2['mud'] == 1 and pl2['aus'] == ['T400'], pl2)
+ck('2ª importação: variação de MRR na prévia', pl2['antes'] == 77300 and pl2['novo'] == 78800, pl2)
+ev(A, "empAplicar('2025-11-01')")
+ck('ausente continua no cadastro, só marcado', ev(A, "Object.keys(S.clients).length") == 6 and ev(A, "Object.values(S.clients).find(c => c.code === 'T400').emp.ausente") is True)
+ck('ausente sai dos indicadores', ev(A, "empDerive().length") == 5 and ev(A, "empTotais(empDerive()).mrrP") == 78800)
+ck('gestão da conta preservada na reimportação', ev(A, "S.clients['c_T100'].gst.prioridade") == 'Alta')
+ck('histórico de MRR por cliente', ev(A, "S.clients['c_T100'].emp.hist") == [['2025-10-01', 25000], ['2025-11-01', 28000]], ev(A, "S.clients['c_T100'].emp.hist"))
+sn = ev(A, "S.meta.emp.snaps.map(s => [s.data, s.total, s.mrrP])")
+ck('snapshots por data-base', sn == [['2025-10-01', 6, 77300], ['2025-11-01', 5, 78800]], sn)
+ck('qualidade lista o ausente', ev(A, "empRegras().find(r => r.id === 'aus').itens.map(d => d.cod)") == ['T400'])
+ev(A, "UI.emp.tab = 'dados'; render(); 1"); ck('evolução do MRR desenhada com 2 importações', 'em-line' in ev(A, "document.getElementById('app').innerHTML"))
+
+# ---------- planilha inválida não altera nada ----------
+bad = ev(A, IMP % (json.dumps([['Nome', 'Valor'], ['x', 1]]), json.dumps('outra.xlsx')))
+ck('planilha sem "Cód"/"MRR PAGANTE" é recusada', bad == -1 and ev(A, "Object.keys(S.clients).length") == 6, bad)
+
+ck('NAV e despacho incluem Carteira & MRR', ev(A, "NAV.some(x => x[0] === 'mrr') && typeof vMrr === 'function'"))
+ev(A, "UI.view = 'geral'; render(); 1")
+ck('sem erros de página', not errs, errs)
+print('FAILS', F)
+p.stop()

@@ -17,6 +17,7 @@ const IC = {
   trend: '<path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/>',
   left: '<path d="M15 6l-6 6 6 6"/>', right: '<path d="M9 6l6 6-6 6"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
   down: '<path d="M12 4v11M7 11l5 5 5-5"/><path d="M5 20h14"/>', plus: '<path d="M12 5v14M5 12h14"/>', ok: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>', warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.6 9.6c-.4-.9-1.400-1.400-2.600-1.400-1.500 0-2.600.7-2.600 1.800 0 2.500 5.400 1.300 5.400 4 0 1.100-1.200 1.800-2.800 1.800-1.300 0-2.400-.5-2.800-1.500"/>',
   flag: '<path d="M6 21V4"/><path d="M6 4h12l-2.5 4L18 12H6"/>'
 };
 const ico = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
@@ -24,6 +25,7 @@ const ico = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="
 const NAV = [
   ['geral', 'Visão da Carteira', 'dash', []],
   ['forecast', 'Meu Forecast', 'flag', []],
+  ['mrr', 'Carteira & MRR', 'coin', []],
   ['clientes', 'Clientes', 'users', [['clientes', 'Clientes', 'users'], ['cliente', 'Cliente', 'user'], ['segmentos', 'Segmentos', 'pie'], ['consol', 'Consolidação', 'merge']]],
   ['oport', 'Oportunidades TOTVS', 'plan', [['oport', 'Oportunidades', 'plan'], ['plano', 'Acompanhamento (opcional)', 'merge']]],
   ['mercado', 'Inteligência de Mercado', 'trend', []],
@@ -35,7 +37,7 @@ const NAV = [
   ['conta', 'Configurações', 'cog', [['conta', 'Conta e catálogo', 'shield'], ['ia', 'IA e provedores', 'cog'], ['dados', 'Gerenciamento de dados', 'shield'], ['criterios', 'Critérios', 'sliders'], ['base', 'Base TOTVS e limites', 'info']]]
 ];
 const navTop = v => NAV.find(([k, , , sub]) => k === (v === 'diag' ? 'cliente' : v) || sub.some(s => s[0] === (v === 'diag' ? 'cliente' : v))) || NAV[0]; const navTopOld = v => NAV.find(([k, , , sub]) => k === v || sub.some(s => s[0] === v)) || NAV[0];
-const VIEW_TITLE = { forecast: 'Meu Forecast', oport: 'Oportunidades TOTVS', mercado: 'Inteligência de Mercado', pend: 'Central de Pendências', cnpj: 'Consulta de CNPJ', importar: 'Importar e fichas', geral: 'Visão da carteira', clientes: 'Clientes', cliente: 'Cliente', diag: 'Diagnóstico da oportunidade', segmentos: 'Segmentos', plano: 'Acompanhamento (opcional)', criterios: 'Critérios de análise', solucoes: 'Base de Soluções', refs: 'Releases e regulatório', consol: 'Consolidação de clientes', conta: 'Conta e catálogo compartilhado', integra: 'Integrações', dados: 'Gerenciamento de dados', ia: 'Configurações de IA', base: 'Base TOTVS e limites' };
+const VIEW_TITLE = { forecast: 'Meu Forecast', mrr: 'Carteira & MRR', oport: 'Oportunidades TOTVS', mercado: 'Inteligência de Mercado', pend: 'Central de Pendências', cnpj: 'Consulta de CNPJ', importar: 'Importar e fichas', geral: 'Visão da carteira', clientes: 'Clientes', cliente: 'Cliente', diag: 'Diagnóstico da oportunidade', segmentos: 'Segmentos', plano: 'Acompanhamento (opcional)', criterios: 'Critérios de análise', solucoes: 'Base de Soluções', refs: 'Releases e regulatório', consol: 'Consolidação de clientes', conta: 'Conta e catálogo compartilhado', integra: 'Integrações', dados: 'Gerenciamento de dados', ia: 'Configurações de IA', base: 'Base TOTVS e limites' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento: só nesta sessão */ } };
 UI.sbCol = lsGet('sb.col') === '1'; UI.sbOpen = false;
 const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
@@ -47,6 +49,7 @@ function viewSub(v) {
   if (v === 'solucoes') return `${activeSols().length} registro(s) ativo(s)`;
   if (v === 'plano') return n ? 'Responsável e prazo são opcionais: apoio à análise, não um CRM' : 'Sem dados importados';
   if (v === 'oport') return n ? 'Onde há oportunidades, por que fazem sentido e o que validar' : 'Sem dados importados';
+  if (v === 'mrr') return S.meta.emp?.fonte ? `Data-base ${fmtD(S.meta.emp.dataBase)} • ${S.meta.emp.fonte}` : 'Importe a planilha Clientes_ESN do Empodera';
   if (v === 'forecast') { const C = fcCfg(); return C?.url ? `Última sincronização: ${shAgo(C.lastOk)}` : 'Vincule a planilha da Mesa Forecast para começar'; }
   return '';
 }
