@@ -40,7 +40,10 @@ ev(A, "empAplicar('2025-10-01')")
 
 ck('cadastro único: 6 clientes no Analisador', ev(A, "Object.keys(S.clients).length") == 6)
 c1 = ev(A, "(()=>{ const c = S.clients['c_T100']; return { name: c.name, mrr: c.mrr, notes: c.notes, seg: c.seg, mrrP: c.emp.mrrP, mrrC: c.emp.mrrC, uvp: c.emp.uvp, uvs: c.emp.uvs, fant: c.emp.fantasia }; })()")
-ck('cliente existente: cadastro do Analisador preservado', c1['name'] == 'NOME DO ANALISADOR' and c1['mrr'] == 777 and c1['notes'] == 'nota antiga' and c1['seg'] == 'Indústria', c1)
+ck('cliente existente: cadastro do Analisador preservado', c1['name'] == 'NOME DO ANALISADOR' and c1['notes'] == 'nota antiga' and c1['seg'] == 'Indústria', c1)
+ck('MRR oficial do cadastro passa a ser o MRR pagante do Empodera (era 777)', c1['mrr'] == 25000, c1['mrr'])
+fz = ev(A, "(()=>{ const o = freezeClient(S.clients['c_T100']); return { mrrP: o.emp && o.emp.mrrP, uvp: o.emp && o.emp.uvp }; })()")
+ck('persistência: bloco Empodera é gravado com o cliente', fz == {'mrrP': 25000, 'uvp': '2023-01-10'}, fz)
 ck('cliente existente: bloco Empodera preenchido', c1['mrrP'] == 25000 and c1['mrrC'] == 30000 and c1['uvp'] == '2023-01-10' and c1['uvs'] == '2025-09-01' and c1['fant'] == 'Alfa', c1)
 c4 = ev(A, "(()=>{ const c = Object.values(S.clients).find(c => c.code === 'T400'); return { name: c.name, cnpj: c.cnpj, seg: c.seg, uf: c.uf, mrr: c.mrr, mrrP: c.emp.mrrP, opps: Array.isArray(c.opps) }; })()")
 ck('cliente novo criado com cadastro e análise', c4 == {'name': 'Delta', 'cnpj': '44555666000177', 'seg': 'VAREJO', 'uf': 'SC', 'mrr': 1500, 'mrrP': 1500, 'opps': True}, c4)
@@ -72,18 +75,23 @@ ck('contador de qualidade ignora regras informativas', ev(A, "empQualN()") == 3,
 
 # ---------- filtros e telas ----------
 ev(A, "UI.view = 'mrr'; 1")
-for tab, txt in [('painel', 'Top 5 clientes'), ('visao', 'Leituras da carteira'), ('recencia', 'Matriz MRR'), ('lista', 'Limpar filtros'), ('produtos', 'Matriz cliente × produto'), ('qualidade', 'Situação Empodera × Protheus'), ('dados', 'Parâmetros da análise')]:
+for tab, txt in [('painel', 'Top 5 clientes'), ('visao', 'Leituras da carteira'), ('recencia', 'Matriz MRR'), ('produtos', 'Matriz cliente × produto'), ('qualidade', 'Situação Empodera × Protheus'), ('dados', 'Parâmetros da análise')]:
     ev(A, "UI.emp.tab = %r; render(); 1" % tab); A.wait_for_timeout(60)
     ck('aba %s renderiza' % tab, txt in ev(A, "document.getElementById('app').innerHTML"))
-ev(A, "UI.emp.f = { ...EMP_F0(), quad: 'Proteger' }; 1"); ck('filtro por quadrante', ev(A, "empLinhas().map(d => d.cod)") == ['T100'])
-ev(A, "UI.emp.f = { ...EMP_F0(), sit: 'todos', seg: 'VAREJO' }; 1"); ck('filtro por segmento, ordenado por MRR', ev(A, "empLinhas().map(d => d.cod)") == ['T400', 'T300'])
-ev(A, "UI.emp.f = { ...EMP_F0(), prod: 'restrito' }; 1"); ck('filtro por etiqueta', ev(A, "empLinhas().map(d => d.cod)") == ['T200'])
-ev(A, "UI.emp.f = { ...EMP_F0(), q: 'joinville' }; 1"); ck('busca por cidade', ev(A, "empLinhas().map(d => d.cod)") == ['T400'])
-ev(A, "UI.emp.f = EMP_F0(); 1")
+cods = "filtered().map(c => c.code).sort()"
+ev(A, "empIr({ quad: 'Proteger' })"); ck('clique no quadrante abre Clientes filtrado', ev(A, "UI.view") == 'clientes' and ev(A, cods) == ['T100'], ev(A, cods))
+hc = ev(A, "document.getElementById('app').innerHTML"); ck('lista Clientes mostra Quadrante e última venda, com o filtro ativo em chip', '<th>Quadrante</th>' in hc and 'Quadrante: Proteger' in hc)
+ev(A, "empIr({ seg: 'VAREJO', sit: 'todos' })"); ck('filtro por segmento do Empodera', ev(A, cods) == ['T300', 'T400'], ev(A, cods))
+ev(A, "empIr({ prod: 'restrito' })"); ck('filtro por etiqueta', ev(A, cods) == ['T200'], ev(A, cods))
+ev(A, "empIr({ sit: 'inativos' })"); ck('filtro por situação no Empodera', ev(A, cods) == ['T500'], ev(A, cods))
+ev(A, "UI.f = { ...UI.f, ...EMP_FCLR }; 1"); ck('sem filtros do Empodera a lista mostra todos', ev(A, "filtered().length") == 6)
+ev(A, "UI.view = 'mrr'; 1")
 
 # ---------- gestão da conta na ficha existente ----------
 ev(A, "empGstSet('c_T100', 'prioridade', 'Alta'); empGstSet('c_T100', 'proximaAcao', ' Visitar o diretor '); empGstSet('c_T100', 'dataAcao', '2020-01-01'); empGstSet('c_T100', 'potencial', '12.000,00'); empGstSet('c_T100', 'campoInvalido', 'x'); 1")
 g = ev(A, "S.clients['c_T100'].gst")
+ck('persistência: gestão da conta é gravada com o cliente', ev(A, "freezeClient(S.clients['c_T100']).gst.prioridade") == 'Alta')
+ev(A, "UI.f.gp = 'Alta'; 1"); ck('filtro por prioridade da conta em Clientes', ev(A, "filtered().map(c => c.code)") == ['T100']); ev(A, "UI.f.gp = ''; 1")
 ck('gestão gravada no cliente (campo desconhecido ignorado)', g['prioridade'] == 'Alta' and g['proximaAcao'] == 'Visitar o diretor' and g['potencial'] == 12000 and 'campoInvalido' not in g, g)
 ev(A, "UI.sel = 'c_T100'; UI.view = 'cliente'; UI.ctab = 'gestao'; render(); 1"); A.wait_for_timeout(100)
 hf = ev(A, "document.getElementById('app').innerHTML")
@@ -103,6 +111,8 @@ ck('2ª importação: 0 novos, 1 MRR alterado, T400 ausente', n2 == 5 and pl2['n
 ck('2ª importação: variação de MRR na prévia', pl2['antes'] == 77300 and pl2['novo'] == 78800, pl2)
 ev(A, "empAplicar('2025-11-01')")
 ck('ausente continua no cadastro, só marcado', ev(A, "Object.keys(S.clients).length") == 6 and ev(A, "Object.values(S.clients).find(c => c.code === 'T400').emp.ausente") is True)
+ev(A, "UI.f.es = 'ausentes'; 1"); ck('filtro "fora da última importação" em Clientes', ev(A, "filtered().map(c => c.code)") == ['T400']); ev(A, "UI.f.es = ''; 1")
+ck('MRR oficial acompanha a reimportação', ev(A, "S.clients['c_T100'].mrr") == 28000)
 ck('ausente sai dos indicadores', ev(A, "empDerive().length") == 5 and ev(A, "empTotais(empDerive()).mrrP") == 78800)
 ck('gestão da conta preservada na reimportação', ev(A, "S.clients['c_T100'].gst.prioridade") == 'Alta')
 ck('histórico de MRR por cliente', ev(A, "S.clients['c_T100'].emp.hist") == [['2025-10-01', 25000], ['2025-11-01', 28000]], ev(A, "S.clients['c_T100'].emp.hist"))
