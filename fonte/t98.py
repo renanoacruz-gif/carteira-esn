@@ -29,6 +29,8 @@ R1 = [H,
   ['T400', 'DELTA SA', 'Delta', '44555666000177', 'ATIVO', 'ATIVO', 'VAREJO', 'FLUIG', 'SC', 'JOINVILLE', '1.500,00', '1.500,00', 0, '20/09/2025', '', ''],
   ['T500', 'EPSILON', 'Epsilon', '55666777000188', 'INATIVO', 'INATIVO', 'LOGISTICA', '', 'PR', 'CURITIBA', 0, 0, 0, '', '', ''],
   ['T600', 'ZETA', 'Zeta', '66777888000199', 'ATIVO', 'ATIVO', 'LOGISTICA', 'RM', 'PR', 'CURITIBA', 0, 0, 0, '', '', '']]
+H.append('GRUPO EMPRESARIAL')
+for r in R1[1:]: r.append({'T100': 'GRUPO ALFA', 'T300': 'Grupo Varejo', 'T400': 'GRUPO VAREJO'}.get(r[0], ''))
 n = ev(A, IMP % (json.dumps(R1), json.dumps('Clientes_ESN_01_10_2025.xlsx')))
 ck('planilha lida: 6 clientes (cabeçalho achado abaixo de linhas de título)', n == 6, n)
 ck('data-base sugerida pelo nome do arquivo', ev(A, "UI.emp.pend.data") == '2025-10-01')
@@ -63,6 +65,13 @@ ev(A, "empSetCfg('baseRecencia', 'produto'); empSetCfg('limiarMrr', '60.000')")
 ck('limiar de MRR 60 mil: T200 vira Nutrir e T100 Reativar', ev(A, "empDerive().filter(d => ['T100','T200'].includes(d.cod)).map(d => d.quad).sort()") == ['Nutrir', 'Reativar'])
 ev(A, "empSetCfg('limiarMrr', '20000'); empSetCfg('limiarDias', '10')"); ck('limiar de dias inválido (<30) é ignorado', ev(A, "S.meta.emp.cfg.limiarDias") == 365)
 
+# ---------- grupos, plano da semana e movimento (antes da 2ª importação) ----------
+G = ev(A, "empGrupos().map(g => [g.nome.toUpperCase(), g.n, g.mrr, g.grupo, g.fora])")
+ck('grupos: MRR do grupo fora da carteira e contas do mesmo grupo', G == [['GRUPO ALFA', 1, 25000, 40000, 15000], ['GRUPO VAREJO', 2, 2300, 800, 0]], G)
+ck('movimento do MRR só existe a partir da 2ª importação', ev(A, "empMov()") is None)
+ps = ev(A, "empPlanoSemana().map(x => [x.tipo, x.nome])")
+ck('plano da semana: conta em Proteger sem próxima ação', ps == [['Proteger sem ação', 'Alfa']], ps)
+
 # ---------- qualidade ----------
 Q = {r['id']: r['cods'] for r in ev(A, "empRegras().map(r => ({ id: r.id, cods: r.itens.map(d => d.cod).sort() }))")}
 ck('qualidade: situação divergente', Q['sitdiv'] == ['T200'], Q['sitdiv'])
@@ -75,7 +84,7 @@ ck('contador de qualidade ignora regras informativas', ev(A, "empQualN()") == 3,
 
 # ---------- filtros e telas ----------
 ev(A, "UI.view = 'mrr'; 1")
-for tab, txt in [('painel', 'Top 5 clientes'), ('visao', 'Leituras da carteira'), ('recencia', 'Matriz MRR'), ('produtos', 'Matriz cliente × produto'), ('qualidade', 'Situação Empodera × Protheus'), ('dados', 'Parâmetros da análise')]:
+for tab, txt in [('painel', 'Top 5 clientes'), ('semana', 'Plano da semana'), ('grupos', 'Grupos empresariais'), ('visao', 'Leituras da carteira'), ('recencia', 'Matriz MRR'), ('produtos', 'Matriz cliente × produto'), ('qualidade', 'Situação Empodera × Protheus'), ('dados', 'Parâmetros da análise')]:
     ev(A, "UI.emp.tab = %r; render(); 1" % tab); A.wait_for_timeout(60)
     ck('aba %s renderiza' % tab, txt in ev(A, "document.getElementById('app').innerHTML"))
 cods = "filtered().map(c => c.code).sort()"
@@ -120,6 +129,10 @@ ck('motor: base instalada do Empodera preenche produtos quando o cadastro não i
 br = dict(ev(A, "empBriefRows(S.clients['c_T100'])"))
 ck('briefing: posição do Empodera com quadrante e próxima ação', br.get('Quadrante de atenção') == 'Proteger' and 'Visitar o diretor' in br.get('Próxima ação', '') and br.get('MRR pagante', '').find('contratado') > 0, br)
 ck('briefing: cliente sem Empodera não ganha o bloco', ev(A, "empBriefRows({ key: 'x' })") is None)
+ev(A, "S.meta.fcData = { opps: [{ id: 'oz', tab: 'ABRIL', mes: '04', cliente: 'Cliente Forecast', produto: 'ERP', status: 'EM ASSINATURA', cdu: 9000, rec: 0, serv: 0, total: 9000, data: '2020-04-10', vendedor: '' }, { id: 'ow', tab: 'ABRIL', mes: '04', cliente: 'Outro', produto: 'RH', status: 'GANHA', cdu: 1, rec: 0, serv: 0, total: 1, data: '2020-04-10', vendedor: '' }], metas: [] }; 1")
+ps2 = ev(A, "empPlanoSemana().map(x => [x.tipo, x.nome, x.v])")
+ck('plano da semana: ação vencida primeiro, depois assinatura parada do forecast (ganha não entra)', ps2 == [['Ação vencida', 'NOME DO ANALISADOR', 25000], ['Assinatura parada', 'Cliente Forecast', 9000]], ps2)
+ev(A, "delete S.meta.fcData; 1")
 ck('menu: Carteira & MRR e Meu Forecast agrupados em Visão da Carteira', ev(A, "NAV.find(x => x[0] === 'geral')[3].map(s => s[0])") == ['geral', 'mrr', 'forecast'] and ev(A, "NAV.filter(x => ['mrr', 'forecast'].includes(x[0])).length") == 0)
 fs = ev(A, "(()=>{ const I = fcNomeIdx(); return [fcSug({ cliente: 'beta' }, I)?.code || null, fcSug({ cliente: 'BETA LTDA' }, I)?.code || null, fcSug({ cliente: 'Bet' }, I), fcSug({ cliente: 'Nome do Analisador' }, I)?.code || null]; })()")
 ck('forecast: sugere vínculo só com nome idêntico (fantasia, razão ou cadastro)', fs == ['T200', 'T200', None, 'T100'], fs)
@@ -145,6 +158,11 @@ ck('gestão da conta preservada na reimportação', ev(A, "S.clients['c_T100'].g
 ck('histórico de MRR por cliente', ev(A, "S.clients['c_T100'].emp.hist") == [['2025-10-01', 25000], ['2025-11-01', 28000]], ev(A, "S.clients['c_T100'].emp.hist"))
 sn = ev(A, "S.meta.emp.snaps.map(s => [s.data, s.total, s.mrrP])")
 ck('snapshots por data-base', sn == [['2025-10-01', 6, 77300], ['2025-11-01', 5, 78800]], sn)
+mv = ev(A, "(()=>{ const m = empMov(); return { it: m.it.map(x => [x.nome, x.tipo, x.dv]), subiu: m.subiu, saiu: m.saiu, liq: m.liq, n: m.n }; })()")
+ck('movimento do MRR: expansão, saída e líquido', mv['it'] == [['Alfa', 'subiu', 3000], ['Delta', 'saiu', -1500]] and mv['subiu'] == 3000 and mv['saiu'] == -1500 and mv['liq'] == 1500, mv)
+ev(A, "UI.view = 'mrr'; UI.emp.tab = 'visao'; render(); 1"); ck('card Movimento do MRR na Visão geral', 'Líquido: +R$' in ev(A, "document.getElementById('app').innerHTML"))
+pdf = ev(A, "empPdf()")
+ck('resumo executivo em PDF é gerado', isinstance(pdf, int) and pdf > 3000, pdf)
 ck('qualidade lista o ausente', ev(A, "empRegras().find(r => r.id === 'aus').itens.map(d => d.cod)") == ['T400'])
 ev(A, "UI.emp.tab = 'dados'; render(); 1"); ck('evolução do MRR desenhada com 2 importações', 'em-line' in ev(A, "document.getElementById('app').innerHTML"))
 
