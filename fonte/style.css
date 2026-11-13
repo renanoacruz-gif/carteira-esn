@@ -845,3 +845,5 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 .em-dt small{display:block;font-size:11.5px;color:var(--txt2)}.em-dt.em-old small{color:var(--lar);font-weight:600}
 @media (max-width:720px){.em-v .tbl-wrap>table{min-width:600px}.em-v .tbl-wrap{-webkit-overflow-scrolling:touch}.em-v .ctabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.em-v .ctabs button{white-space:nowrap;flex:none}.em-bar{grid-template-columns:1fr auto;row-gap:4px}.em-bar .t{grid-column:1/-1;grid-row:2}.em-ag{grid-template-columns:64px 1fr}.em-ag .pill{grid-column:2}}
 @media (max-width:720px){.em-k>b{white-space:normal;font-size:17px;overflow-wrap:anywhere}.fc-mg .bar{flex-wrap:wrap}.fc-mg .bar .lb{flex:1 0 100%;max-width:none;white-space:normal}}
+
+#atu-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:900;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 24px);padding:10px 14px;border-radius:12px;background:var(--card);color:var(--txt);border:1px solid var(--bd2);box-shadow:0 8px 28px rgba(0,0,0,.28);font-size:14px}
