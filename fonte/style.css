@@ -856,3 +856,4 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 [data-theme=dark] .cgrp button.on{background:var(--ciano2);color:#002233;border-color:var(--ciano2)}
 .em-sub{margin:-4px 0 12px}.gr-h{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);padding:8px 10px 2px}
 .onb-n{display:inline-flex;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:1px solid var(--bd);color:var(--txt2);flex:none}.onb-n.ok{background:var(--ok);border-color:var(--ok);color:#fff}.onb-n.at{background:var(--pet);border-color:var(--pet);color:#fff}
+.pt-res{display:inline-flex;align-items:center;gap:6px;margin-top:6px}.pt-res select{padding:3px 6px;font-size:12.5px}

@@ -141,6 +141,12 @@ function empBriefRows(c) {
     ...(d.tags.length ? [['Etiquetas', d.tags.map(t => t.l).join(', ')]] : []), ...(g.proximaAcao || g.dataAcao ? [['Próxima ação', (g.proximaAcao || 'sem descrição') + (g.dataAcao ? ' · ' + fmtD(g.dataAcao) : '')]] : []), ['Data-base', fmtD(empMeta().dataBase)]];
 }
 /* Visão da Carteira: ações de conta vencidas ou para hoje */
+/* aviso discreto quando a data-base da carteira passa de 30 dias */
+function empVelha() {
+  const db = S.meta.emp?.dataBase; if (!db || !Object.values(S.clients).some(c => c.emp)) return '';
+  const dias = Math.floor((Date.parse(empHoje() + 'T12:00:00') - Date.parse(String(db).slice(0, 10) + 'T12:00:00')) / 864e5); if (!(dias > 30)) return '';
+  return `<div class="alert w" id="emp-velha"><b>Sua carteira é de ${esc(fmtD(String(db).slice(0, 10)))} (há ${dias} dias).</b> MRR, última venda e plano da semana refletem essa data. <button class="btn sm" data-a="empTab" data-v="dados" data-ir="1">Subir planilha atual</button></div>`;
+}
 function empHoje2() {
   const hj = empHoje(), it = Object.values(S.clients).filter(c => c.gst?.dataAcao && c.gst.dataAcao <= hj).sort((a, b) => a.gst.dataAcao.localeCompare(b.gst.dataAcao)); if (!it.length) return '';
   return `<div class="card" id="emphoje"><div class="row"><h3>Ações de conta para hoje</h3>${pill(it.length + (it.length > 1 ? ' ações' : ' ação'), 'warn')}</div>${it.slice(0, 6).map(c => `<button class="em-ag" data-a="openTab" data-k="${esc(c.key)}" data-v="gestao"><span class="${c.gst.dataAcao < hj ? 'em-late' : ''}"><b>${fmtD(c.gst.dataAcao).slice(0, 5)}</b><small>${c.gst.dataAcao < hj ? 'Vencida' : 'Hoje'}</small></span><span><b>${esc(c.name)}</b><small>${esc(c.gst.proximaAcao || 'Ação sem descrição')}</small></span>${c.gst.prioridade ? pill(c.gst.prioridade, c.gst.prioridade === 'Alta' ? 'warn' : 'off') : ''}</button>`).join('')}${it.length > 6 ? `<p class="sm muted">+ ${it.length - 6} — veja em Pendências documentais.</p>` : ''}</div>`;
@@ -401,5 +407,5 @@ function vMrr() {
   const tab = EMP_TABS.some(t => t[0] === U.tab) ? U.tab : 'painel', nq = tem ? empQualN() : 0;
   const T = { painel: () => empPainel() + empVisao(), semana: empSemana, grupos: empGruposTab, visao: () => empPainel() + empVisao(), recencia: empRecencia, produtos: empProdutos, qualidade: empQualidade, dados: empDados };
   const an = EMP_ANALISES.some(t => t[0] === tab), topo = an ? 'recencia' : tab === 'visao' ? 'painel' : tab;
-  return `<div class="em-v">${tem ? `<div class="ctabs">${EMP_BARRA.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${topo === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>${an ? `<div class="seg2 em-sub" role="tablist" aria-label="Análises">${EMP_ANALISES.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
+  return `<div class="em-v">${tab === 'dados' ? '' : empVelha()}${tem ? `<div class="ctabs">${EMP_BARRA.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${topo === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>${an ? `<div class="seg2 em-sub" role="tablist" aria-label="Análises">${EMP_ANALISES.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
 }

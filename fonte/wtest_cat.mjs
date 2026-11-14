@@ -1,6 +1,6 @@
 // Catálogo de soluções: descoberta em lotes com fontes simuladas (fetch e D1 falsos). Uso: node wtest_cat.mjs (ao lado de worker.mjs)
 import { DatabaseSync } from 'node:sqlite';
-import { admCatalogo, catRobotsParse, catRobotsOk } from './worker.mjs';
+import { admCatalogo, catRobotsParse, catRobotsOk, catAuto } from './worker.mjs';
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
 const sql = new DatabaseSync(':memory:');
 const st = q => { let b = []; const o = { bind: (...a) => { b = a; return o; }, run: async () => { const r = sql.prepare(q).run(...b); return { meta: { changes: Number(r.changes) } }; }, first: async () => sql.prepare(q).get(...b) || null, all: async () => ({ results: sql.prepare(q).all(...b) }), _x: () => { if (/^\s*(select)/i.test(q)) return { results: sql.prepare(q).all(...b), meta: { changes: 0 } }; const r = sql.prepare(q).run(...b); return { meta: { changes: Number(r.changes) } }; } }; return o; };
@@ -82,3 +82,16 @@ x = await call({ op: 'reler', fonte: 'enxoval' }); ok(x.s === 400, 'releitura bl
 x = await call({ op: 'limpar', fonte: 'tdn' }); ok(x.s === 400, 'limpar exige confirmação');
 x = await call({ op: 'limpar', fonte: 'tdn', confirmar: 'tdn' }); ok(x.j.removidas === 4, 'limpar remove só a fila da fonte');
 x = await call({ op: 'nada' }); ok(x.s === 400, 'operação desconhecida recusada');
+// leitura agendada
+site[pg(11)] = () => html('Backoffice', '<p>Sem filhos.</p>');
+ok((await catAuto(env, true)) === null, 'leitura agendada desligada por padrão: nada é lido');
+x = await call({ op: 'auto', ligar: true }); ok(x.j.auto === true && (await call({ op: 'estado' })).j.auto === true, 'administrador liga a leitura agendada');
+ok((await catAuto(env, false)) === null, 'ligada, mas sem página pendente: nada a fazer');
+await espera(); await call({ op: 'testar', fonte: 'tdn' }); seen = [];
+let a = await catAuto(env, false); ok(a && a.fonte === 'tdn' && a.lidas === 1 && a.novas === 2, 'ligada e com pendência: lê 1 lote da fonte testada');
+ok(!seen.some(s => /enxoval/.test(s.u)), 'fonte que exige login não é tocada pela leitura agendada');
+x = await call({ op: 'estado' }); ok(x.j.exec.some(e => e.op === 'auto' && /leitura agendada/.test(e.detalhe)), 'execução agendada fica registrada');
+a = await catAuto(env, false); a = await catAuto(env, false); a = await catAuto(env, false); ok(a === null, 'fila esgotada: para sozinha');
+const k10 = (await call({ op: 'estado', estado: 'lida', q: 'Protheus' })).j.paginas[0].chave; await call({ op: 'revisar', chaves: [k10], estado: 'candidata' });
+a = await catAuto(env, true); ok(a && a.relidas === 1, 'sem pendentes, no horário diário: verifica alterações das páginas revisadas');
+x = await call({ op: 'auto', ligar: false }); ok(x.j.auto === false && (await catAuto(env, true)) === null, 'desligar interrompe a leitura agendada');

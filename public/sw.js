@@ -14,6 +14,7 @@ async function resumoTexto() {
     if (!n && !ret) return null;
     const hoje = em.toDateString() === new Date().toDateString(), q = n === 1 ? '1 cliente' : n + ' clientes', t = ret === 1 ? '1 retorno vencendo' : ret + ' retornos vencendo';
     const dia = ' na sua última visita (' + String(em.getDate()).padStart(2, '0') + '/' + String(em.getMonth() + 1).padStart(2, '0') + ')';
+    if (new Date().getDay() === 1 && new Date().getHours() < 12) return 'Semana começando: ' + [n ? q + ' com motivo para aprofundar' : '', ret ? t : ''].filter(Boolean).join(' e ') + dia.replace(' na sua última visita', ', pela sua última visita') + '. Abra e veja o plano da semana.';
     if (n && ret) return q + ' com motivo para aprofundar e ' + t + (hoje ? ' hoje' : dia) + '. Abra a ferramenta e veja.';
     if (ret) return t + (hoje ? ' hoje' : dia) + '. Abra a ferramenta e veja.';
     return hoje ? q + ' com motivo para aprofundar hoje. Abra a ferramenta e veja quais.' : q + ' com motivo para aprofundar' + dia + '. Abra e confira.';

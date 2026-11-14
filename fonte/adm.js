@@ -300,6 +300,7 @@ function admCatCard() {
   const opt = (v, t, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(t)}</option>`;
   return `<div class="card" id="adm-cat"><h3>Catálogo de soluções — fontes oficiais <span class="muted sm">(descoberta e revisão)</span></h3>
   <p class="sm muted">A leitura é feita pelo servidor, em lotes pequenos, só nos domínios oficiais TOTVS e respeitando o robots.txt de cada fonte. Nada entra na Base de Soluções sozinho: cada página descoberta precisa da sua revisão, e a importação continua passando pela pré-visualização. Fonte que exige login não é contornada.</p>
+  <label class="sm" style="display:block;margin:6px 0"><input type="checkbox" data-c="admCatAuto" ${c.auto ? 'checked' : ''}> <b>Leitura agendada</b> — o servidor lê 1 lote por horário agendado, em dias úteis, nas fontes já testadas com sucesso; uma vez por dia verifica alterações nas páginas revisadas. Continua sem importar nada sozinho.</label>
   ${ADMV.catBusy ? `<div class="alert i busy" role="status"><b>${esc(ADMV.catBusy)}</b></div>` : ''}
   <div class="tw"><table><thead><tr><th>Fonte</th><th>Estado</th><th>Cobertura</th><th>Ações</th></tr></thead><tbody>${fontes}</tbody></table></div>
   <h4 style="margin-top:14px">Fila de revisão <span class="muted sm">(${c.total} página(s) no filtro)</span></h4>
@@ -370,6 +371,7 @@ function admAviso() { if (ADMV.msg) toast(ADMV.msg.replace(/^!/, '')); } /* a me
 async function admCopiar(txt, ok) { try { await navigator.clipboard.writeText(txt); toast(ok); } catch { window.prompt('Copie o texto abaixo:', txt); } }
 function admChange(t, c, v) {
   if (c === 'admCatFonte' || c === 'admCatEst') { ADMV.catF[c === 'admCatFonte' ? 'fonte' : 'estado'] = v; ADMV.catF.pag = 0; admCatLoad(); return true; }
+  if (c === 'admCatAuto') { admCatOp({ op: 'auto', ligar: t.checked }, 'Gravando…').then(j => { if (j) toast(j.auto ? 'Leitura agendada ligada.' : 'Leitura agendada desligada.'); }); return true; }
   if (c === 'admCatMud') { ADMV.catF.mudou = t.checked; ADMV.catF.pag = 0; admCatLoad(); return true; }
   if (c === 'admCatSel') { ADMV.catSel[t.dataset.k] = t.checked; render(); return true; }
   if (c === 'admDias') { ADMV.dias = +v || 30; ADMV.de = ADMV.ate = ''; ADMV.data = null; admLoad(); render(); return true; }
