@@ -47,6 +47,7 @@ const ACT = {
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
   fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''), fcLinkSug: t => { if (S.clients[t.dataset.k]) fcLink(t.dataset.id, t.dataset.k); },
+  fcSimOpen: (t, e) => { UI.fc ||= {}; setTimeout(() => { UI.fc.simOpen = !!document.getElementById('fc-sim')?.open; }, 0); }, fcSimLimpar: () => { S.meta.fcSim = { pAberto: null, pAssin: null, recBase: '', porOpp: {} }; touchMeta(); render(); },
   empTab: t => { empUI().tab = t.dataset.v; if (t.dataset.ir) UI.view = 'mrr'; render(); window.scrollTo(0, 0); }, empGo: t => empIr(JSON.parse(t.dataset.f)), empBase: t => empSetCfg('baseRecencia', t.dataset.v),
   empXlsx: () => empXlsx(), empPdf: () => empPdf(),
   empApply: () => empAplicar($('#emp_data')?.value), empCancel: () => { empUI().pend = null; render(); }, gstAddI: t => empGstAddI(t.dataset.k), gstDelI: t => empGstDelI(t.dataset.k, t.dataset.id),
@@ -192,6 +193,8 @@ document.addEventListener('change', async e => {
     case 'fcmes': case 'fctri': { UI.fc ||= {}; UI.fc.sel = v; render(); break; }
     case 'fcfst': case 'fcftipo': { UI.fc ||= {}; UI.fc[c.slice(3)] = v; render(); break; }
     case 'fcsort': { UI.fc ||= {}; UI.fc.sort = v; render(); break; }
+    case 'fcsim': { const M = fcSim(), f = t.dataset.f; if (f === 'recBase') M.recBase = ['mensal', 'anual'].includes(v) ? v : ''; else if (f === 'pAberto' || f === 'pAssin') { const n = fcPct(v); if (v !== '' && n == null) toast('Probabilidade deve ser um número de 0 a 100.'); M[f] = n; } UI.fc ||= {}; UI.fc.simOpen = true; touchMeta(); render(); break; }
+    case 'fcsimopp': { const M = fcSim(), n = fcPct(v); if (v !== '' && n == null) toast('Probabilidade deve ser um número de 0 a 100.'); if (n == null) delete M.porOpp[t.dataset.id]; else M.porOpp[t.dataset.id] = n; UI.fc ||= {}; UI.fc.simOpen = true; touchMeta(); render(); break; }
   }
 });
 /* Item 04: renders caros disparados por digitação são agrupados (140 ms); o estado (UI.*) é atualizado a cada tecla e só o render é adiado. deb.flush(k) executa já. */

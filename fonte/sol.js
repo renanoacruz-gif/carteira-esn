@@ -132,14 +132,27 @@ async function readDocx(buf) {
   const kids = (n, ln) => [...n.children].filter(c => c.localName === ln);
   const txt = n => { let t = ''; const walk = x => { for (const c of x.children) { const l = c.localName; if (l === 't') t += c.textContent; else if (l === 'tab') t += '  '; else if (l === 'br' || l === 'cr') t += ' '; else if (l === 'noBreakHyphen') t += '-'; else if (['pPr', 'rPr', 'instrText', 'del', 'Fallback', 'tblPr', 'trPr', 'tcPr'].includes(l)) continue; else walk(c); } }; walk(n); return t.replace(/[ \t]+$/g, '').replace(/^\s+/, ''); };
   const out = []; let ti = 0, pi = 0;
+  const estilo = p => { const ppr = kids(p, 'pPr')[0]; return ppr ? [...(kids(ppr, 'pStyle')[0]?.attributes || [])].find(a => a.localName === 'val')?.value || '' : ''; };
+  const nivelDe = p => { const m = /^(?:heading|t[ií]tulo|ttulo)\s*([1-9])$/i.exec(estilo(p)); return m ? +m[1] : /^(title|t[ií]tulo|ttulo)$/i.test(estilo(p)) ? 1 : 0; };
   const para = p => { const t = txt(p).trim(); if (!t) return ''; const ppr = kids(p, 'pPr')[0]; const stl = ppr ? [...(kids(ppr, 'pStyle')[0]?.attributes || [])].find(a => a.localName === 'val')?.value || '' : ''; return ppr && (kids(ppr, 'numPr').length || /^(list|lista|bullet|marcador)/i.test(stl)) ? '• ' + t : t; };
   const cellText = tc => kids(tc, 'p').map(para).concat(kids(tc, 'tbl').map(tb => kids(tb, 'tr').map(rowText).join(' / '))).filter(Boolean).join(' ');
   const rowText = tr => kids(tr, 'tc').map(cellText).filter(Boolean).join('  ');
   const walkBody = node => { for (const c of node.children) {
-    if (c.localName === 'p') { const t = para(c); if (t) out.push({ text: t, loc: 'parágrafo ' + (++pi) }); }
-    else if (c.localName === 'tbl') { ti++; kids(c, 'tr').forEach((tr, r) => { const t = rowText(tr).trim(); if (t) out.push({ text: t, loc: `tabela ${ti} linha ${r + 1}` }); }); }
+    if (c.localName === 'p') { const t = para(c); if (t) { const nv = nivelDe(c), o = { text: t, loc: (nv ? 'título nível ' + nv + ', ' : '') + 'parágrafo ' + (++pi) }; if (nv) o.nivel = nv; if (t.startsWith('• ')) o.lista = true; out.push(o); } }
+    else if (c.localName === 'tbl') { ti++; kids(c, 'tr').forEach((tr, r) => { const t = rowText(tr).trim(); if (t) out.push({ text: t, loc: `tabela ${ti} linha ${r + 1}`, tabela: ti, linha: r + 1, cells: kids(tr, 'tc').map(cellText) }); }); }
     else if (c.localName === 'sdt' || c.localName === 'sdtContent' || c.localName === 'customXml') walkBody(c); } };
-  walkBody(body); return out;
+  walkBody(body);
+  /* cabeçalhos e rodapés ficam em partes separadas do arquivo; texto repetido entre seções entra uma vez */
+  const lim = [], vistos = new Set();
+  for (const [re, rot] of [[/^word\/header\d*\.xml$/, 'cabeçalho'], [/^word\/footer\d*\.xml$/, 'rodapé']]) {
+    for (const n of Object.keys(z.files).filter(x => re.test(x)).sort()) { try { const dx = new DOMParser().parseFromString(await zipTxt(z.file(n)), 'application/xml'); if (dx.querySelector('parsererror')) { lim.push(`${rot} ilegível (${n})`); continue; }
+      [...dx.getElementsByTagName('*')].filter(e => e.localName === 'p').forEach(pp => { const t = txt(pp).trim(), k = rot + '|' + t; if (t && !vistos.has(k)) { vistos.add(k); out.push({ text: t, loc: rot, parte: rot }); } }); } catch { lim.push(`${rot} não pôde ser lido (${n})`); } }
+  }
+  const conta = ln => [...doc.getElementsByTagName('*')].filter(e => e.localName === ln).length, nImg = conta('drawing') + conta('pict'), nObj = conta('object');
+  if (nImg) lim.push(`${nImg} imagem(ns) ou desenho(s) não lido(s) — texto dentro de imagem exige OCR`); if (nObj) lim.push(`${nObj} objeto(s) embutido(s) não lido(s)`);
+  if (Object.keys(z.files).some(x => /^word\/(footnotes|endnotes|comments)\.xml$/.test(x))) lim.push('notas de rodapé, notas de fim e comentários não são lidos');
+  out.limites = lim; out.resumo = { paragrafos: pi, tabelas: ti, titulos: out.filter(x => x.nivel).length, listas: out.filter(x => x.lista).length, cabecalhos: out.filter(x => x.parte === 'cabeçalho').length, rodapes: out.filter(x => x.parte === 'rodapé').length };
+  return out;
 }
 
 async function readPptx(buf) {
@@ -222,7 +235,7 @@ async function extractSolutionsFile(file) {
   if (['xlsx', 'xls', 'csv'].includes(ext)) { const t = await readTable(file, buf); let cands = []; for (const sh of t.sheets) { const r = extractTable(sh, file.name); if (r) cands.push(...r); }
     if (cands.length) return { cands, aviso: `Tabela lida: ${cands.length} linha(s) com coluna de nome.` };
     const units = t.sheets.flatMap(tableUnits); return { cands: extractText(units.flatMap(u => u.lines), file.name), aviso: 'Nenhuma coluna "nome/produto" encontrada: planilha tratada como texto corrido (extração aproximada).' }; }
-  if (ext === 'docx') return { cands: extractText(await readDocx(buf), file.name), aviso: 'DOCX lido como texto (tabelas viram texto corrido; extração aproximada).' };
+  if (ext === 'docx') { const ls = await readDocx(buf), r = ls.resumo; return { cands: extractText(ls, file.name), aviso: `DOCX lido: ${r.paragrafos} parágrafo(s), ${r.titulos} título(s), ${r.tabelas} tabela(s), ${r.cabecalhos} linha(s) de cabeçalho e ${r.rodapes} de rodapé.` + (ls.limites.length ? ' Não lido: ' + ls.limites.join('; ') + '.' : '') }; }
   if (ext === 'pdf') { const { lines } = await readPdf(buf); if (!lines.length) throw new Error('PDF sem camada de texto (provável escaneado). Se for material de produto, use “OCR de material escaneado” na página do backend e importe a resposta em Importar resposta do backend.'); return { cands: extractText(lines.map(l => ({ text: l.text, loc: 'p. ' + l.p })), file.name), aviso: 'PDF lido como texto (extração aproximada).' }; }
   if (['html', 'htm'].includes(ext)) { const c = extractHtmlSections(decodeText(buf), { origem: 'upload ' + file.name, file: file.name }); c.fontes = [{ t: c.nome || file.name, u: '', d: today(), origem: 'upload ' + file.name }]; return { cands: [c], aviso: 'HTML lido por seções (títulos → finalidade, funcionalidades, dores, requisitos…). Trechos sem seção reconhecida ficam pendentes de revisão.' }; }
   if (ext === 'pptx') return { cands: extractText(await readPptx(buf), file.name), aviso: 'PPTX lido como texto dos slides (extração aproximada).' };
