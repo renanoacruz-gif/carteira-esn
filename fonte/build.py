@@ -44,7 +44,7 @@ hh2=re.sub(r'const WORKER_SRC = ".*";\nconst WORKER_README = ".*";\nconst WORKER
 os.makedirs(hd+'public/vendor',exist_ok=True)
 for f in os.listdir(d+'vendor'):
     if f.endswith('.js'): shutil.copy(d+'vendor/'+f,hd+'public/vendor/'+f)
-shutil.copy(d+'_headers',hd+'public/_headers')
+HEADERS_SRC=open(d+'_headers').read()  # gravado depois, com o hash dos scripts embutidos
 wk=r('worker.src.js').replace('/*__ADM__*/', r('worker.adm.js')).replace('/*__PUSH__*/', r('worker.push.js'))
 # versão publicada: impressão digital do pacote (página + servidor); a página compara com /api/versao para avisar que há atualização
 import hashlib
@@ -53,4 +53,15 @@ BUILD=hashlib.sha256((hh+wk).encode()).hexdigest()[:12]
 hh=hh.replace("'__BUILD__'","'"+BUILD+"'"); wk=wk.replace("'__BUILD__'","'"+BUILD+"'")
 open(hd+'public/index.html','w').write(hh)
 open(hd+'src/worker.js','w').write(wk)
+# CSP aplicada (não só relatório): scripts embutidos só rodam se o hash bater; nada de 'unsafe-inline' nem 'unsafe-eval' para script
+import base64
+def _hashes(html): return ["'sha256-"+base64.b64encode(hashlib.sha256(m.encode()).digest()).decode()+"'" for m in re.findall(r'<script>([\s\S]*?)</script>',html)]
+_hs=_hashes(hh)
+_sob=os.environ.get('SOBRE_DIR',hd+'public/sobre'); assert os.path.isdir(_sob), 'defina SOBRE_DIR com a pasta public/sobre (páginas públicas com script embutido)'
+for _r,_d,_f in os.walk(_sob):
+    for _n in _f:
+        if _n.endswith('.html'):
+            _t=open(os.path.join(_r,_n)).read(); assert not re.search(r'<script\s[^>]*>\s*\S',re.sub(r'<script\s[^>]*src=[^>]*>\s*</script>','',_t)), 'script embutido com atributos em '+_n; _hs+=_hashes(_t)
+_hs=sorted(set(_hs)); assert _hs and '__CSP_SCRIPT__' in HEADERS_SRC
+open(hd+'public/_headers','w').write(HEADERS_SRC.replace('__CSP_SCRIPT__',' '.join(_hs)))
 open(hd+'schema.sql','w').write(r('worker.schema.sql'))

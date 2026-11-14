@@ -615,6 +615,10 @@ const nomeDeEmail = e => e ? String(e).split('@')[0].split(/[._\-+]+/).filter(Bo
 const DB_SEG = /^[A-Za-z0-9_.@+~:\-]{1,200}$/;
 function dbPath(p) { p = String(p || '').replace(/^\/+|\/+$/g, ''); if (!p || p.length > 400) return null; const seg = p.split('/'); return seg.every(x => DB_SEG.test(x) && x !== '.' && x !== '..') ? seg : null; }
 const DB_MAX = 1500000;
+/* teto por usuário (por isolate) para rotas autenticadas sem custo de provedor: contém automação abusiva sem atrapalhar a gravação em lote da carteira */
+const USO = new Map();
+function usoLimite(chave, max) { const now = Date.now(), a = (USO.get(chave) || []).filter(t => now - t < 60000); if (a.length >= max) { USO.set(chave, a); return Math.max(1, Math.ceil((60000 - (now - a[0])) / 1000)); } a.push(now); USO.set(chave, a); if (USO.size > 2000) USO.delete(USO.keys().next().value); return 0; }
+const usoErro = s => J({ ok: false, erro: { codigo: 'limite_local', mensagem: `Muitas requisições em sequência. Aguarde ~${s}s.`, repetir: true, aguardarSegundos: s } }, 429);
 async function handleDb(req, env, au) {
   const E = (codigo, mensagem, st = 400, extra = {}) => J({ ok: false, erro: { codigo, mensagem }, ...extra }, st);
   if (!au.user) return E('nao_autorizado', 'O banco exige identidade do Cloudflare Access.', 401);
@@ -623,6 +627,7 @@ async function handleDb(req, env, au) {
   const raw = await req.text(); if (raw.length > DB_MAX) return E('muito_grande', 'Corpo acima de 1,5 MB.', 413);
   let q; try { q = JSON.parse(raw); } catch { return E('requisicao_invalida', 'JSON inválido.'); }
   const seg = dbPath(q.path); if (!seg) return E('caminho_invalido', 'Caminho inválido.');
+  { const esc = q.op === 'set' || q.op === 'delete', w = usoLimite((esc ? 'dbw:' : 'dbr:') + au.user, esc ? 1500 : 6000); if (w) return usoErro(w); }
   const path = seg.join('/'), me = au.user, op = String(q.op || '');
   const privado = seg[0] === 'data' && seg[1] === 'users';
   if (privado) { if (seg.length < 3 || seg[2].toLowerCase() !== me) return E('proibido', 'Você só acessa a sua própria carteira.', 403); }
@@ -707,7 +712,7 @@ async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/limites' && req.method === 'GET') return handleLimites(env);
   if (url.pathname === '/api/importar') return handleImportar(req, env);
   if (url.pathname === '/api/status') return handleStatus(env);
-  if (url.pathname === '/api/planilha' && req.method === 'POST') return handlePlanilha(req);
+  if (url.pathname === '/api/planilha' && req.method === 'POST') { const w = usoLimite('pl:' + (au.user || 'token'), 30); if (w) return usoErro(w); return handlePlanilha(req); }
   if (url.pathname === '/api/cnpj' && req.method === 'POST') return handleCnpj(req, env);
   if (url.pathname === '/api/ia' && req.method === 'POST') return handleIa(req, env, false);
   if (url.pathname === '/api/ia/teste' && req.method === 'POST') return handleIa(req, env, true);
