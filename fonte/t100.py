@@ -19,7 +19,7 @@ P.route('**/api/versao',lambda rt: rt.fulfill(status=500,body='x'))
 ck('falha na consulta não derruba nem apaga o aviso', ev(P,"atuCheck().then(v=>v)")==False and ev(P,"!!document.getElementById('atu-bar')"))
 # atualizar: grava pendências, recarrega e limpa o endereço
 ev(P,"window.__antes=1;S.meta.atuTeste='gravado';touchMeta();0")
-P.click('#atu-bar [data-a=atuGo]'); P.wait_for_function("window.__antes===undefined && document.body.innerText.includes('Ferramenta atualizada')",timeout=20000); tok=True; P.wait_for_timeout(3000)
+P.click('#atu-bar [data-a=atuGo]'); P.wait_for_function("() => window.__antes===undefined && document.body.innerText.includes('Ferramenta atualizada')",timeout=20000); tok=True; P.wait_for_timeout(3000)
 ck('recarregou a página (estado em memória zerado)', ev(P,"window.__antes")==None and ev(P,"typeof BUILD")=='string')
 ck('endereço limpo após a recarga', ev(P,"location.pathname+location.search")=='/')
 ck('dado pendente foi gravado antes de recarregar', ev(P,"S.meta.atuTeste")=='gravado', ev(P,"S.meta.atuTeste"))

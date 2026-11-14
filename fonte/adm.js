@@ -144,6 +144,7 @@ async function admLoad() {
     ADMV.data = await admApi('/api/adm/resumo?' + p.toString());
     try { ADMV.sug = await admApi('/api/adm/sugestoes'); } catch { ADMV.sug = { erro: true }; }
     await admCatLoad(true);
+    try { ADMV.aud = (await admApi('/api/adm/auditoria')).itens; } catch { ADMV.aud = null; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -211,6 +212,7 @@ function vAdm() {
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
   h += admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admAudCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
 }
@@ -228,6 +230,10 @@ function admFunilCard(us) {
   <div class="adm-fun">${F.map((e, i) => `<div class="adm-fe"><div class="row" style="gap:10px"><b class="adm-fn">${e.n}</b><span>${esc(e.rot)}</span><span class="sp"></span><span class="sm muted">${i ? Math.round(e.n / tot * 100) + '% dos convidados' : ''}</span></div><div class="adm-fb"><i style="width:${Math.max(e.n ? 2 : 0, e.n / tot * 100)}%"></i></div>
     ${e.parou.length ? `<details class="sm"><summary><b>${e.parou.length}</b> parou(aram) aqui — ${esc(ADM_FUNIL_DICA[i])}</summary><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button class="btn sm" data-a="admFunilCopy" data-i="${i}">Copiar e-mails (${e.parou.length})</button></div><div class="sm muted" style="word-break:break-word">${e.parou.map(u => esc(u.nome || u.email)).join(' · ')}</div></details>` : ''}</div>`).join('')}</div>
   ${fora ? `<p class="sm muted" style="margin-top:8px">Fora da lista de previstos: ${fora} conta(s) acessaram e não entram neste funil.</p>` : ''}</div>`;
+}
+function admAudCard() {
+  const a = ADMV.aud; if (!a) return '';
+  return `<div class="card" id="adm-aud"><h3>Trilha de auditoria <span class="muted sm">(ações administrativas que alteram algo; guardada por 12 meses)</span></h3>${a.length ? `<details><summary class="sm">${a.length} registro(s) mais recente(s)</summary><div class="tw" style="max-height:320px"><table><thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Detalhe</th><th>Resultado</th></tr></thead><tbody>${a.map(x => `<tr><td class="sm">${esc(fmtDate(x.ts))}</td><td class="sm">${esc(x.usuario)}</td><td class="sm">${esc(x.acao)}</td><td class="sm">${esc(x.detalhe || '')}</td><td>${x.resultado === 'ok' ? '<span class="pill p-ok">ok</span>' : `<span class="pill p-warn">${esc(x.resultado)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>` : '<p class="sm muted">Nenhuma ação registrada ainda.</p>'}</div>`;
 }
 function admLemCard(l) {
   if (!l) return '';
@@ -249,7 +255,7 @@ function admConviteCard() {
     <textarea id="adm-convite-txt" rows="7" style="width:100%">${esc(admConviteTxt())}</textarea><div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="admCopiarConvite">Copiar texto</button></div></div>`;
 }
 function admCsv(d) {
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"', L = [];
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1") + '"', L = []; /* neutraliza fórmulas ao abrir no Excel */
   L.push(['Relatório administrativo', 'Período', d.periodo.de, d.periodo.ate, 'Cobertura desde', d.cobertura_inicio || ''].map(q).join(';'));
   L.push(['Nome', 'E-mail', 'Primeiro acesso', 'Último acesso', 'Última atividade útil', 'Situação', 'Recursos utilizados'].map(q).join(';'));
   d.usuarios.forEach(u => L.push([u.nome, u.email, u.primeiro_acesso || '', u.ultimo_acesso || '', u.ultima_atividade_util || '', (ADM_SIT[u.situacao] || [u.situacao])[0], u.recursos_utilizados.map(f => d.funcs[f]?.rot || f).join(' | ')].map(q).join(';')));

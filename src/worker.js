@@ -615,6 +615,10 @@ const nomeDeEmail = e => e ? String(e).split('@')[0].split(/[._\-+]+/).filter(Bo
 const DB_SEG = /^[A-Za-z0-9_.@+~:\-]{1,200}$/;
 function dbPath(p) { p = String(p || '').replace(/^\/+|\/+$/g, ''); if (!p || p.length > 400) return null; const seg = p.split('/'); return seg.every(x => DB_SEG.test(x) && x !== '.' && x !== '..') ? seg : null; }
 const DB_MAX = 1500000;
+/* teto por usuário (por isolate) para rotas autenticadas sem custo de provedor: contém automação abusiva sem atrapalhar a gravação em lote da carteira */
+const USO = new Map();
+function usoLimite(chave, max) { const now = Date.now(), a = (USO.get(chave) || []).filter(t => now - t < 60000); if (a.length >= max) { USO.set(chave, a); return Math.max(1, Math.ceil((60000 - (now - a[0])) / 1000)); } a.push(now); USO.set(chave, a); if (USO.size > 2000) USO.delete(USO.keys().next().value); return 0; }
+const usoErro = s => J({ ok: false, erro: { codigo: 'limite_local', mensagem: `Muitas requisições em sequência. Aguarde ~${s}s.`, repetir: true, aguardarSegundos: s } }, 429);
 async function handleDb(req, env, au) {
   const E = (codigo, mensagem, st = 400, extra = {}) => J({ ok: false, erro: { codigo, mensagem }, ...extra }, st);
   if (!au.user) return E('nao_autorizado', 'O banco exige identidade do Cloudflare Access.', 401);
@@ -623,6 +627,7 @@ async function handleDb(req, env, au) {
   const raw = await req.text(); if (raw.length > DB_MAX) return E('muito_grande', 'Corpo acima de 1,5 MB.', 413);
   let q; try { q = JSON.parse(raw); } catch { return E('requisicao_invalida', 'JSON inválido.'); }
   const seg = dbPath(q.path); if (!seg) return E('caminho_invalido', 'Caminho inválido.');
+  { const esc = q.op === 'set' || q.op === 'delete', w = usoLimite((esc ? 'dbw:' : 'dbr:') + au.user, esc ? 1500 : 6000); if (w) return usoErro(w); }
   const path = seg.join('/'), me = au.user, op = String(q.op || '');
   const privado = seg[0] === 'data' && seg[1] === 'users';
   if (privado) { if (seg.length < 3 || seg[2].toLowerCase() !== me) return E('proibido', 'Você só acessa a sua própria carteira.', 403); }
@@ -693,7 +698,7 @@ async function handleInner(req, env0, ctx) {
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
-  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: 'd6a217280b1f' });
+  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: '21c5aec7d0cc' });
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
   if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
@@ -707,7 +712,7 @@ async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/limites' && req.method === 'GET') return handleLimites(env);
   if (url.pathname === '/api/importar') return handleImportar(req, env);
   if (url.pathname === '/api/status') return handleStatus(env);
-  if (url.pathname === '/api/planilha' && req.method === 'POST') return handlePlanilha(req);
+  if (url.pathname === '/api/planilha' && req.method === 'POST') { const w = usoLimite('pl:' + (au.user || 'token'), 30); if (w) return usoErro(w); return handlePlanilha(req); }
   if (url.pathname === '/api/cnpj' && req.method === 'POST') return handleCnpj(req, env);
   if (url.pathname === '/api/ia' && req.method === 'POST') return handleIa(req, env, false);
   if (url.pathname === '/api/ia/teste' && req.method === 'POST') return handleIa(req, env, true);
@@ -788,6 +793,7 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS adm_tentativas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, motivo TEXT NOT NULL, rota TEXT)',
   'CREATE TABLE IF NOT EXISTS sugestoes (id TEXT PRIMARY KEY, email TEXT NOT NULL, em TEXT NOT NULL, area TEXT NOT NULL, texto TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0)',
   'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS adm_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT NOT NULL, acao TEXT NOT NULL, detalhe TEXT, resultado TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS cat_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, url TEXT NOT NULL, estado TEXT NOT NULL, erro TEXT, autenticado INTEGER NOT NULL DEFAULT 0, testada_em TEXT, ultima_sinc TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_paginas (chave TEXT PRIMARY KEY, url TEXT NOT NULL, fonte TEXT NOT NULL, pai TEXT, titulo TEXT, prof INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL, erro TEXT, hash TEXT, filhos INTEGER, vista_em TEXT, alterada_em TEXT, revisada_em TEXT)',
   'CREATE INDEX IF NOT EXISTS cat_pag_fe ON cat_paginas(fonte, estado, prof)',
@@ -864,6 +870,7 @@ async function admGravar(env, linhas) {
 async function admPurgar(env, forcar) {
   const db = admDb(env); if (!db) return { eventos: 0, tentativas: 0 }; await admInit(env); const { cfg } = await admCfgLer(db), lim = new Date(Date.now() - cfg.retencao_dias * 864e5).toISOString();
   const a = await db.prepare('DELETE FROM eventos WHERE ts<?').bind(lim).run(), b = await db.prepare('DELETE FROM adm_tentativas WHERE ts<?').bind(new Date(Date.now() - 90 * 864e5).toISOString()).run();
+  await db.prepare('DELETE FROM adm_audit WHERE ts<?').bind(new Date(Date.now() - 365 * 864e5).toISOString()).run();
   await db.prepare('DELETE FROM sugestoes WHERE em<?').bind(new Date(Date.now() - 180 * 864e5).toISOString()).run();
   await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('ultima_purga', JSON.stringify(new Date().toISOString())).run();
   return { eventos: a.meta?.changes ?? 0, tentativas: b.meta?.changes ?? 0 };
@@ -1185,7 +1192,23 @@ async function admCatalogo(req, env) {
   }
   return inval('Operação desconhecida.');
 }
-async function admRota(req, env, au, url) {
+/* Trilha de auditoria das ações administrativas que alteram algo (quem, quando, o quê, resultado). Sem conteúdo de carteira nem segredos. */
+const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'] };
+function admAudDescrever(rota, q) {
+  const t = (v, n = 80) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').slice(0, n), r = rota.replace('/api/adm/', '');
+  if (r === 'roster') return { acao: 'previstos.' + t(q.op || 'add', 20), detalhe: q.op === 'import' ? `${Array.isArray(q.itens) ? q.itens.length : 0} e-mail(s)` : t(q.email) + (q.novo_email ? ' → ' + t(q.novo_email) : '') + (q.tudo ? ' (inclui registro de acesso)' : '') };
+  if (r === 'config') return { acao: 'configuracao.alterar', detalhe: Object.keys(q || {}).map(k => t(k, 30)).slice(0, 8).join(', ') };
+  if (r === 'purgar') return { acao: 'retencao.aplicar', detalhe: '' };
+  if (r === 'catalogo') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.catalogo.includes(op)) return null; return { acao: 'catalogo.' + op, detalhe: [q.fonte && 'fonte ' + t(q.fonte, 20), Array.isArray(q.chaves) && q.chaves.length + ' página(s)', q.estado && '→ ' + t(q.estado, 20), q.ligar != null && (q.ligar === true ? 'ligar' : 'desligar')].filter(Boolean).join(' ') }; }
+  if (r === 'sugestoes') return { acao: 'sugestao.marcar_lida', detalhe: '' };
+  return { acao: t(r, 40), detalhe: '' };
+}
+async function admAuditar(env, au, rota, corpo, resp) {
+  try { let q = {}; try { q = JSON.parse(corpo || '{}'); } catch { q = {}; } const d = admAudDescrever(rota, q && typeof q === 'object' ? q : {}); if (!d) return;
+    const db = admDb(env); await db.prepare('INSERT INTO adm_audit(ts,usuario,acao,detalhe,resultado) VALUES(?,?,?,?,?)').bind(new Date().toISOString(), au.user, d.acao, d.detalhe, resp.status < 400 ? 'ok' : 'recusada_' + resp.status).run();
+  } catch { /* a trilha nunca derruba a operação */ }
+}
+async function admRotaInterna(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg; if (!admDb(env)) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503);
   try {
     if (url.pathname === '/api/adm/resumo' && req.method === 'GET') return J({ ok: true, ...(await admResumo(env, url)) });
@@ -1199,6 +1222,16 @@ async function admRota(req, env, au, url) {
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
 export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto };
+
+async function admRota(req, env, au, url) {
+  const neg = await admGuard(env, au, url.pathname); if (neg) return neg;
+  if (url.pathname === '/api/adm/auditoria' && req.method === 'GET') { const db = admDb(env); if (!db) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503); await admInit(env); return J({ ok: true, itens: (await db.prepare('SELECT ts,usuario,acao,detalhe,resultado FROM adm_audit ORDER BY id DESC LIMIT 60').all()).results || [] }); }
+  if (req.method !== 'POST') return admRotaInterna(req, env, au, url);
+  const corpo = await req.text(); if (corpo.length > 200000) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Corpo acima do limite.' } }, 413);
+  const resp = await admRotaInterna(new Request(req.url, { method: 'POST', headers: req.headers, body: corpo }), env, au, url);
+  if (admDb(env)) await admAuditar(env, au, url.pathname, corpo, resp);
+  return resp;
+}
 
 /* ===== Lembrete diário (Web Push SEM conteúdo) =====
    Crons 12:00 e 17:00 UTC (09:00 e 14:00 em Brasília, UTC-3, sem horário de verão) de segunda a sexta. Envia um push vazio a cada aparelho inscrito;

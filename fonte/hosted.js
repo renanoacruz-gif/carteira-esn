@@ -6,7 +6,9 @@
 const HOST = !!window.__HOSTED__;
 const HK_LS = 'carteira_chaves_ia_v1';
 const hkLer = () => { try { const o = JSON.parse(localStorage.getItem(HK_LS) || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
-const hkSalvarTudo = o => { try { localStorage.setItem(HK_LS, JSON.stringify(o)); return true; } catch { return false; } };
+const hkSalvarTudo = o => { try { const eu = typeof ME !== 'undefined' && ME && ME.id ? ME.id : (o && o._dono) || ''; localStorage.setItem(HK_LS, JSON.stringify(eu ? { ...o, _dono: eu } : o)); return true; } catch { return false; } };
+/* a chave pertence a quem a digitou: se outra conta entrar neste navegador, as chaves guardadas são apagadas (nunca reaproveitadas) */
+function hkDono(eu) { try { if (!eu) return; const o = hkLer(); if (o._dono && o._dono !== eu) { localStorage.removeItem(HK_LS); return 'apagadas'; } if (!o._dono && Object.keys(o).some(k => k !== '_dono' && o[k])) hkSalvarTudo({ ...o, _dono: eu }); } catch { /* sem armazenamento */ } }
 const hkChave = p => String(hkLer()[p] || '');
 const hkFim = k => k ? '…' + k.slice(-4) : '';
 function hkHeaders(prov) { const k = prov && prov !== 'pagina' ? hkChave(prov) : ''; return k ? { 'x-provider': prov, 'x-provider-key': k } : {}; }
@@ -35,7 +37,7 @@ if (HOST && !window.claude) {
       catch (e) { if (!(leitura && t < 1 && (e.code === 'rede' || e.code === 'tempo_esgotado'))) throw e; await new Promise(r => setTimeout(r, 500)); }
     }
   };
-  let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
+  let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { if (hkDono(j.id) === 'apagadas') setTimeout(() => toast('As chaves de IA guardadas neste navegador eram de outra conta e foram apagadas.'), 1500); } catch { /* opcional */ } try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
   const lastGet = {};
   const col = path => ({
     path,
@@ -94,6 +96,7 @@ function hkCard() {
 /* Rodada 28: Sair. Grava o que estiver pendente, encerra a sessão do Cloudflare Access neste domínio e leva à página pública /sobre. */
 async function sair() {
   try { await flush(); } catch {}
+  try { localStorage.removeItem(HK_LS); } catch {} /* a chave de IA não fica no aparelho depois de sair */
   try { await fetch('/cdn-cgi/access/logout', { credentials: 'include', redirect: 'manual', cache: 'no-store' }); } catch {}
   location.href = '/sobre/';
 }

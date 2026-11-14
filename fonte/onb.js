@@ -9,7 +9,7 @@ function onbPassos() {
 }
 /* ajustes opcionais: só aparecem depois dos 3 passos, em uma linha */
 function onbExtras() {
-  const cl = clients(), temChave = (() => { try { return Object.values(hkLer()).some(Boolean); } catch { return false; } })();
+  const cl = clients(), temChave = (() => { try { return Object.entries(hkLer()).some(([k, v]) => k !== '_dono' && v); } catch { return false; } })();
   return [[temChave, 'Conectar chave de IA', 'ia'], [cl.some(c => c.fstat && c.fstat.k === 'disponivel'), 'Anexar uma ficha de faturamento', 'importar'], [!!(typeof LEM !== 'undefined' && LEM.local), 'Ativar o lembrete neste aparelho', 'conta']].filter(x => !x[0]);
 }
 function onbCard() {
