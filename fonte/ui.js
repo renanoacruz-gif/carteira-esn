@@ -166,6 +166,8 @@ function resumoTab(c) {
 }
 
 /* ---------- Segmentos ---------- */
+/* confiança da recomendação setorial: só o que tem documentação oficial entra como confirmada ou integração documentada */
+const SEG_CONF = { confirmada: ['compatibilidade confirmada', 'ok'], integracao: ['integração documentada', 'ok'], investigar: ['possibilidade a investigar', 'info'], validar: ['necessita validação', 'warn'] };
 function vSeg() {
   const sel = KB.segments.find(s => s.id === UI.segSel);
   if (!sel) { const cnt = id => clients().filter(c => c.segInfo.id === id).length;
@@ -174,8 +176,9 @@ function vSeg() {
   const cs = clients().filter(c => c.segInfo.id === sel.id);
   return `<button class="btn ghost sm" data-a="openSeg" data-id="">← Segmentos</button><div class="row" style="margin:10px 0"><h2>${esc(sel.nome)}</h2><button class="btn ghost sm" data-a="pesqSeg" data-id="${sel.id}">Pesquisar soluções para este segmento</button>${sel.estudo ? pill('Estudo carregado', 'ok') : pill('ESTUDO NÃO CARREGADO', 'off')}<span class="muted sm">${cs.length} cliente(s) (${cs.filter(c => c.segInfo.mode === 'inferido').length} por inferência)</span></div>
   <div class="alert ${sel.estudo ? 'i' : ''}">${esc(sel.resumo || '')}<br><span class="sm muted">Consulta em ${esc(KB.consulta)}. Evidência setorial NÃO é evidência do cliente individual.</span></div>
-  <div class="grid g2"><div class="card"><h3>Processos típicos</h3>${li(sel.processos)}<h3 style="margin-top:12px">Dores prováveis ${chip('HIPÓTESE')}</h3>${li(sel.dores)}<h3 style="margin-top:12px">Demandas tecnológicas</h3>${li(sel.demandas)}</div>
-  <div class="card"><h3>Aplicações TOTVS</h3>${sel.aplicacoes.length ? `<ul>${sel.aplicacoes.map(a => { const s = KB.sol(a.sol); return `<li><b>${esc(s?.nome || a.sol)}</b>: ${esc(a.porque)}${s ? `<div class="sm muted">Fonte: ${link(s.fonte)} • ${esc(s.limites)}</div>` : ''}</li>`; }).join('')}</ul>` : '<span class="muted">—</span>'}<h3 style="margin-top:12px">Perguntas de validação</h3>${li(sel.perguntas)}</div></div>
+  <div class="grid g2"><div class="card"><h3>Processos típicos</h3>${li(sel.processos)}<h3 style="margin-top:12px">Dores prováveis ${chip('HIPÓTESE')}</h3>${li(sel.dores)}<h3 style="margin-top:12px">Demandas tecnológicas</h3>${li(sel.demandas)}${(sel.modelos || []).length ? `<h3 style="margin-top:12px">Modelos de negócio</h3>${li(sel.modelos)}` : ''}${(sel.indicadores || []).length ? `<h3 style="margin-top:12px">Indicadores relevantes</h3>${li(sel.indicadores)}` : ''}</div>
+  <div class="card"><h3>Aplicações TOTVS</h3>${sel.aplicacoes.length ? `<ul>${sel.aplicacoes.map(a => { const s = KB.sol(a.sol); return `<li><b>${esc(s?.nome || a.sol)}</b>${a.conf && SEG_CONF[a.conf] ? ' ' + pill(SEG_CONF[a.conf][0], SEG_CONF[a.conf][1]) : ''}: ${esc(a.porque)}${s ? `<div class="sm muted">Fonte: ${link(s.fonte)} • ${esc(s.limites)}</div>` : ''}</li>`; }).join('')}</ul>` : '<span class="muted">—</span>'}<h3 style="margin-top:12px">Perguntas de validação</h3>${li(sel.perguntas)}</div></div>
+  ${(sel.regulatorio || []).length ? `<div class="card" id="seg-reg"><h3>Exigências regulatórias ${chip('FATO')}</h3><ul>${sel.regulatorio.map(t => `<li>${esc(t.t)}<div class="sm">Fonte: ${link(t.fonte)}${t.fonte?.d ? ` <span class="muted">(${esc(t.fonte.d)})</span>` : ''}</div></li>`).join('')}</ul><p class="sm muted">Obrigação comprovada na fonte não é diagnóstico do cliente: confirme o enquadramento de cada um.</p></div>` : ''}
   <div class="card"><h3>Tendências e pressões ${chip('FATO')} setoriais</h3>${sel.tendencias.length ? `<ul>${sel.tendencias.map(t => `<li>${esc(t.t)}<div class="sm">Fonte: ${link(t.fonte)}</div><div class="sm muted">Impacto: ${esc(t.impacto)}</div></li>`).join('')}</ul>` : '<span class="muted">Sem tendências carregadas.</span>'}</div>`;
 }
 
