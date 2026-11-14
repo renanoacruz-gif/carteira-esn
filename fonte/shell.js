@@ -12,7 +12,7 @@ const IC = {
   merge: '<path d="M5 4v6a4 4 0 0 0 4 4h6M19 4v6a4 4 0 0 1-4 4"/><path d="M12 14v6M9 17l3 3 3-3"/>',
   sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>', atualizar: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', sair: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 8l4 4-4 4M19 12H9"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>', mais: '<circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/>', atualizar: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', sair: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 8l4 4-4 4M19 12H9"/>',
   shield: '<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>', link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   trend: '<path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/>',
   left: '<path d="M15 6l-6 6 6 6"/>', right: '<path d="M9 6l6 6-6 6"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -29,9 +29,7 @@ const NAV = [
   ['mercado', 'Inteligência de Mercado', 'trend', []],
   ['solucoes', 'Base de Soluções', 'box', [['solucoes', 'Soluções', 'box'], ['portfolio', 'Portfólio TOTVS', 'box'], ['refs', 'Releases e regulatório', 'doc']]],
   ['importar', 'Importar e fichas', 'upload', [], true],
-  ['pend', 'Pendências documentais', 'warn', []],
-  ['cnpj', 'Consulta de CNPJ', 'search', []],
-  ['integra', 'Integrações', 'link', []],
+  ['pend', 'Mais ferramentas', 'mais', [['pend', 'Pendências documentais', 'warn'], ['cnpj', 'Consulta de CNPJ', 'search'], ['integra', 'Integrações', 'link']]],
   ['conta', 'Configurações', 'cog', [['conta', 'Conta e catálogo', 'shield'], ['ia', 'IA e provedores', 'cog'], ['dados', 'Gerenciamento de dados', 'shield'], ['criterios', 'Critérios', 'sliders'], ['base', 'Base TOTVS e limites', 'info']]]
 ];
 const navTop = v => NAV.find(([k, , , sub]) => k === (v === 'diag' ? 'cliente' : v) || sub.some(s => s[0] === (v === 'diag' ? 'cliente' : v))) || NAV[0]; const navTopOld = v => NAV.find(([k, , , sub]) => k === v || sub.some(s => s[0] === v)) || NAV[0];
@@ -78,24 +76,38 @@ function paintShell() {
   const v = UI.view, title = VIEW_TITLE[v] || v, q = $('#gq')?.value || '';
   $('#top').innerHTML = `<button type="button" class="btn ghost sm top-mn" data-a="sbOpen" aria-label="Abrir menu" aria-expanded="${UI.sbOpen}">${ico('menu', 18)}</button>
   <div class="top-t"><h1 id="ptitle">${esc(title)}</h1><div class="sm muted top-s">${esc(viewSub(v))}</div></div>
-  <div class="top-q" role="search"><label class="sr" for="gq">Buscar cliente</label>${ico('search', 16)}<input id="gq" type="search" data-i="gq" placeholder="Buscar cliente por nome, código ou CNPJ  ( / )" autocomplete="off" value="${esc(q)}" aria-controls="gres" aria-expanded="false"><div id="gres" class="gres" hidden></div></div>
+  <div class="top-q" role="search"><label class="sr" for="gq">Buscar cliente, solução, ação ou tela</label>${ico('search', 16)}<input id="gq" type="search" data-i="gq" placeholder="Buscar cliente, solução, ação ou tela  ( / )" autocomplete="off" value="${esc(q)}" aria-controls="gres" aria-expanded="false"><div id="gres" class="gres" hidden></div></div>
   <div class="top-a">${viewActions(v)}</div>`;
   document.title = title + ' — Gestão de Carteira TOTVS ESN';
   if (q) gSearch(q, true);
 }
-/* ---------- busca global (clientes) ---------- */
+/* ---------- busca global: clientes primeiro; depois soluções, ações da conta e telas ---------- */
 function gSearch(q, keepOpen) {
   const box = $('#gres'), inp = $('#gq'); if (!box) return; q = norm(q).trim();
   if (!q) { box.hidden = true; box.innerHTML = ''; inp?.setAttribute('aria-expanded', 'false'); return; }
   const dq = q.replace(/\D/g, ''), hit = clients().filter(c => norm(`${c.name} ${c.code || ''}`).includes(q) || (dq.length >= 4 && (c.cnpj || '').includes(dq)));
-  box.innerHTML = hit.length ? hit.slice(0, 8).map(c => `<button type="button" class="gr" data-a="gsOpen" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span class="muted sm">${esc(c.code || '')} ${c.cnpj ? '• ' + esc(c.cnpj) : ''} ${esc(segName(c.segInfo?.id) || '')}</span></button>`).join('') + (hit.length > 8 ? `<div class="muted sm gr-more">+${hit.length - 8} — refine a busca ou use Clientes</div>` : '') : `<div class="muted sm gr-more">${clients().length ? 'Nenhum cliente encontrado.' : 'Importe a carteira para buscar clientes.'}</div>`;
+  const grp = (t, h) => h ? `<div class="gr-h">${t}</div>${h}` : '';
+  let h = hit.slice(0, 8).map(c => `<button type="button" class="gr" data-a="gsOpen" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span class="muted sm">${esc(c.code || '')} ${c.cnpj ? '• ' + esc(c.cnpj) : ''} ${esc(segName(c.segInfo?.id) || '')}</span></button>`).join('') + (hit.length > 8 ? `<div class="muted sm gr-more">+${hit.length - 8} — refine a busca ou use Clientes</div>` : '');
+  if (q.length >= 2) {
+    const sols = activeSols().filter(r => norm(`${r.nome} ${r.sigla || ''} ${r.linha || ''} ${(r.termos || []).join(' ')}`).includes(q)).slice(0, 4);
+    const acoes = clients().filter(c => c.gst && norm(`${c.gst.proximaAcao || ''} ${c.gst.oportunidade || ''}`).includes(q)).slice(0, 3);
+    const telas = NAV.flatMap(([k, l, , sub]) => sub.length ? sub.filter(s => s[0] !== 'cliente').map(s => [s[0], s[1], l]) : [[k, l, '']]).filter(([, l, pai]) => norm(l + ' ' + pai).includes(q)).slice(0, 4);
+    h = (hit.length ? grp('Clientes', h) : '') + grp('Soluções', sols.map(r => `<button type="button" class="gr" data-a="gsSol" data-id="${esc(r.id)}"><b>${esc(r.nome)}</b><span class="muted sm">${esc(TIPOS[r.tipo] || r.tipo)}${r.linha ? ' • ' + esc(r.linha) : ''} • onde posso vender</span></button>`).join(''))
+      + grp('Ações da conta', acoes.map(c => `<button type="button" class="gr" data-a="gsAcao" data-k="${esc(c.key)}"><b>${esc(c.gst.proximaAcao || c.gst.oportunidade)}</b><span class="muted sm">${esc(c.name)}${c.gst.dataAcao ? ' • ' + esc(fmtD(c.gst.dataAcao)) : ''}</span></button>`).join(''))
+      + grp('Ir para', telas.map(([k, l, pai]) => `<button type="button" class="gr" data-a="gsTela" data-v="${esc(k)}"><b>${esc(l)}</b>${pai && pai !== l ? `<span class="muted sm">${esc(pai)}</span>` : ''}</button>`).join(''));
+  }
+  box.innerHTML = h || `<div class="muted sm gr-more">${clients().length ? 'Nada encontrado.' : 'Nenhum resultado. Importe a carteira para buscar clientes.'}</div>`;
   box.hidden = false; inp?.setAttribute('aria-expanded', 'true');
 }
+const gsLimpa = () => { const inp = $('#gq'), g = $('#gres'); if (inp) inp.value = ''; if (g) { g.hidden = true; g.innerHTML = ''; } };
 const SHELL_ACT = {
   sbToggle: () => { if (isMobile()) { UI.sbOpen = false; } else { UI.sbCol = !UI.sbCol; lsSet('sb.col', UI.sbCol ? '1' : '0'); } paintShell(); },
   sbOpen: () => { UI.sbOpen = true; paintShell(); $('#nav .sb-item.on, #nav .sb-item')?.focus(); },
   sbClose: () => { const was = UI.sbOpen; UI.sbOpen = false; paintShell(); if (was) $('.top-mn')?.focus(); },
   gsOpen: (t, e) => { const inp = $('#gq'); if (inp) inp.value = ''; ACT.open(t, e || { preventDefault() { } }); },
+  gsSol: t => { gsLimpa(); const U = ptUI(); U.sel = t.dataset.id; U.cls = ''; UI.view = 'portfolio'; render(); window.scrollTo(0, 0); },
+  gsAcao: t => { gsLimpa(); UI.sel = t.dataset.k; UI.view = 'cliente'; UI.ctab = 'gestao'; render(); window.scrollTo(0, 0); },
+  gsTela: t => { gsLimpa(); UI.view = t.dataset.v; UI.sbOpen = false; render(); window.scrollTo(0, 0); },
   toastX: () => { clearTimeout(toastT); $('#toast').hidden = true; },
   mdClose: (t, e) => { if (e && t && e.target !== t) return; const m = MODALS[UI.confirm]; if (m) ACT[m.cancel](); }
 };

@@ -856,6 +856,10 @@ button.ck-cell{cursor:pointer;transition:transform var(--t) var(--ease)}button.c
 #app .pt-xp{white-space:normal;width:min(440px,70vw);overflow-wrap:anywhere}
 .pt-cand{border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-top:10px}.pt-h{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--txt2);margin-top:8px}
 .adm-fun{display:flex;flex-direction:column;gap:12px}.adm-fn{font-size:22px;min-width:38px}.adm-fb{height:8px;border-radius:5px;background:var(--bd);overflow:hidden;margin:4px 0}.adm-fb i{display:block;height:100%;background:var(--ciano2);border-radius:5px}.adm-fe summary{cursor:pointer}
+.cgrp{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}.cgrp button{border:1px solid var(--bd);background:transparent;color:var(--txt2);border-radius:999px;padding:6px 14px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13.5px;transition:var(--t)}.cgrp button:hover{color:var(--txt);border-color:var(--bd2)}.cgrp button.on{background:var(--pet);color:#fff;border-color:var(--pet)}
+[data-theme=dark] .cgrp button.on{background:var(--ciano2);color:#002233;border-color:var(--ciano2)}
+.em-sub{margin:-4px 0 12px}.gr-h{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);padding:8px 10px 2px}
+.onb-n{display:inline-flex;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:1px solid var(--bd);color:var(--txt2);flex:none}.onb-n.ok{background:var(--ok);border-color:var(--ok);color:#fff}.onb-n.at{background:var(--pet);border-color:var(--pet);color:#fff}
 </style>
 <script>try{var t=localStorage.getItem('rf.theme');if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <link rel="manifest" href="/sobre/app.webmanifest" crossorigin="use-credentials"><link rel="icon" type="image/png" sizes="32x32" href="/sobre/icons/favicon-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/sobre/icons/favicon-48.png"><link rel="apple-touch-icon" href="/sobre/icons/apple-touch-icon.png"><meta name="theme-color" content="#002233"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Carteira ESN"><meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -4733,7 +4737,7 @@ const IC = {
   merge: '<path d="M5 4v6a4 4 0 0 0 4 4h6M19 4v6a4 4 0 0 1-4 4"/><path d="M12 14v6M9 17l3 3 3-3"/>',
   sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>', atualizar: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', sair: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 8l4 4-4 4M19 12H9"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>', mais: '<circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/>', atualizar: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', sair: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 8l4 4-4 4M19 12H9"/>',
   shield: '<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>', link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   trend: '<path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/>',
   left: '<path d="M15 6l-6 6 6 6"/>', right: '<path d="M9 6l6 6-6 6"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -4750,9 +4754,7 @@ const NAV = [
   ['mercado', 'Inteligência de Mercado', 'trend', []],
   ['solucoes', 'Base de Soluções', 'box', [['solucoes', 'Soluções', 'box'], ['portfolio', 'Portfólio TOTVS', 'box'], ['refs', 'Releases e regulatório', 'doc']]],
   ['importar', 'Importar e fichas', 'upload', [], true],
-  ['pend', 'Pendências documentais', 'warn', []],
-  ['cnpj', 'Consulta de CNPJ', 'search', []],
-  ['integra', 'Integrações', 'link', []],
+  ['pend', 'Mais ferramentas', 'mais', [['pend', 'Pendências documentais', 'warn'], ['cnpj', 'Consulta de CNPJ', 'search'], ['integra', 'Integrações', 'link']]],
   ['conta', 'Configurações', 'cog', [['conta', 'Conta e catálogo', 'shield'], ['ia', 'IA e provedores', 'cog'], ['dados', 'Gerenciamento de dados', 'shield'], ['criterios', 'Critérios', 'sliders'], ['base', 'Base TOTVS e limites', 'info']]]
 ];
 const navTop = v => NAV.find(([k, , , sub]) => k === (v === 'diag' ? 'cliente' : v) || sub.some(s => s[0] === (v === 'diag' ? 'cliente' : v))) || NAV[0]; const navTopOld = v => NAV.find(([k, , , sub]) => k === v || sub.some(s => s[0] === v)) || NAV[0];
@@ -4799,24 +4801,38 @@ function paintShell() {
   const v = UI.view, title = VIEW_TITLE[v] || v, q = $('#gq')?.value || '';
   $('#top').innerHTML = `<button type="button" class="btn ghost sm top-mn" data-a="sbOpen" aria-label="Abrir menu" aria-expanded="${UI.sbOpen}">${ico('menu', 18)}</button>
   <div class="top-t"><h1 id="ptitle">${esc(title)}</h1><div class="sm muted top-s">${esc(viewSub(v))}</div></div>
-  <div class="top-q" role="search"><label class="sr" for="gq">Buscar cliente</label>${ico('search', 16)}<input id="gq" type="search" data-i="gq" placeholder="Buscar cliente por nome, código ou CNPJ  ( / )" autocomplete="off" value="${esc(q)}" aria-controls="gres" aria-expanded="false"><div id="gres" class="gres" hidden></div></div>
+  <div class="top-q" role="search"><label class="sr" for="gq">Buscar cliente, solução, ação ou tela</label>${ico('search', 16)}<input id="gq" type="search" data-i="gq" placeholder="Buscar cliente, solução, ação ou tela  ( / )" autocomplete="off" value="${esc(q)}" aria-controls="gres" aria-expanded="false"><div id="gres" class="gres" hidden></div></div>
   <div class="top-a">${viewActions(v)}</div>`;
   document.title = title + ' — Gestão de Carteira TOTVS ESN';
   if (q) gSearch(q, true);
 }
-/* ---------- busca global (clientes) ---------- */
+/* ---------- busca global: clientes primeiro; depois soluções, ações da conta e telas ---------- */
 function gSearch(q, keepOpen) {
   const box = $('#gres'), inp = $('#gq'); if (!box) return; q = norm(q).trim();
   if (!q) { box.hidden = true; box.innerHTML = ''; inp?.setAttribute('aria-expanded', 'false'); return; }
   const dq = q.replace(/\D/g, ''), hit = clients().filter(c => norm(`${c.name} ${c.code || ''}`).includes(q) || (dq.length >= 4 && (c.cnpj || '').includes(dq)));
-  box.innerHTML = hit.length ? hit.slice(0, 8).map(c => `<button type="button" class="gr" data-a="gsOpen" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span class="muted sm">${esc(c.code || '')} ${c.cnpj ? '• ' + esc(c.cnpj) : ''} ${esc(segName(c.segInfo?.id) || '')}</span></button>`).join('') + (hit.length > 8 ? `<div class="muted sm gr-more">+${hit.length - 8} — refine a busca ou use Clientes</div>` : '') : `<div class="muted sm gr-more">${clients().length ? 'Nenhum cliente encontrado.' : 'Importe a carteira para buscar clientes.'}</div>`;
+  const grp = (t, h) => h ? `<div class="gr-h">${t}</div>${h}` : '';
+  let h = hit.slice(0, 8).map(c => `<button type="button" class="gr" data-a="gsOpen" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span class="muted sm">${esc(c.code || '')} ${c.cnpj ? '• ' + esc(c.cnpj) : ''} ${esc(segName(c.segInfo?.id) || '')}</span></button>`).join('') + (hit.length > 8 ? `<div class="muted sm gr-more">+${hit.length - 8} — refine a busca ou use Clientes</div>` : '');
+  if (q.length >= 2) {
+    const sols = activeSols().filter(r => norm(`${r.nome} ${r.sigla || ''} ${r.linha || ''} ${(r.termos || []).join(' ')}`).includes(q)).slice(0, 4);
+    const acoes = clients().filter(c => c.gst && norm(`${c.gst.proximaAcao || ''} ${c.gst.oportunidade || ''}`).includes(q)).slice(0, 3);
+    const telas = NAV.flatMap(([k, l, , sub]) => sub.length ? sub.filter(s => s[0] !== 'cliente').map(s => [s[0], s[1], l]) : [[k, l, '']]).filter(([, l, pai]) => norm(l + ' ' + pai).includes(q)).slice(0, 4);
+    h = (hit.length ? grp('Clientes', h) : '') + grp('Soluções', sols.map(r => `<button type="button" class="gr" data-a="gsSol" data-id="${esc(r.id)}"><b>${esc(r.nome)}</b><span class="muted sm">${esc(TIPOS[r.tipo] || r.tipo)}${r.linha ? ' • ' + esc(r.linha) : ''} • onde posso vender</span></button>`).join(''))
+      + grp('Ações da conta', acoes.map(c => `<button type="button" class="gr" data-a="gsAcao" data-k="${esc(c.key)}"><b>${esc(c.gst.proximaAcao || c.gst.oportunidade)}</b><span class="muted sm">${esc(c.name)}${c.gst.dataAcao ? ' • ' + esc(fmtD(c.gst.dataAcao)) : ''}</span></button>`).join(''))
+      + grp('Ir para', telas.map(([k, l, pai]) => `<button type="button" class="gr" data-a="gsTela" data-v="${esc(k)}"><b>${esc(l)}</b>${pai && pai !== l ? `<span class="muted sm">${esc(pai)}</span>` : ''}</button>`).join(''));
+  }
+  box.innerHTML = h || `<div class="muted sm gr-more">${clients().length ? 'Nada encontrado.' : 'Nenhum resultado. Importe a carteira para buscar clientes.'}</div>`;
   box.hidden = false; inp?.setAttribute('aria-expanded', 'true');
 }
+const gsLimpa = () => { const inp = $('#gq'), g = $('#gres'); if (inp) inp.value = ''; if (g) { g.hidden = true; g.innerHTML = ''; } };
 const SHELL_ACT = {
   sbToggle: () => { if (isMobile()) { UI.sbOpen = false; } else { UI.sbCol = !UI.sbCol; lsSet('sb.col', UI.sbCol ? '1' : '0'); } paintShell(); },
   sbOpen: () => { UI.sbOpen = true; paintShell(); $('#nav .sb-item.on, #nav .sb-item')?.focus(); },
   sbClose: () => { const was = UI.sbOpen; UI.sbOpen = false; paintShell(); if (was) $('.top-mn')?.focus(); },
   gsOpen: (t, e) => { const inp = $('#gq'); if (inp) inp.value = ''; ACT.open(t, e || { preventDefault() { } }); },
+  gsSol: t => { gsLimpa(); const U = ptUI(); U.sel = t.dataset.id; U.cls = ''; UI.view = 'portfolio'; render(); window.scrollTo(0, 0); },
+  gsAcao: t => { gsLimpa(); UI.sel = t.dataset.k; UI.view = 'cliente'; UI.ctab = 'gestao'; render(); window.scrollTo(0, 0); },
+  gsTela: t => { gsLimpa(); UI.view = t.dataset.v; UI.sbOpen = false; render(); window.scrollTo(0, 0); },
   toastX: () => { clearTimeout(toastT); $('#toast').hidden = true; },
   mdClose: (t, e) => { if (e && t && e.target !== t) return; const m = MODALS[UI.confirm]; if (m) ACT[m.cancel](); }
 };
@@ -4865,7 +4881,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = 'c56a39545931';
+const BUILD = 'c9fb2a0d4b3c';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -7039,7 +7055,7 @@ function stats() {
 /* ---------- Render principal ---------- */
 const VIEWS = [['importar', 'Importar'], ['geral', 'Visão geral'], ['forecast', 'Meu Forecast'], ['mrr', 'Carteira & MRR'], ['clientes', 'Clientes'], ['cliente', 'Cliente'], ['segmentos', 'Segmentos'], ['plano', 'Plano de ação'], ['criterios', 'Critérios'], ['solucoes', 'Base de Soluções'], ['portfolio', 'Portfólio TOTVS'], ['refs', 'Releases e regulatório'], ['consol', 'Consolidação'], ['ia', 'Configurações de IA'], ['base', 'Base TOTVS e limites']];
 function render() {
-  paintShell();
+  onbVisto(); paintShell();
   const V = { importar: vImport, oport: vOport, geral: vGeral, forecast: vForecast, mrr: vMrr, portfolio: vPortfolio, clientes: vClientes, cliente: vCliente, diag: vDiag, segmentos: vSeg, plano: vPlano, criterios: vCrit, base: vBase, solucoes: vSolucoes, ia: vIA, refs: vRefs, consol: vConsol, conta: vConta, dados: vDados, integra: vIntegra, cnpj: vCnpj, mercado: vMercado, pend: vPend, adm: vAdm }[UI.view];
   $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + (window.__HOSTED__ ? hkBanner() : '') + V();
   paintModal();
@@ -7450,6 +7466,9 @@ function vIA() {
 }
 
 /* ===== INTERFACE: GESTÃO CONSULTIVA (cliente em abas, releases e regulatório, painel) ===== */
+/* grupos da ficha por momento de uso; as chaves das abas não mudam */
+const CGRUPOS = [['preparar', 'Preparar a conversa', ['raiox', 'resumo', 'diagnostico', 'briefing', 'portfolio']], ['contrato', 'Contrato e ambiente', ['cadastro', 'fichas', 'contratacao', 'tecnologia', 'regulatorio', 'roi', 'ecossistema']], ['acompanhar', 'Acompanhar', ['gestao', 'reuniao', 'validacao']]];
+const cGrupoDe = k => CGRUPOS.find(g => g[2].includes(k)) || CGRUPOS[0];
 const CTABS = [['raiox', 'Raio-X'], ['resumo', 'Resumo'], ['cadastro', 'Cadastro e contratos'], ['fichas', 'Fichas'], ['contratacao', 'Contratação e licenciamento'], ['tecnologia', 'Tecnologia (release)'], ['regulatorio', 'Fiscal e regulatório'], ['roi', 'ROI'], ['ecossistema', 'Ecossistema e Techfin'], ['diagnostico', 'Diagnóstico executivo'], ['briefing', 'Briefing pré-reunião'], ['gestao', 'Gestão da conta'], ['portfolio', 'Portfólio TOTVS'], ['reuniao', 'Reunião e retornos'], ['validacao', 'Validação']];
 const kk = c => esc(c.key);
 const stPill = st => pill({ confirmado: 'confirmado', candidato: 'a revisar', descartado: 'descartado', substituido: 'substituído' }[st] || st, { confirmado: 'ok', candidato: 'warn', descartado: 'off', substituido: 'off' }[st] || 'off');
@@ -7495,7 +7514,8 @@ function vCliente(all) {
   consInit(c); const tab = all ? null : (UI.ctab || 'raiox');
   let h = `<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" data-a="nav" data-v="clientes">← Clientes</button><h2>${esc(c.name)}</h2>${fPill(c)} ${docPill(c)}${shForaPill(c)}<span class="sp"></span><button class="btn ghost" data-a="pesqCli" data-k="${kk(c)}">Pesquisar soluções para este cliente</button><button class="btn ghost" data-a="expCli" data-k="${kk(c)}">Relatório do cliente (HTML)</button><button class="btn" data-a="briefOpen" data-k="${kk(c)}">Briefing pré-reunião</button><button class="btn pri" data-a="ctab" data-v="diagnostico">Gerar diagnóstico executivo</button></div>
   ${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
-  if (!all) h += `<div class="ctabs">${CTABS.map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  if (!all) { const G = cGrupoDe(tab), resto = CTABS.filter(([k]) => !CGRUPOS.some(g => g[2].includes(k))).map(x => x[0]);
+    h += `<div class="cgrp" role="tablist" aria-label="Grupos da ficha">${CGRUPOS.map(g => `<button data-a="ctab" data-v="${g[2][0]}" data-g="${g[0]}" class="${G[0] === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div><div class="ctabs">${[...G[2], ...resto].map(k => CTABS.find(x => x[0] === k)).filter(Boolean).map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`; }
   const T = { portfolio: () => ptTab(c), gestao: () => empGestaoTab(c), validacao: () => valTab(c), raiox: () => rxTab(c), resumo: () => resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c) + ptDiagCard(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
   if (all) h += ['raiox', 'resumo', 'cadastro', 'fichas', 'contratacao', 'tecnologia', 'regulatorio', 'roi', 'ecossistema'].map(k => `<h2 style="margin:18px 0 6px">${CTABS.find(x => x[0] === k)[1]}</h2>` + T[k]()).join('');
   else h += T[tab]();
@@ -9079,6 +9099,8 @@ const EMP_QORD = { Proteger: 0, Reativar: 1, Expandir: 2, Nutrir: 3, 'Sem data':
 const EMP_FAIXAS = [{ l: 'Acima de 50 mil', min: 50000 }, { l: '10 a 50 mil', min: 10000 }, { l: '5 a 10 mil', min: 5000 }, { l: '1 a 5 mil', min: 1000 }, { l: 'Abaixo de 1 mil', min: 0.01 }, { l: 'Sem MRR', min: -Infinity }];
 const EMP_SEG = { manufatura: 'Manufatura', servicos: 'Serviços', logistica: 'Logística', 'construcao e projetos': 'Construção e Projetos', varejo: 'Varejo', educacional: 'Educacional', agroindustria: 'Agroindústria', saude: 'Saúde', distribuicao: 'Distribuição', 'servicos financeiros': 'Serviços Financeiros' };
 const EMP_COR = ['var(--ciano2)', 'var(--roxo)', 'var(--lar)', 'var(--ok)', 'var(--rosa)', 'var(--cz)', 'var(--lima)', 'var(--menta)', 'var(--link)', 'var(--bad)'];
+/* barra principal com 5 entradas; "Análises" reúne última venda, produtos e grupos; "Painel" mostra também a visão geral */
+const EMP_BARRA = [['painel', 'Painel'], ['semana', 'Plano da semana'], ['recencia', 'Análises'], ['qualidade', 'Qualidade'], ['dados', 'Importar & histórico']], EMP_ANALISES = [['recencia', 'Última venda'], ['produtos', 'Produtos'], ['grupos', 'Grupos']];
 const EMP_TABS = [['painel', 'Painel executivo'], ['semana', 'Plano da semana'], ['visao', 'Visão geral'], ['recencia', 'Última venda'], ['produtos', 'Produtos'], ['grupos', 'Grupos'], ['qualidade', 'Qualidade'], ['dados', 'Importar & histórico']];
 const EMP_FK = { quad: 'eq', buck: 'eb', prod: 'ep', sit: 'es', seg: 'eg', prio: 'gp' };
 /* ---------- utilidades ---------- */
@@ -9464,8 +9486,9 @@ function empDados() {
 function vMrr() {
   const U = empUI(), tem = Object.values(S.clients).some(c => c.emp); if (!tem) U.tab = 'dados';
   const tab = EMP_TABS.some(t => t[0] === U.tab) ? U.tab : 'painel', nq = tem ? empQualN() : 0;
-  const T = { painel: empPainel, semana: empSemana, grupos: empGruposTab, visao: empVisao, recencia: empRecencia, produtos: empProdutos, qualidade: empQualidade, dados: empDados };
-  return `<div class="em-v">${tem ? `<div class="ctabs">${EMP_TABS.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
+  const T = { painel: () => empPainel() + empVisao(), semana: empSemana, grupos: empGruposTab, visao: () => empPainel() + empVisao(), recencia: empRecencia, produtos: empProdutos, qualidade: empQualidade, dados: empDados };
+  const an = EMP_ANALISES.some(t => t[0] === tab), topo = an ? 'recencia' : tab === 'visao' ? 'painel' : tab;
+  return `<div class="em-v">${tem ? `<div class="ctabs">${EMP_BARRA.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${topo === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>${an ? `<div class="seg2 em-sub" role="tablist" aria-label="Análises">${EMP_ANALISES.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
 }
 
 /* ===== Rodada 18 §5: origem de cada indicação (explicável) =====
@@ -10888,22 +10911,30 @@ try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { i
 
 /* Primeiros passos (onboarding): lista curta na Visão da Carteira, calculada do estado real (nada é marcado à mão). Começa vazio: sem dados de exemplo. */
 function onbPassos() {
-  const cl = clients(), temChave = (() => { try { return Object.values(hkLer()).some(Boolean); } catch { return false; } })();
+  const cl = clients();
   return [
-    { ok: cl.length > 0, t: 'Importar sua carteira', d: 'Planilha ou Planilha do Google, em Importar e fichas.', v: 'importar' },
-    { ok: temChave, t: 'Conectar sua chave de IA', d: 'Opcional para a análise por IA e o OCR. A chave fica só neste navegador.', v: 'ia' },
-    { ok: cl.some(c => c.fstat && c.fstat.k === 'disponivel'), t: 'Anexar uma ficha de faturamento', d: 'Sem ficha, o raio-X e o briefing ficam incompletos.', v: 'importar' },
-    { ok: !!(typeof LEM !== 'undefined' && LEM.local), t: 'Ativar o lembrete neste aparelho', d: 'Aviso às 9h e às 14h só se você ainda não abriu a ferramenta.', v: 'conta' }
+    { ok: cl.length > 0, t: 'Suba a planilha da sua carteira', d: 'A exportação “Clientes_ESN” do Empodera, em Carteira & MRR. Leva menos de um minuto.', v: 'mrr', b: 'Subir planilha' },
+    { ok: lsGet('onb.semana') === '1', t: 'Veja o plano da semana', d: 'As contas que pedem atenção agora, por ordem de prioridade.', v: 'mrr', tab: 'semana', b: 'Ver plano', dep: cl.length > 0 },
+    { ok: lsGet('onb.cliente') === '1', t: 'Abra um cliente', d: 'Raio-X, diagnóstico e briefing prontos para a próxima conversa.', v: 'clientes', b: 'Ver clientes', dep: cl.length > 0 }
   ];
+}
+/* ajustes opcionais: só aparecem depois dos 3 passos, em uma linha */
+function onbExtras() {
+  const cl = clients(), temChave = (() => { try { return Object.values(hkLer()).some(Boolean); } catch { return false; } })();
+  return [[temChave, 'Conectar chave de IA', 'ia'], [cl.some(c => c.fstat && c.fstat.k === 'disponivel'), 'Anexar uma ficha de faturamento', 'importar'], [!!(typeof LEM !== 'undefined' && LEM.local), 'Ativar o lembrete neste aparelho', 'conta']].filter(x => !x[0]);
 }
 function onbCard() {
   if (lsGet('onb.fim') === '1') return '';
-  const p = onbPassos(), n = p.filter(x => x.ok).length; if (n === p.length) return '';
-  return `<div class="card" id="onb"><div class="row"><h3>Primeiros passos</h3><span class="pill p-info">${n} de ${p.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="onbFim">Ocultar</button></div>
-  <ol class="sm" style="list-style:none;padding:0;margin:8px 0 0">${p.map(x => `<li class="row" style="gap:8px;padding:6px 0;border-top:1px solid var(--bd2)"><span aria-hidden="true">${x.ok ? '✔' : '○'}</span><div style="flex:1"><b>${esc(x.t)}</b>${x.ok ? ' <span class="muted">(feito)</span>' : ''}<div class="muted">${esc(x.d)}</div></div>${x.ok ? '' : `<button class="btn ghost sm" data-a="nav" data-v="${x.v}">Abrir</button>`}</li>`).join('')}</ol>
+  const p = onbPassos(), n = p.filter(x => x.ok).length, ex = onbExtras(); if (n === p.length && !ex.length) return '';
+  if (n === p.length) return `<div class="card" id="onb"><div class="row"><h3>Tudo pronto</h3><span class="pill p-ok">3 de 3</span><span class="sp"></span><button class="btn ghost sm" data-a="onbFim">Ocultar</button></div><p class="sm muted" style="margin:6px 0 0">Quando quiser, opcional: ${ex.map(x => `<button class="btn ghost sm" data-a="nav" data-v="${x[2]}">${esc(x[1])}</button>`).join(' ')}</p></div>`;
+  const prox = p.findIndex(x => !x.ok);
+  return `<div class="card" id="onb"><div class="row"><h3>Comece em 3 passos</h3><span class="pill p-info">${n} de ${p.length}</span><span class="sp"></span><button class="btn ghost sm" data-a="onbFim">Ocultar</button></div>
+  <ol class="sm" style="list-style:none;padding:0;margin:8px 0 0">${p.map((x, i) => `<li class="row" style="gap:10px;padding:8px 0;border-top:1px solid var(--bd2)"><span class="onb-n ${x.ok ? 'ok' : i === prox ? 'at' : ''}" aria-hidden="true">${x.ok ? '✔' : i + 1}</span><div style="flex:1"><b>${esc(x.t)}</b>${x.ok ? ' <span class="muted">(feito)</span>' : ''}<div class="muted">${esc(x.d)}</div></div>${x.ok ? '' : `<button class="btn ${i === prox ? 'pri' : 'ghost'} sm" data-a="onbIr" data-i="${i}" ${x.dep === false ? 'disabled title="Depende do passo 1"' : ''}>${esc(x.b)}</button>`}</li>`).join('')}</ol>
   <p class="sm muted" style="margin-top:8px">Sua carteira é privada: só você a vê. Este quadro some quando os passos terminam, ou ao ocultar.</p></div>`;
 }
-const ONB_ACT = { onbFim: () => { lsSet('onb.fim', '1'); render(); } };
+/* marca os passos 2 e 3 pelo uso real da tela (não por clique no quadro) */
+function onbVisto() { try { if (!clients().length) return; if (UI.view === 'mrr' && UI.emp && UI.emp.tab === 'semana' && lsGet('onb.semana') !== '1') lsSet('onb.semana', '1'); if (UI.view === 'cliente' && UI.sel && S.clients[UI.sel] && lsGet('onb.cliente') !== '1') lsSet('onb.cliente', '1'); } catch { /* sem efeito */ } }
+const ONB_ACT = { onbFim: () => { lsSet('onb.fim', '1'); render(); }, onbIr: t => { const x = onbPassos()[+t.dataset.i]; if (!x) return; if (x.tab) empUI().tab = x.tab; UI.view = x.v; render(); window.scrollTo(0, 0); } };
 {
   const g = typeof vGeral === 'function' ? vGeral : null;
   if (g) globalThis.vGeral = function (forExport) { const h = g.apply(this, arguments); return forExport ? h : onbCard() + h; };

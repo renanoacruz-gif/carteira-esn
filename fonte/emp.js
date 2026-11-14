@@ -12,6 +12,8 @@ const EMP_QORD = { Proteger: 0, Reativar: 1, Expandir: 2, Nutrir: 3, 'Sem data':
 const EMP_FAIXAS = [{ l: 'Acima de 50 mil', min: 50000 }, { l: '10 a 50 mil', min: 10000 }, { l: '5 a 10 mil', min: 5000 }, { l: '1 a 5 mil', min: 1000 }, { l: 'Abaixo de 1 mil', min: 0.01 }, { l: 'Sem MRR', min: -Infinity }];
 const EMP_SEG = { manufatura: 'Manufatura', servicos: 'Serviços', logistica: 'Logística', 'construcao e projetos': 'Construção e Projetos', varejo: 'Varejo', educacional: 'Educacional', agroindustria: 'Agroindústria', saude: 'Saúde', distribuicao: 'Distribuição', 'servicos financeiros': 'Serviços Financeiros' };
 const EMP_COR = ['var(--ciano2)', 'var(--roxo)', 'var(--lar)', 'var(--ok)', 'var(--rosa)', 'var(--cz)', 'var(--lima)', 'var(--menta)', 'var(--link)', 'var(--bad)'];
+/* barra principal com 5 entradas; "Análises" reúne última venda, produtos e grupos; "Painel" mostra também a visão geral */
+const EMP_BARRA = [['painel', 'Painel'], ['semana', 'Plano da semana'], ['recencia', 'Análises'], ['qualidade', 'Qualidade'], ['dados', 'Importar & histórico']], EMP_ANALISES = [['recencia', 'Última venda'], ['produtos', 'Produtos'], ['grupos', 'Grupos']];
 const EMP_TABS = [['painel', 'Painel executivo'], ['semana', 'Plano da semana'], ['visao', 'Visão geral'], ['recencia', 'Última venda'], ['produtos', 'Produtos'], ['grupos', 'Grupos'], ['qualidade', 'Qualidade'], ['dados', 'Importar & histórico']];
 const EMP_FK = { quad: 'eq', buck: 'eb', prod: 'ep', sit: 'es', seg: 'eg', prio: 'gp' };
 /* ---------- utilidades ---------- */
@@ -397,6 +399,7 @@ function empDados() {
 function vMrr() {
   const U = empUI(), tem = Object.values(S.clients).some(c => c.emp); if (!tem) U.tab = 'dados';
   const tab = EMP_TABS.some(t => t[0] === U.tab) ? U.tab : 'painel', nq = tem ? empQualN() : 0;
-  const T = { painel: empPainel, semana: empSemana, grupos: empGruposTab, visao: empVisao, recencia: empRecencia, produtos: empProdutos, qualidade: empQualidade, dados: empDados };
-  return `<div class="em-v">${tem ? `<div class="ctabs">${EMP_TABS.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
+  const T = { painel: () => empPainel() + empVisao(), semana: empSemana, grupos: empGruposTab, visao: () => empPainel() + empVisao(), recencia: empRecencia, produtos: empProdutos, qualidade: empQualidade, dados: empDados };
+  const an = EMP_ANALISES.some(t => t[0] === tab), topo = an ? 'recencia' : tab === 'visao' ? 'painel' : tab;
+  return `<div class="em-v">${tem ? `<div class="ctabs">${EMP_BARRA.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${topo === k ? 'on' : ''}">${l}${k === 'qualidade' && nq ? ` <small>${nq}</small>` : ''}</button>`).join('')}</div>${an ? `<div class="seg2 em-sub" role="tablist" aria-label="Análises">${EMP_ANALISES.map(([k, l]) => `<button data-a="empTab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}` : '<p class="sm muted">Importe a exportação "Clientes_ESN" do Empodera para ver MRR, última venda, quadrantes de atenção, produtos e qualidade dos dados da sua carteira.</p>'}${T[tab]()}</div>`;
 }
