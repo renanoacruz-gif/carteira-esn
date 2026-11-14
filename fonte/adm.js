@@ -63,7 +63,8 @@ const telClN = () => { try { return Object.keys(S.clients).length; } catch { ret
 function telWire() {
   if (!TEL.on) return;
   /* carteira: o evento útil é a confirmação da importação; falha de leitura é registrada na própria leitura */
-  telWrap('loadPortfolio', () => ({ func: 'import_carteira', meta: { tipo: 'carteira', via: 'arquivo' }, fim: () => (UI.wiz ? false : undefined) }));
+  telWrap('loadPortfolio', () => ({ func: 'import_carteira', meta: { tipo: 'carteira', via: 'arquivo' }, fim: () => (UI.wiz || UI.emp?.pend ? false : undefined) }));
+  telWrap('empAplicar', () => ({ func: 'import_carteira', meta: { tipo: 'carteira', via: 'arquivo' }, fim: () => ({ clientes: telClN() }) }));
   telWrap('impApplyPlan', () => { const n0 = telClN(); return { func: 'import_carteira', meta: { tipo: 'carteira', via: 'arquivo' }, fim: () => (UI.wiz ? false : { n: Math.max(0, telClN() - n0), clientes: telClN() }) }; });
   telWrap('ingestLote', a => ({ func: a[1] === 'doc' ? 'doc_upload' : 'ficha_upload', inicio: true, meta: { modo: 'lote', tipo: a[1] === 'doc' ? 'doc' : 'ficha', n: telN(a[0]) } }));
   telWrap('ingest', a => ({ func: a[1] === 'ficha' ? 'ficha_upload' : 'doc_upload', inicio: true, meta: { modo: 'individual', tipo: a[1] === 'ficha' ? 'ficha' : 'doc', n: telN(a[0]) } }));
@@ -193,6 +194,7 @@ function vAdm() {
     <p class="sm muted" style="margin-top:6px">Link do convite: <code>${esc(link)}</code></p>
     ${d.roster.length ? `<details class="sm" style="margin-top:6px"><summary>${d.roster.length} previsto(s) na lista</summary><table><tbody>${d.roster.map(r => { const u = d.usuarios.find(x => x.email === r.email); return `<tr><td>${esc(r.nome || '')}</td><td>${esc(r.email)}</td><td>${u?.identificado ? `<span class="pill p-ok">Acessou</span> <span class="muted">${esc(fmtDate(u.primeiro_acesso))}</span>` : '<span class="pill p-info">Previsto</span>'}</td><td><button class="btn ghost sm" data-a="admRosterRm" data-id="${esc(r.email)}">Remover</button></td></tr>`; }).join('')}</tbody></table></details>` : ''}</div>`;
   const us = d.usuarios.filter(u => (!ADMV.sit || u.situacao === ADMV.sit) && (!ADMV.acc || (ADMV.acc === 'prev' ? !u.identificado : u.identificado)));
+  h += admFunilCard(d.usuarios || []);
   h += `<div class="card"><div class="row"><h3>Executivos <span class="pill p-n">${us.length}</span></h3><span class="sp"></span><button class="btn pri sm" data-a="admAddFocus">+ Adicionar executivo</button></div><div class="row" style="margin-bottom:8px;gap:6px;flex-wrap:wrap" role="group" aria-label="Filtro de acesso">${[['', 'Todos', d.usuarios.length], ['prev', 'Previstos (ainda não acessaram)', nPrev], ['ac', 'Acessaram', nAc]].map(([v, l, n]) => `<button class="btn ${ADMV.acc === v ? 'pri' : 'ghost'} sm" data-a="admAcc" data-v="${v}" aria-pressed="${ADMV.acc === v}">${l} (${n})</button>`).join('')}<span class="sp"></span><label class="sm">Situação de uso <select data-c="admSit">${opt('', 'Todas', ADMV.sit)}${Object.entries(ADM_SIT).map(([v, [l]]) => opt(v, l, ADMV.sit)).join('')}</select></label></div>
     <div class="tw"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Acesso</th><th>Primeiro acesso</th><th>Último acesso</th><th>Última atividade útil</th><th>Situação de uso</th><th>Recursos utilizados</th><th>Ações</th></tr></thead><tbody>${us.map(u => { const [sl, sc] = ADM_SIT[u.situacao] || [u.situacao, 'p-n'];
       if (ADMV.edit === u.email) return `<tr class="edit"><td><input type="text" id="adm-e-nome" value="${esc(u.nome)}" maxlength="80" aria-label="Nome" style="min-width:160px"></td><td>${u.identificado ? esc(u.email) + '<div class="sm muted">vem do login; não pode ser alterado</div>' : `<input type="email" id="adm-e-email" value="${esc(u.email)}" aria-label="E-mail" style="min-width:220px">`}</td><td colspan="6" class="sm muted">Editando ${esc(u.email)}</td><td class="nw"><button class="btn pri sm" data-a="admEditSave" data-id="${esc(u.email)}">Salvar</button> <button class="btn ghost sm" data-a="admEditOff">Cancelar</button></td></tr>`;
@@ -211,6 +213,21 @@ function vAdm() {
   h += admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
+}
+/* Funil de adoção dos previstos: cada etapa conta quem chegou nela; "parou aqui" lista quem não passou para a seguinte */
+function admFunil(us) {
+  const P = us.filter(u => u.previsto), ok3 = u => u.importou_carteira, ok4 = u => (u.recursos_principais_cobertura || []).some(f => f !== 'import_carteira');
+  const et = [['Convidados (lista de previstos)', P], ['Acessaram', P.filter(u => u.identificado)], ['Importaram a carteira', P.filter(u => u.identificado && ok3(u))], ['Usaram um recurso principal', P.filter(u => u.identificado && ok3(u) && ok4(u))]];
+  return et.map(([rot, l], i) => ({ rot, n: l.length, parou: i < et.length - 1 ? l.filter(u => !et[i + 1][1].includes(u)) : [] }));
+}
+const ADM_FUNIL_DICA = ['Ainda não entraram: reenvie o convite.', 'Entraram e não subiram a planilha da carteira: mostre o primeiro passo.', 'Têm carteira e ainda não usaram fichas, Raio-X, diagnóstico ou pesquisa: indique um cliente para começar.'];
+function admFunilCard(us) {
+  const F = admFunil(us), tot = F[0].n; if (!tot) return '';
+  const fora = us.filter(u => !u.previsto && u.identificado).length;
+  return `<div class="card" id="adm-funil"><h3>Funil de adoção <span class="muted sm">(previstos, desde o início da coleta)</span></h3>
+  <div class="adm-fun">${F.map((e, i) => `<div class="adm-fe"><div class="row" style="gap:10px"><b class="adm-fn">${e.n}</b><span>${esc(e.rot)}</span><span class="sp"></span><span class="sm muted">${i ? Math.round(e.n / tot * 100) + '% dos convidados' : ''}</span></div><div class="adm-fb"><i style="width:${Math.max(e.n ? 2 : 0, e.n / tot * 100)}%"></i></div>
+    ${e.parou.length ? `<details class="sm"><summary><b>${e.parou.length}</b> parou(aram) aqui — ${esc(ADM_FUNIL_DICA[i])}</summary><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button class="btn sm" data-a="admFunilCopy" data-i="${i}">Copiar e-mails (${e.parou.length})</button></div><div class="sm muted" style="word-break:break-word">${e.parou.map(u => esc(u.nome || u.email)).join(' · ')}</div></details>` : ''}</div>`).join('')}</div>
+  ${fora ? `<p class="sm muted" style="margin-top:8px">Fora da lista de previstos: ${fora} conta(s) acessaram e não entram neste funil.</p>` : ''}</div>`;
 }
 function admLemCard(l) {
   if (!l) return '';
@@ -307,6 +324,7 @@ const ADM_CAT_ACT = {
   admCatPag: t => { ADMV.catF.pag = Math.max(0, ADMV.catF.pag + (+t.dataset.d || 0)); admCatLoad(); }
 };
 const ADM_ACT = {
+  admFunilCopy: t => { const e = admFunil(ADMV.data?.usuarios || [])[+t.dataset.i]; if (e && e.parou.length) admCopiar(e.parou.map(u => u.email).join('; '), `${e.parou.length} e-mail(s) copiado(s).`); },
   admSugLida: async t => { try { await admApi('/api/adm/sugestoes', { id: t.dataset.id }); ADMV.sug = await admApi('/api/adm/sugestoes'); } catch (e) { toast(e.message); } render(); },
   admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },
   admReload: () => { ADMV.data = null; ADMV.msg = ''; admLoad(); render(); },

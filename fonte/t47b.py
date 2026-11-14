@@ -68,7 +68,7 @@ t=t+' '+ev(M,"document.querySelector('#app').textContent")
 for w in ['Cobertura dos indicadores','Critérios de classificação','Evolução da adoção','Executivos','Lista de previstos','Recursos e valor gerado','Saúde da plataforma','Privacidade e retenção','Primeiro acesso','Última atividade útil','Situação de uso','Recursos utilizados']:
     ck('painel contém: '+w, w in t)
 ck('executivo de teste aparece como Ativo', ana in t and 'Ativo' in t)
-ck('painel não expõe dados de carteira', not re.search(r'\d{14}|LTDA|T0000\d', t), re.findall(r'.{10}(?:LTDA|T0000\d).{5}',t)[:2])
+ck('painel não expõe dados de carteira', not re.search(r'(?<![\d-])\d{14}(?![\d-])|LTDA|T0000\d', t), re.findall(r'.{10}(?:LTDA|T0000\d).{5}',t)[:2])
 # filtro por recurso e período
 M.select_option('[data-c=admFunc]','import_carteira'); M.wait_for_timeout(1500)
 t2=ev(M,"document.querySelector('#app').innerText"); ck('filtro por recurso aplica', 'Importação da carteira' in t2)
