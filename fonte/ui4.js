@@ -192,6 +192,22 @@ function tabDiag(c) {
 }
 
 /* ---------- Tela global: Releases e regulatório ---------- */
+/* Releases da carteira: agrupa a release em produção CONFIRMADA de cada cliente e cruza com o marco oficial. Nenhuma data é calculada. */
+function relCarteira() {
+  const g = new Map(); let semConf = [];
+  for (const c of clients()) { let rows = []; try { rows = relRows(c); } catch { rows = []; } if (!rows.length) continue;
+    for (const r of rows) { if (!r.rel) { semConf.push({ c, produto: r.produto }); continue; } const k = r.produto + '|' + r.rel, e = g.get(k) || { produto: r.produto, rel: r.rel, marco: r.marco || null, sit: r.sit, cs: [] }; if ((r.sit?.sev || 0) > (e.sit?.sev || 0)) e.sit = r.sit; e.cs.push(c); g.set(k, e); } }
+  const itens = [...g.values()].sort((a, b) => (b.sit?.sev || 0) - (a.sit?.sev || 0) || String(a.marco?.data || '9999').localeCompare(String(b.marco?.data || '9999')) || b.cs.length - a.cs.length);
+  return { itens, semConf };
+}
+function relCarteiraCard() {
+  const R = relCarteira(); if (!R.itens.length && !R.semConf.length) return '';
+  const nomes = cs => cs.slice(0, 12).map(c => `<a href="#" data-a="openTab" data-k="${esc(c.key)}" data-v="tecnologia">${esc(c.name)}</a>`).join(' · ') + (cs.length > 12 ? ` <span class="muted">+${cs.length - 12}</span>` : '');
+  return `<div class="card" id="rel-cart"><h3>Releases da carteira <span class="muted sm">(só release em produção confirmada)</span></h3>
+  ${R.itens.length ? `<div class="tw"><table><thead><tr><th>Produto</th><th>Release</th><th>Marco oficial</th><th>Situação</th><th class="num">Clientes</th><th style="min-width:260px">Quem</th></tr></thead><tbody>${R.itens.map(e => `<tr><td>${esc(e.produto)}</td><td><b>${esc(e.rel)}</b></td><td class="sm">${e.marco ? `${esc(e.marco.tipo)}: <b>${e.marco.data ? fmtD(e.marco.data) : 'sem data pública'}</b><div>${srcLink(e.marco.fonte)}</div>` : '<span class="muted">sem marco cadastrado</span>'}</td><td>${e.sit ? pill(e.sit.l, e.sit.sev >= 3 ? 'bad' : e.sit.sev === 2 ? 'warn' : e.sit.k === 'vigente' ? 'ok' : 'off') : '—'}</td><td class="num">${e.cs.length}</td><td class="sm">${nomes(e.cs)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted">Nenhum cliente com release em produção confirmada.</p>'}
+  ${R.semConf.length ? `<details class="sm" style="margin-top:8px"><summary><b>${new Set(R.semConf.map(x => x.c.key)).size}</b> cliente(s) sem release em produção confirmada</summary><div style="margin-top:6px">${nomes([...new Map(R.semConf.map(x => [x.c.key, x.c])).values()])}</div></details>` : ''}
+  <p class="sm muted" style="margin-top:8px">A data vem do marco oficial cadastrado abaixo, com fonte. Sem marco, não há data: nada é presumido.</p></div>`;
+}
 function vRefs() {
   const P = refPending(), ms = (S.marcos || []).filter(m => m.st !== 'pendente' && m.st !== 'descartado'), rs = (S.regs || []).filter(r => r.st !== 'pendente' && r.st !== 'descartado'), cs = clients();
   const lastM = ms.map(m => m.consultadoEm).sort().pop(), lastR = rs.map(r => r.consultadoEm).sort().pop();
@@ -211,7 +227,7 @@ function vRefs() {
   <details><summary class="sm">Registrar novo evento</summary><div class="grid g3"><input id="rg_n" placeholder="Obrigação ou mudança"><input id="rg_o" placeholder="Órgão responsável"><input id="rg_ft" placeholder="Título da fonte oficial"><input id="rg_fu" placeholder="URL da fonte"><label class="sm">Publicação <input id="rg_pub" type="date"></label><label class="sm">Vigência <input id="rg_vig" type="date"></label><label class="sm">Prazo <input id="rg_pz" type="date"></label><label class="sm">Testes início <input id="rg_ti" type="date"></label><label class="sm">Testes fim <input id="rg_tf" type="date"></label></div>
   <div class="row sm">Regimes: ${REGIMES.map(x => `<label><input type="checkbox" class="rg_reg" value="${x}"> ${x}</label>`).join(' ')}</div><div class="row sm">Operações: ${Object.entries(OPS).map(([k, l]) => `<label><input type="checkbox" class="rg_op" value="${k}"> ${l}</label>`).join(' ')}</div><div class="row sm">Ações: ${Object.entries(ACOES_REG).map(([k, l]) => `<label><input type="checkbox" class="rg_ac" value="${k}"> ${l}</label>`).join(' ')}</div>
   <div class="row"><input id="rg_ufs" placeholder="UFs (vazio = todas), ex.: PR, SC" style="width:200px"><input id="rg_nota" placeholder="Critérios adicionais / observação" style="min-width:300px"><button class="btn ghost sm" data-a="rgNew">Registrar evento</button></div></details></div>`;
-  return h;
+  return relCarteiraCard() + h;
 }
 
 /* ---------- Painel geral: bloco consultivo ---------- */
