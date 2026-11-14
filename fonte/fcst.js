@@ -98,6 +98,30 @@ function fcSheetCard() {
   ${C.lastErr ? `<div class="alert b sm"><b>Falha em ${esc(shAgo(C.lastErr.at))}:</b> ${esc(C.lastErr.msg)}</div>` : ''}</div>`;
 }
 function fcKpiCard(l, v, sub = '') { return `<div class="kpi em-k"><div class="sm muted">${esc(l)}</div><b>${v}</b>${sub ? `<div class="sm muted">${sub}</div>` : ''}</div>`; }
+/* ---------- Simulador comercial: receita ponderada e ARR. Não altera a planilha nem a carteira; premissas são suas e ficam à vista. ----------
+   Receita ponderada = Σ (valor da oportunidade × probabilidade informada). Sem probabilidade informada, não há ponderação (nada é presumido).
+   ARR do pipeline = recorrente × 12 somente se você declarar que o valor recorrente da planilha é mensal. ARR da carteira = MRR pagante × 12. */
+function fcSim() { return S.meta.fcSim ||= { pAberto: null, pAssin: null, recBase: '', porOpp: {} }; }
+const fcPct = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null; };
+function fcSimCalc(opps, tipo) {
+  const M = fcSim(), val = o => tipo ? o[tipo] : o.total, ab = opps.filter(o => o.status === 'EM ABERTO' || o.status === 'EM ASSINATURA');
+  let pond = 0, base = 0, semProb = 0, recPond = 0, recBruto = 0;
+  for (const o of ab) { const p = fcPct(M.porOpp[o.id]) ?? (o.status === 'EM ASSINATURA' ? fcPct(M.pAssin) : fcPct(M.pAberto)); base += val(o); recBruto += o.rec || 0; if (p == null) { semProb++; continue; } pond += val(o) * p / 100; recPond += (o.rec || 0) * p / 100; }
+  const ganhoRec = opps.filter(o => o.status === 'GANHA').reduce((a, o) => a + (o.rec || 0), 0), fat = M.recBase === 'mensal' ? 12 : M.recBase === 'anual' ? 1 : null;
+  const mrrCart = Object.values(S.clients).filter(c => c.emp && !c.emp.ausente).reduce((a, c) => a + (c.emp.mrrP || 0), 0), temCart = Object.values(S.clients).some(c => c.emp);
+  return { n: ab.length, base, pond: semProb === ab.length ? null : pond, semProb, arrGanho: fat == null ? null : ganhoRec * fat, arrPond: fat == null || semProb === ab.length ? null : recPond * fat, recBruto, arrCart: temCart ? mrrCart * 12 : null, mrrCart, proprias: Object.keys(M.porOpp).filter(id => fcPct(M.porOpp[id]) != null && ab.some(o => o.id === id)).length };
+}
+function fcSimCard(k, tipo) {
+  const M = fcSim(), r = fcSimCalc(k.opps, tipo), v = (x, vazio) => x == null ? `<b class="muted">indisponível</b><span class="sm muted">${vazio}</span>` : `<b>${fmtBRL(x)}</b>`;
+  const inp = (f, l, val) => `<label class="sm">${l}<input type="text" inputmode="decimal" data-c="fcsim" data-f="${f}" value="${val == null ? '' : esc(String(val))}" placeholder="não informada" style="width:110px"></label>`;
+  return `<details class="card fc-mg" id="fc-sim" ${UI.fc.simOpen ? 'open' : ''}><summary data-a="fcSimOpen"><b>Simulador: receita ponderada e ARR</b> <span class="muted sm">— premissas suas; não altera a planilha nem a carteira</span></summary>
+  <div class="row" style="gap:14px;flex-wrap:wrap;margin:10px 0">${inp('pAberto', 'Probabilidade — Em aberto (%) ', M.pAberto)}${inp('pAssin', 'Probabilidade — Em assinatura (%) ', M.pAssin)}<label class="sm">O valor “Recorrente” da planilha é <select data-c="fcsim" data-f="recBase"><option value="" ${!M.recBase ? 'selected' : ''}>não informado</option><option value="mensal" ${M.recBase === 'mensal' ? 'selected' : ''}>mensal</option><option value="anual" ${M.recBase === 'anual' ? 'selected' : ''}>anual</option></select></label>${Object.keys(M.porOpp).length || M.pAberto != null || M.pAssin != null || M.recBase ? '<button class="btn ghost sm" data-a="fcSimLimpar">Limpar premissas</button>' : ''}</div>
+  <div class="grid g4"><div class="kpi em-k"><span class="sm muted">Pipeline no período (importado)</span><b>${fmtBRL(r.base)}</b><span class="sm muted">${r.n} oportunidade(s) em aberto ou assinatura</span></div>
+  <div class="kpi em-k"><span class="sm muted">Receita ponderada (estimativa)</span>${v(r.pond, 'informe ao menos uma probabilidade')}${r.pond != null && r.semProb ? `<span class="sm muted">${r.semProb} oportunidade(s) sem probabilidade ficaram fora</span>` : ''}</div>
+  <div class="kpi em-k"><span class="sm muted">ARR do recorrente ponderado (estimativa)</span>${v(r.arrPond, M.recBase ? 'informe as probabilidades' : 'diga se o recorrente é mensal ou anual')}</div>
+  <div class="kpi em-k"><span class="sm muted">ARR da carteira (calculado)</span>${v(r.arrCart, 'suba a planilha do Empodera')}${r.arrCart != null ? `<span class="sm muted">MRR pagante ${fmtBRL(r.mrrCart)} × 12</span>` : ''}</div></div>
+  <p class="sm muted" style="margin-top:8px"><b>Como é calculado:</b> receita ponderada = valor da oportunidade × probabilidade informada (a do status, ou a que você definiu na linha — ${r.proprias} com probabilidade própria). ARR do recorrente = recorrente × ${M.recBase === 'mensal' ? '12' : M.recBase === 'anual' ? '1' : '12 (se mensal) ou 1 (se anual)'}. As probabilidades são premissas suas: a ferramenta não tem histórico de fechamento para calculá-las. Estimativa não é previsão de faturamento.</p></details>`;
+}
 function vForecast() {
   UI.fc ||= {}; const per = UI.fc.per || 'mensal';
   const sel = UI.fc.sel || (per === 'trimestral' ? 'Q1' : per === 'mensal' ? FC_TABS[0][1] : null);
@@ -114,7 +138,7 @@ function vForecast() {
   ${k.meta > 0 ? `<div class="bar" style="margin:8px 0 14px"><div class="tr" style="flex:1"><div class="fl" style="width:${barPct}%"></div></div><div class="nv">${barPct}%</div></div>` : ''}`;
   const sec2 = `<div class="grid g3">${fcKpiCard('Oportunidades em aberto', k.aberto.n, fmtBRL(k.aberto.v))}${fcKpiCard('Em assinatura', k.assinatura.n, fmtBRL(k.assinatura.v))}</div>
   <div class="card fc-mg"><h3>Meta × Ganho por tipo de venda</h3>${k.porTipo.map(x => `<div class="bar"${tipo && tipo !== x.t ? ' style="opacity:.45"' : ''}><div class="lb"><b>${x.l}</b> — ${fmtBRL(x.ganho)} de ${x.meta > 0 ? fmtBRL(x.meta) : 'meta não configurada'}</div><div class="tr"><div class="fl" style="width:${x.pct == null ? 0 : Math.min(100, Math.round(x.pct))}%"></div></div><div class="nv">${x.pct == null ? '—' : Math.round(x.pct) + '%'}</div></div>`).join('')}</div>`;
-  return `<div class="em-v">${fcSheetCard()}${perSel}${kpis}${fcCobCard(k)}${sec2}${fcTable(k.opps, tipo)}</div>`;
+  return `<div class="em-v">${fcSheetCard()}${perSel}${kpis}${fcCobCard(k)}${sec2}${fcSimCard(k, tipo)}${fcTable(k.opps, tipo)}</div>`;
 }
 function fcTable(opps, tipo) {
   const f = UI.fc, q = norm(f.q || ''), st = f.st || '', val = o => tipo ? o[tipo] : o.total, sort = f.sort || 'data_desc', lim = f.lim || 150;
@@ -128,7 +152,7 @@ function fcTable(opps, tipo) {
   <div class="row" style="gap:6px;flex-wrap:wrap"><input data-i="fcq" type="text" aria-label="Buscar oportunidade" placeholder="Buscar cliente ou produto…" value="${esc(f.q || '')}" style="min-width:220px">
   <select data-c="fcfst"><option value="">Todos os status</option>${['EM ABERTO', 'EM ASSINATURA', 'GANHA', 'PERDIDA'].map(s => `<option value="${s}" ${s === st ? 'selected' : ''}>${fcStLabel[s]}</option>`).join('')}</select>
   <select data-c="fcsort"><option value="data_desc" ${sort === 'data_desc' ? 'selected' : ''}>Data (mais recente)</option><option value="data_asc" ${sort === 'data_asc' ? 'selected' : ''}>Data (mais antiga)</option><option value="valor_desc" ${sort === 'valor_desc' ? 'selected' : ''}>Valor (maior)</option><option value="valor_asc" ${sort === 'valor_asc' ? 'selected' : ''}>Valor (menor)</option></select></div>
-  <div class="tbl-wrap"><table class="sm"><thead><tr><th>Cliente</th><th>Produto</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Data de previsão</th><th>Origem</th></tr></thead>
-  <tbody>${rows.length ? rows.map(o => `<tr><td>${clienteCel(o)}</td><td>${esc(o.produto)}</td><td>${catChip(o)}</td><td>${fmtBRL(val(o))}</td><td>${pill(fcStLabel[o.status], fcStPill[o.status])}</td><td>${fmtD(o.data)}</td><td class="sm muted">Mesa Forecast (${esc(o.tab)})</td></tr>`).join('') : `<tr><td colspan="7" class="sm muted">Nenhuma oportunidade no período/filtro selecionado.</td></tr>`}</tbody></table></div>
+  <div class="tbl-wrap"><table class="sm"><thead><tr><th>Cliente</th><th>Produto</th><th>Categoria</th><th>Valor</th><th>Status</th><th title="Premissa sua para o simulador; não altera a planilha">Prob. (%)</th><th>Data de previsão</th><th>Origem</th></tr></thead>
+  <tbody>${rows.length ? rows.map(o => `<tr><td>${clienteCel(o)}</td><td>${esc(o.produto)}</td><td>${catChip(o)}</td><td>${fmtBRL(val(o))}</td><td>${pill(fcStLabel[o.status], fcStPill[o.status])}</td><td>${o.status === 'EM ABERTO' || o.status === 'EM ASSINATURA' ? `<input type="text" inputmode="decimal" data-c="fcsimopp" data-id="${o.id}" value="${fcSim().porOpp[o.id] == null ? '' : esc(String(fcSim().porOpp[o.id]))}" placeholder="${(p => p == null ? '—' : p)(o.status === 'EM ASSINATURA' ? fcPct(fcSim().pAssin) : fcPct(fcSim().pAberto))}" aria-label="Probabilidade desta oportunidade" style="width:58px">` : '<span class="muted">—</span>'}</td><td>${fmtD(o.data)}</td><td class="sm muted">Mesa Forecast (${esc(o.tab)})</td></tr>`).join('') : `<tr><td colspan="8" class="sm muted">Nenhuma oportunidade no período/filtro selecionado.</td></tr>`}</tbody></table></div>
   ${total > lim ? `<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-a="fcMore">Carregar mais (${total - lim} restante(s))</button></div>` : ''}</div>`;
 }

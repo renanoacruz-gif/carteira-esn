@@ -145,6 +145,7 @@ async function admLoad() {
     try { ADMV.sug = await admApi('/api/adm/sugestoes'); } catch { ADMV.sug = { erro: true }; }
     await admCatLoad(true);
     try { ADMV.aud = (await admApi('/api/adm/auditoria')).itens; } catch { ADMV.aud = null; }
+    try { ADMV.integ = await admApi('/api/adm/integracoes'); } catch { ADMV.integ = null; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -211,7 +212,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admIntegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += admAudCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
@@ -230,6 +231,16 @@ function admFunilCard(us) {
   <div class="adm-fun">${F.map((e, i) => `<div class="adm-fe"><div class="row" style="gap:10px"><b class="adm-fn">${e.n}</b><span>${esc(e.rot)}</span><span class="sp"></span><span class="sm muted">${i ? Math.round(e.n / tot * 100) + '% dos convidados' : ''}</span></div><div class="adm-fb"><i style="width:${Math.max(e.n ? 2 : 0, e.n / tot * 100)}%"></i></div>
     ${e.parou.length ? `<details class="sm"><summary><b>${e.parou.length}</b> parou(aram) aqui — ${esc(ADM_FUNIL_DICA[i])}</summary><div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0"><button class="btn sm" data-a="admFunilCopy" data-i="${i}">Copiar e-mails (${e.parou.length})</button></div><div class="sm muted" style="word-break:break-word">${e.parou.map(u => esc(u.nome || u.email)).join(' · ')}</div></details>` : ''}</div>`).join('')}</div>
   ${fora ? `<p class="sm muted" style="margin-top:8px">Fora da lista de previstos: ${fora} conta(s) acessaram e não entram neste funil.</p>` : ''}</div>`;
+}
+const ADM_INT_EST = { nao_configurado: ['Não configurado', 'p-off'], nao_testado: ['Configurado, não testado', 'p-info'], conectado: ['Conectado e validado', 'p-ok'], falha_autenticacao: ['Falha de autenticação', 'p-bad'], indisponivel: ['Serviço indisponível', 'p-warn'], intervencao: ['Necessita intervenção', 'p-warn'] };
+function admIntegCard() {
+  const g = ADMV.integ; if (!g) return '';
+  return `<div class="card" id="adm-integ"><div class="row"><h3>Integrações e Inteligência</h3><span class="sp"></span><button class="btn ghost sm" data-a="admIntegReload">Atualizar</button></div>
+  <p class="sm muted">O estado vem da última execução real registrada de cada serviço. “Conectado e validado” só aparece quando houve uma execução bem-sucedida; credenciais ficam no servidor e nunca são exibidas.</p>
+  <div class="tw"><table><thead><tr><th>Integração</th><th>Estado</th><th>Última verificação</th><th>Observação</th></tr></thead><tbody>${g.itens.map(x => { const e = ADM_INT_EST[x.estado] || [x.estado, 'p-info']; return `<tr><td><b>${esc(x.nome)}</b></td><td><span class="pill ${e[1]}">${esc(e[0])}</span>${x.codigo ? `<div class="sm muted">${esc(x.codigo)}</div>` : ''}</td><td class="sm">${x.ultima ? esc(fmtDate(x.ultima)) : '<span class="muted">nunca</span>'}</td><td class="sm muted">${esc(x.obs || '')}</td></tr>`; }).join('')}</tbody></table></div>
+  <h4 style="margin-top:14px">Consumo e cotas <span class="muted sm">(contagem gravada no banco; vale para todas as instâncias)</span></h4>
+  <div class="tw"><table><thead><tr><th>Operação</th><th class="num">Hoje</th><th class="num">7 dias</th><th class="num">Usuários (7 dias)</th><th class="num">Maior uso de um usuário hoje</th><th class="num">Limite diário por usuário</th></tr></thead><tbody>${g.consumo.map(c => `<tr><td>${esc(c.rot)}</td><td class="num">${c.hoje}</td><td class="num">${c.sete}</td><td class="num">${c.usuarios}</td><td class="num">${c.pico_usuario_hoje}${c.pico_usuario_hoje >= c.limite ? ' <span class="pill p-warn">no limite</span>' : ''}</td><td class="num">${c.limite}</td></tr>`).join('')}</tbody></table></div>
+  <p class="sm muted" style="margin-top:8px">Frequência da leitura das fontes: bloco “Catálogo de soluções”. Aprovação de informações: fila de revisão do catálogo. Registro das ações: “Trilha de auditoria”.</p></div>`;
 }
 function admAudCard() {
   const a = ADMV.aud; if (!a) return '';
@@ -331,6 +342,7 @@ const ADM_CAT_ACT = {
   admCatPag: t => { ADMV.catF.pag = Math.max(0, ADMV.catF.pag + (+t.dataset.d || 0)); admCatLoad(); }
 };
 const ADM_ACT = {
+  admIntegReload: async () => { try { ADMV.integ = await admApi('/api/adm/integracoes'); toast('Estado das integrações atualizado.'); } catch (e) { toast(e.message); } render(); },
   admFunilCopy: t => { const e = admFunil(ADMV.data?.usuarios || [])[+t.dataset.i]; if (e && e.parou.length) admCopiar(e.parou.map(u => u.email).join('; '), `${e.parou.length} e-mail(s) copiado(s).`); },
   admSugLida: async t => { try { await admApi('/api/adm/sugestoes', { id: t.dataset.id }); ADMV.sug = await admApi('/api/adm/sugestoes'); } catch (e) { toast(e.message); } render(); },
   admCopiarConvite: async () => { const t = document.getElementById('adm-convite-txt'); try { await navigator.clipboard.writeText(t ? t.value : admConviteTxt()); toast('Texto copiado.'); } catch { if (t) { t.focus(); t.select(); } toast('Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.'); } },

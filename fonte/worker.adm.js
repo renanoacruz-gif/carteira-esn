@@ -41,6 +41,7 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS sugestoes (id TEXT PRIMARY KEY, email TEXT NOT NULL, em TEXT NOT NULL, area TEXT NOT NULL, texto TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0)',
   'CREATE TABLE IF NOT EXISTS csp_obs (chave TEXT PRIMARY KEY, diretiva TEXT NOT NULL, alvo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, ultimo TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS adm_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT NOT NULL, acao TEXT NOT NULL, detalhe TEXT, resultado TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS uso_dia (dia TEXT NOT NULL, usuario TEXT NOT NULL, rota TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (dia, usuario, rota))',
   'CREATE TABLE IF NOT EXISTS cat_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, url TEXT NOT NULL, estado TEXT NOT NULL, erro TEXT, autenticado INTEGER NOT NULL DEFAULT 0, testada_em TEXT, ultima_sinc TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_paginas (chave TEXT PRIMARY KEY, url TEXT NOT NULL, fonte TEXT NOT NULL, pai TEXT, titulo TEXT, prof INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL, erro TEXT, hash TEXT, filhos INTEGER, vista_em TEXT, alterada_em TEXT, revisada_em TEXT)',
   'CREATE INDEX IF NOT EXISTS cat_pag_fe ON cat_paginas(fonte, estado, prof)',
@@ -117,6 +118,7 @@ async function admGravar(env, linhas) {
 async function admPurgar(env, forcar) {
   const db = admDb(env); if (!db) return { eventos: 0, tentativas: 0 }; await admInit(env); const { cfg } = await admCfgLer(db), lim = new Date(Date.now() - cfg.retencao_dias * 864e5).toISOString();
   const a = await db.prepare('DELETE FROM eventos WHERE ts<?').bind(lim).run(), b = await db.prepare('DELETE FROM adm_tentativas WHERE ts<?').bind(new Date(Date.now() - 90 * 864e5).toISOString()).run();
+  await db.prepare('DELETE FROM uso_dia WHERE dia<?').bind(new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10)).run();
   await db.prepare('DELETE FROM adm_audit WHERE ts<?').bind(new Date(Date.now() - 365 * 864e5).toISOString()).run();
   await db.prepare('DELETE FROM sugestoes WHERE em<?').bind(new Date(Date.now() - 180 * 864e5).toISOString()).run();
   await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('ultima_purga', JSON.stringify(new Date().toISOString())).run();
@@ -439,6 +441,51 @@ async function admCatalogo(req, env) {
   }
   return inval('Operação desconhecida.');
 }
+/* ===== Cotas diárias por usuário, gravadas no banco (valem para todas as instâncias; a contagem é atômica) =====
+   Só para rotas que geram custo ou tráfego externo. O limite por minuto em memória continua como primeira barreira. */
+const COTA_DIA = { '/api/ia': 400, '/api/ia/teste': 60, '/api/ocr': 200, '/api/importar': 200, '/api/cnpj': 400 };
+const COTA_ROT = { '/api/ia': 'Pesquisa e análise com IA', '/api/ia/teste': 'Teste de provedor de IA', '/api/ocr': 'Leitura de imagem (OCR)', '/api/importar': 'Importação por link', '/api/cnpj': 'Consulta de CNPJ' };
+function cotaMax(env, rota) { let o = null; try { o = env.COTAS_DIA ? JSON.parse(env.COTAS_DIA) : null; } catch { o = null; } const v = o && Number.isInteger(o[rota]) && o[rota] > 0 ? o[rota] : COTA_DIA[rota]; return v || 0; }
+async function cotaDia(env, user, rota) {
+  const max = cotaMax(env, rota), db = admDb(env); if (!max || !user || !db) return null;
+  try { await admInit(env); const r = await db.prepare('INSERT INTO uso_dia(dia,usuario,rota,n) VALUES(?,?,?,1) ON CONFLICT(dia,usuario,rota) DO UPDATE SET n=n+1 RETURNING n').bind(new Date().toISOString().slice(0, 10), user, rota).first(); return r && r.n > max ? { n: r.n, max } : null; }
+  catch { return null; } /* falha do contador não bloqueia o uso legítimo */
+}
+async function usoProprio(env, au) {
+  const db = admDb(env), hoje = new Date().toISOString().slice(0, 10), m = {}; if (db && au.user) { try { await admInit(env); for (const r of ((await db.prepare('SELECT rota, n FROM uso_dia WHERE dia=? AND usuario=?').bind(hoje, au.user).all()).results || [])) m[r.rota] = r.n; } catch { /* sem banco */ } }
+  return J({ ok: true, dia: hoje, persistente: !!db, itens: Object.keys(COTA_DIA).map(r => ({ rota: r, rot: COTA_ROT[r], usado: m[r] || 0, limite: cotaMax(env, r) })) });
+}
+/* ===== Integrações e Inteligência (painel): estado real de cada serviço, pela última execução registrada. Nenhum segredo é devolvido. ===== */
+const INT_AUTH = ['chave_invalida', 'sem_permissao', 'autenticacao_necessaria', 'nao_autorizado', 'chave_ausente', 'sem_creditos'], INT_IND = ['indisponivel', 'tempo_esgotado', 'tempo_esgotado_pagina', 'limite_de_uso', 'limite_local'];
+function intEstado(configurado, ult) {
+  if (!configurado) return 'nao_configurado'; if (!ult) return 'nao_testado'; if (ult.resultado === 'ok' || ult.resultado === 'parcial') return 'conectado';
+  let cod = ''; try { cod = String(JSON.parse(ult.meta || '{}').codigo || ''); } catch { cod = ''; }
+  return INT_AUTH.includes(cod) ? 'falha_autenticacao' : INT_IND.includes(cod) || /^http_5/.test(cod) ? 'indisponivel' : 'intervencao';
+}
+async function admInteg(env) {
+  const db = admDb(env); await admInit(env); await catSeed(db);
+  const ult = async (func, cond = '') => db.prepare(`SELECT ts, resultado, meta FROM eventos WHERE func=? AND fase<>'iniciada' ${cond} ORDER BY ts DESC LIMIT 1`).bind(func).first();
+  const cod = u => { try { return String(JSON.parse(u?.meta || '{}').codigo || ''); } catch { return ''; } };
+  const it = (id, nome, configurado, u, obs) => ({ id, nome, estado: intEstado(configurado, u), ultima: u ? u.ts : null, codigo: u && u.resultado !== 'ok' ? cod(u) : '', obs });
+  const [uIa, uTeste, uOcr, uCnpj, uImp] = await Promise.all([ult('pesquisa_ic'), ult('integracao_teste', "AND meta LIKE '%\"tipo\":\"teste\"%'"), ult('ocr_leitura'), ult('cnpj_consulta'), ult('solucao_importar', "AND meta LIKE '%\"via\":\"link\"%'")]);
+  const srvIa = !!env.GEMINI_API_KEY, tdnCred = !!(env.TDN_AUTH_HEADER || env.TDN_COOKIE);
+  const itens = [
+    it('ia', 'IA — pesquisa e análise', true, uIa || uTeste, 'Cada executivo usa a própria chave, guardada no navegador dele.' + (srvIa ? ' Há também uma chave Gemini configurada no servidor.' : ' Nenhuma chave de IA no servidor.')),
+    it('ocr', 'OCR por IA (leitura de imagem)', true, uOcr, 'Opcional; usa a chave Gemini do executivo e só roda com autorização por documento.'),
+    it('cnpj', 'Consulta de CNPJ', true, uCnpj, 'Provedores públicos de terceiros; não é API oficial da Receita Federal.'),
+    it('importar', 'Importação por link (TDN e páginas TOTVS)', true, uImp, tdnCred ? 'Credencial do TDN configurada no servidor.' : 'Sem credencial do TDN: páginas que exigem login não são lidas.')
+  ];
+  const mapF = { ok: 'conectado', nao_testada: 'nao_testado', autenticacao_necessaria: 'falha_autenticacao', indisponivel: 'indisponivel', nao_encontrada: 'intervencao', bloqueada_robots: 'intervencao' };
+  for (const f of ((await db.prepare('SELECT id,nome,estado,erro,testada_em,ultima_sinc FROM cat_fontes ORDER BY id').all()).results || [])) itens.push({ id: 'fonte_' + f.id, nome: 'Catálogo — ' + f.nome, estado: mapF[f.estado] || 'intervencao', ultima: f.testada_em || null, codigo: f.estado === 'ok' ? '' : f.estado, obs: (f.erro ? f.erro + ' ' : '') + (f.ultima_sinc ? 'Última leitura: ' + f.ultima_sinc.slice(0, 10) + '.' : 'Nenhuma leitura ainda.') });
+  const auto = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='cat_auto'").first(), uAuto = await db.prepare("SELECT ts, erros FROM cat_exec WHERE op='auto' ORDER BY id DESC LIMIT 1").first();
+  itens.push({ id: 'agendada', nome: 'Leitura agendada das fontes', estado: !(auto && auto.valor === '1') ? 'nao_configurado' : !uAuto ? 'nao_testado' : 'conectado', ultima: uAuto ? uAuto.ts : null, codigo: '', obs: auto && auto.valor === '1' ? '1 lote por horário agendado, em dias úteis.' : 'Desligada. Ligue no bloco do Catálogo de soluções.' });
+  let push = { conf: false, subs: 0, ult: null }; try { push.conf = pushOk(env); const r = await db.prepare('SELECT COUNT(*) n, MAX(ultimo_ok) u FROM push_subs').first(); push.subs = r?.n || 0; push.ult = r?.u || null; } catch { /* tabela ainda não criada */ }
+  itens.push({ id: 'push', nome: 'Lembrete diário (notificações)', estado: !push.conf ? 'nao_configurado' : !push.ult ? 'nao_testado' : 'conectado', ultima: push.ult, codigo: '', obs: `${push.subs} aparelho(s) inscrito(s).` });
+  itens.push({ id: 'crm', nome: 'CRM / ERP corporativo', estado: 'nao_configurado', ultima: null, codigo: '', obs: 'Planejado. Nenhum conector ativo e nenhuma escrita em sistema corporativo.' });
+  const hoje = new Date().toISOString().slice(0, 10), d7 = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+  const con = (await db.prepare('SELECT rota, SUM(CASE WHEN dia=? THEN n ELSE 0 END) hoje, SUM(n) sete, COUNT(DISTINCT usuario) usuarios, MAX(CASE WHEN dia=? THEN n ELSE 0 END) pico FROM uso_dia WHERE dia>=? GROUP BY rota').bind(hoje, hoje, d7).all()).results || [];
+  return { itens, consumo: Object.keys(COTA_DIA).map(r => { const x = con.find(y => y.rota === r) || {}; return { rota: r, rot: COTA_ROT[r], hoje: x.hoje || 0, sete: x.sete || 0, usuarios: x.usuarios || 0, pico_usuario_hoje: x.pico || 0, limite: cotaMax(env, r) }; }), em: new Date().toISOString() };
+}
 /* Trilha de auditoria das ações administrativas que alteram algo (quem, quando, o quê, resultado). Sem conteúdo de carteira nem segredos. */
 const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'] };
 function admAudDescrever(rota, q) {
@@ -472,6 +519,7 @@ export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse
 
 async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg;
+  if (url.pathname === '/api/adm/integracoes' && req.method === 'GET') { if (!admDb(env)) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503); try { return J({ ok: true, ...(await admInteg(env)) }); } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar as integrações.' } }, 500); } }
   if (url.pathname === '/api/adm/auditoria' && req.method === 'GET') { const db = admDb(env); if (!db) return J({ ok: false, erro: { codigo: 'sem_banco', mensagem: 'D1 não configurado.' } }, 503); await admInit(env); return J({ ok: true, itens: (await db.prepare('SELECT ts,usuario,acao,detalhe,resultado FROM adm_audit ORDER BY id DESC LIMIT 60').all()).results || [] }); }
   if (req.method !== 'POST') return admRotaInterna(req, env, au, url);
   const corpo = await req.text(); if (corpo.length > 200000) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Corpo acima do limite.' } }, 413);
