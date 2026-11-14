@@ -28,11 +28,14 @@ function iaStatusOf(p) {
   const t = iaInit().testes[p]; if (!t) return { k: 'nao_verificado', l: 'Não verificado' };
   return t.ok ? { k: 'verificado', l: 'Conectado e testado', t } : { k: 'falha', l: 'Com erro', t };
 }
+const IA_PAUSA = {}; /* após "limite de uso", novos testes só gastam cota: pausa de 60 s por provedor */
+const iaPausa = p => Math.max(0, Math.ceil(((IA_PAUSA[p] || 0) - Date.now()) / 1000));
 async function iaTestar(p) {
+  if (iaPausa(p)) return toast(`Aguarde ${iaPausa(p)} s para testar ${AI_PROV[p].nome} de novo: o provedor acabou de recusar por limite de uso.`);
   const c = iaInit(), pedido = { versao: 1, pedidoId: 't_' + uid(), tipo: 'ia_teste', provedor: p, modelo: c.modelos[p], buscaWeb: c.buscaWeb !== false };
   try {
     const r = await bkChamar('ia_teste', pedido, `pedido-teste-${p}.json`);
-    if (r.via === 'direto') { await iaTesteResposta(r.resp); return; }
+    if (r.via === 'direto') { if (r.resp?.erro?.codigo === 'limite_de_uso') { IA_PAUSA[p] = Date.now() + 60000; setTimeout(() => { if (UI.view === 'ia') render(); }, 60500); } await iaTesteResposta(r.resp); return; }
     toast(`Pedido de teste de ${AI_PROV[p].nome} gerado. ${r.motivo ? r.motivo + ' ' : ''}Envie-o na página do backend e importe a resposta.`);
   } catch (e) { toast(e.message); }
   render();
@@ -57,7 +60,7 @@ function iaProvCards() {
     <td class="sm">${usos.length ? esc(usos.join('; ')) : '<span class="muted">nenhuma tarefa</span>'}</td>
     <td class="sm">${Object.keys(AI_CAP).map(k => `<span class="pill ${P.caps[k] ? 'p-ok' : 'p-off'}" title="${P.caps[k] ? 'implementado no backend' : 'não implementado no backend'}">${AI_CAP[k].split(' (')[0]}${P.caps[k] ? '' : ' —'}</span>`).join(' ')}<br><span class="muted">Busca: ${esc(P.busca)}</span></td>
     <td class="sm">${esc(P.lim)}<br><span class="muted">Backend: 3 tentativas, pedido ≤ 12 mil caracteres</span></td>
-    <td><span class="pill p-${{ nao_verificado: 'off', verificado: 'ok', falha: 'bad' }[s.k]}">${s.l}</span><div class="sm muted">${s.t ? `${dtBR(s.t.at)} • ${esc(s.t.modelo || '')}${s.t.ok ? (s.t.buscaSolicitada ? (s.t.usouBusca ? ' • busca confirmada' : ' • busca NÃO confirmada') : '') : ' • ' + esc(s.t.erro?.codigo || '') + (s.t.erro?.mensagem ? ': ' + esc(s.t.erro.mensagem) : '')}` : ''}</div><button class="btn ghost sm" data-a="iaTestar" data-p="${p}">Testar</button></td></tr>`;
+    <td><span class="pill p-${{ nao_verificado: 'off', verificado: 'ok', falha: 'bad' }[s.k]}">${s.l}</span><div class="sm muted">${s.t ? `${dtBR(s.t.at)} • ${esc(s.t.modelo || '')}${s.t.ok ? (s.t.buscaSolicitada ? (s.t.usouBusca ? ' • busca confirmada' : ' • busca NÃO confirmada') : '') : ' • ' + esc(s.t.erro?.codigo || '') + (s.t.erro?.mensagem ? ': ' + esc(s.t.erro.mensagem) : '')}` : ''}</div>${s.k === 'falha' && AI_ERR[s.t.erro?.codigo] ? `<div class="sm"><b>O que fazer:</b> ${esc(AI_ERR[s.t.erro.codigo])}</div>` : ''}<button class="btn ghost sm" data-a="iaTestar" data-p="${p}" ${iaPausa(p) ? 'disabled' : ''}>${iaPausa(p) ? 'Aguarde 1 min' : 'Testar'}</button></td></tr>`;
   }).join('');
   const tarefas = Object.entries(AI_TAREFAS).map(([t, l]) => { const x = c.tarefas[t], ef = aiTarefa(t); return `<tr><td>${esc(l)}</td><td><select data-c="iatar" data-t="${t}" data-f="prov"><option value="">Padrão (${AI_PROV[c.provedor].nome})</option>${AI_PROV_IDS.map(p => optS(p, AI_PROV[p].nome, x.prov)).join('')}</select></td><td><select data-c="iatar" data-t="${t}" data-f="modelo" ${x.prov ? '' : 'disabled'}>${(x.prov ? AI_PROV[x.prov].modelos : AI_PROV[c.provedor].modelos).map(m => optS(m.id, m.l, x.prov ? ef.modelo : c.modelos[c.provedor])).join('')}</select></td><td><label class="sm"><input type="checkbox" data-c="iatar" data-t="${t}" data-f="busca" ${x.busca !== false ? 'checked' : ''}> pesquisa web</label></td><td class="sm muted">${AI_PROV[ef.prov].nome} • ${esc(ef.modelo)}${ef.busca && AI_PROV[ef.prov].buscaModelos && !AI_PROV[ef.prov].buscaModelos.includes(ef.modelo) ? `<div>${pill('este modelo não tem busca web na Groq', 'warn')}</div>` : ''}</td></tr>`; }).join('');
   const modo = bkModo();

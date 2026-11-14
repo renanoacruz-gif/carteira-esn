@@ -693,7 +693,7 @@ async function handleInner(req, env0, ctx) {
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
-  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: 'fc06dc89e737' });
+  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: 'c56a39545931' });
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
   if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
@@ -918,7 +918,7 @@ async function admMedir(env, ctx, au, path, req, t0, resp) {
     if (path === '/api/ia') { try { const q = await req.clone().json(); const tp = String(q?.tipo || ''); if (tp === 'regulatorio' || tp === 'marcos') func = 'radar_regulatorio'; if (ADM_ENUM.tipo.includes(tp)) meta.tipo = tp; if (/^[a-z0-9_]{1,20}$/.test(String(q?.provedor || ''))) meta.prov = q.provedor; } catch { /* sem metadados */ } }
     if (path === '/api/importar') meta.via = 'link'; if (path === '/api/ia/teste') meta.tipo = 'teste'; if (path === '/api/status') meta.tipo = 'status';
     let j = null; try { j = await resp.clone().json(); } catch { /* corpo não JSON */ }
-    if (resp.status >= 500 && !j) { res = 'erro'; cod = 'http_' + resp.status; } else if (j && j.ok === false) { res = 'erro'; cod = String(j.erro?.codigo || 'erro').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40); } else if (!j) { res = 'erro'; cod = 'resposta_invalida'; } else if (j.daCache) meta.cache = 1;
+    if (resp.status >= 500 && !j) { res = 'erro'; cod = 'http_' + resp.status; } else if (j && j.ok === false) { res = 'erro'; cod = String(j.erro?.codigo || (Array.isArray(j.resultados) ? j.resultados.find(r => r && r.erro)?.erro?.codigo : '') || 'erro').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40); } else if (!j) { res = 'erro'; cod = 'resposta_invalida'; } else if (j.daCache) meta.cache = 1;
     if (cod) meta.codigo = cod;
     const l = admEvento({ id: 'sv_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24), func, fase: res === 'ok' ? 'concluida' : 'erro', resultado: res, dur: Date.now() - t0, meta }, au.user, 's', new Date().toISOString());
     if (l) { const p = admGravar(env, [l]).catch(() => admFalha(env)); if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p; }
@@ -942,7 +942,7 @@ function admCalc({ users = [], roster = [], events = [], cfg = ADM_CFG0, agora, 
     const recursosTotal = [...new Set(ut.filter(e => principais.has(e.func)).map(e => e.func))].sort(), recursos = [...new Set(utP.map(e => e.func))].sort();
     let sit; if (!u) sit = 'nunca_acessou'; else if (!ut.some(e => principais.has(e.func))) sit = 'sem_recursos_principais'; else sit = recJan.length ? 'ativo' : 'sem_atividade_recente';
     const ant = anteriores[email] || null;
-    return { email, nome: (u && u.nome) || (r && r.nome) || nomeDeEmail(email), previsto: !!r, identificado: !!u, primeiro_acesso: u ? u.primeiro_acesso : null, ultimo_acesso: u ? u.ultimo_acesso : null, ultima_atividade_util: ultUtil, situacao: sit, recursos_utilizados: recursos, recursos_principais_cobertura: recursosTotal, acessos_periodo: acP.length, atividades_periodo: utP.length, evidencia_anterior: ant && cobertura && ant.primeira < cobertura ? { gravacoes: ant.n, primeira: ant.primeira, ultima: ant.ultima } : null };
+    return { email, nome: (u && u.nome) || (r && r.nome) || nomeDeEmail(email), previsto: !!r, identificado: !!u, importou_carteira: ut.some(e => e.func === 'import_carteira'), primeiro_acesso: u ? u.primeiro_acesso : null, ultimo_acesso: u ? u.ultimo_acesso : null, ultima_atividade_util: ultUtil, situacao: sit, recursos_utilizados: recursos, recursos_principais_cobertura: recursosTotal, acessos_periodo: acP.length, atividades_periodo: utP.length, evidencia_anterior: ant && cobertura && ant.primeira < cobertura ? { gravacoes: ant.n, primeira: ant.primeira, ultima: ant.ultima } : null };
   });
   const cnt = s => linhas.filter(l => l.situacao === s).length, prevL = linhas.filter(l => l.previsto);
   const kpis = { previstos: prevL.length, identificados: linhas.filter(l => l.identificado).length, primeiro_acesso_previstos: prevL.filter(l => l.identificado).length, fora_da_lista: linhas.filter(l => l.identificado && !l.previsto).length, ativos_periodo: linhas.filter(l => l.atividades_periodo > 0).length, com_acesso_periodo: linhas.filter(l => l.acessos_periodo > 0 || l.atividades_periodo > 0).length, sem_atividade_recente: cnt('sem_atividade_recente'), nunca_acessaram: cnt('nunca_acessou'), acessaram_sem_recursos_principais: cnt('sem_recursos_principais') };
