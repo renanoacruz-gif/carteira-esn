@@ -78,9 +78,9 @@ ck('IA sem chave do próprio usuário não consome nada do servidor (chave ausen
 ck('corpo acima do limite é recusado', http('POST','/api/importar',{'versao':1,'tipo':'importar_link','urls':['https://tdn.totvs.com/x'],'lixo':'x'*30000},ha)[0]==413)
 # 8) cabeçalhos e segredos no pacote publicado
 s,t,h=http('GET','/'); hl={k.lower():v for k,v in h.items()}; csp=hl.get('content-security-policy','')
-ck('CSP aplicada (não só relatório): conexões e imagens só da própria origem, sem enquadramento', all(k in csp for k in ["default-src 'self'","connect-src 'self'","img-src 'self' data: blob:","frame-ancestors 'none'","object-src 'none'","base-uri 'self'","form-action 'self'","report-uri /api/csp"]) and 'unsafe-eval' not in csp, csp[:200])
+ck('CSP aplicada (não só relatório): conexões e imagens só da própria origem, sem enquadramento', all(k in csp for k in ["default-src 'self'","connect-src 'self'","img-src 'self' data: blob:","frame-ancestors 'none'","object-src 'none'","base-uri 'self'","form-action 'self'","report-uri /api/csp"]) and "'unsafe-eval'" not in csp, csp[:200])  # 'wasm-unsafe-eval' (OCR local) libera só compilação de WebAssembly; eval de JavaScript continua proibido
 ro=hl.get('content-security-policy-report-only','')
-ck('política estrita em observação: scripts só por hash, sem unsafe-inline', "script-src 'self' 'sha256-" in ro and "'unsafe-inline'" not in ro.split('style-src')[0] and ro.count("'sha256-")==4, ro[:160])
+ck('política estrita em observação: scripts só por hash, sem unsafe-inline', "script-src 'self' 'wasm-unsafe-eval' 'sha256-" in ro and "'unsafe-eval'" not in ro and "'unsafe-inline'" not in ro.split('style-src')[0] and ro.count("'sha256-")==4, ro[:160])
 ck('demais cabeçalhos de segurança presentes', hl.get('x-content-type-options')=='nosniff' and 'max-age=' in hl.get('strict-transport-security','') and hl.get('referrer-policy') and 'camera=()' in hl.get('permissions-policy',''))
 ck('respostas da API não são guardadas em cache', 'no-store' in {k.lower():v for k,v in http('GET','/api/me',headers=ha)[2].items()}.get('cache-control',''))
 PAT=[r'AIza[0-9A-Za-z_-]{35}',r'sk-[A-Za-z0-9_-]{20,}',r'gsk_[A-Za-z0-9]{20,}',r'-----BEGIN [A-Z ]*PRIVATE KEY',r'xox[baprs]-[A-Za-z0-9-]{10,}',r'service_role',r'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}']

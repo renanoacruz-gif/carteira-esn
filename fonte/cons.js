@@ -158,6 +158,23 @@ function applic(r, c) {
 function regForClient(c) { return regsOk().map(r => ({ r, ap: applic(r, c), t: regTiming(r) })); }
 const regNear = x => x.t.some(t => (t.k === 'prazo' && t.d <= alertDays()[0]) || (t.k === 'futuro' && t.d <= alertDays()[0]) || (t.k === 'vigor' && t.d >= -180) || (t.k === 'vencido' && t.d >= -180) || t.k === 'teste');
 
+/* Radar regulatório (versão hospedada): fontes oficiais que o servidor relê 1x por dia útil. O aviso diz apenas que a página mudou;
+   o evento só existe depois que o executivo abre a fonte e o registra. "Já conferi" fica em S.meta.regVisto (por usuário). */
+const RGF = { d: null, t: 0, busy: false };
+async function rgfCarregar() { if (!window.__HOSTED__ || RGF.busy || Date.now() - RGF.t < 300000) return; RGF.busy = true; try { const r = await fetch('/api/regfontes', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); if (r.ok) { const j = await r.json(); RGF.d = Array.isArray(j.fontes) ? j.fontes : []; RGF.t = Date.now(); if (UI.view === 'refs') render(); } } catch { /* offline: o registro manual continua */ } finally { RGF.busy = false; } }
+const rgfPend = () => (RGF.d || []).filter(f => f.mudou_em && (S.meta.regVisto || {})[f.id] !== f.mudou_em);
+function rgfCard() {
+  if (!window.__HOSTED__) return ''; rgfCarregar(); const F = RGF.d; if (!F) return '';
+  if (!F.length) return '<div class="card" id="rgf"><h3>Radar regulatório</h3><p class="sm muted">Nenhuma fonte oficial está sendo monitorada. O administrador cadastra as fontes no Painel Administrador; até lá, registre os eventos manualmente abaixo, com a fonte oficial.</p></div>';
+  const P = rgfPend(), ids = new Set(P.map(f => f.id));
+  return `<div class="card" id="rgf"><h3>Radar regulatório <span class="pill ${P.length ? 'p-warn' : 'p-ok'}">${P.length ? P.length + ' fonte(s) com mudança a conferir' : 'sem mudança a conferir'}</span></h3>
+  <p class="sm muted">${F.length} fonte(s) oficial(is) relida(s) 1 vez por dia útil. O radar <b>só aponta que a página mudou</b>: não diz o que mudou e não cria evento. Abra a fonte; se houver norma nova, registre o evento com publicação, vigência e prazo comprovados.</p>
+  ${[...P, ...F.filter(f => !ids.has(f.id))].map(f => `<div class="row sm" style="gap:8px;padding:6px 0;border-top:1px solid var(--bd2)"><span style="flex:1"><b>${esc(f.nome)}</b>${f.orgao ? ` <span class="muted">— ${esc(f.orgao)}</span>` : ''}<div class="muted">${ids.has(f.id) ? `<b>Página alterada em ${esc(dtBR(f.mudou_em))}</b> — a conferir` : f.estado !== 'ok' ? 'Não foi possível ler na última tentativa' : f.vista_em ? 'Sem mudança a conferir • lida em ' + esc(dtBR(f.vista_em)) : 'Ainda não lida'}</div></span><a class="btn ghost sm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">Abrir fonte</a>${ids.has(f.id) ? `<button class="btn sm" data-a="rgfUsar" data-id="${esc(f.id)}">Registrar evento desta fonte</button><button class="btn ghost sm" data-a="rgfVisto" data-id="${esc(f.id)}">Já conferi</button>` : ''}</div>`).join('')}</div>`;
+}
+const RGF_ACT = {
+  rgfVisto: t => { const f = (RGF.d || []).find(x => x.id === t.dataset.id); if (!f) return; S.meta.regVisto = { ...(S.meta.regVisto || {}), [f.id]: f.mudou_em }; touchMeta(); render(); },
+  rgfUsar: t => { const f = (RGF.d || []).find(x => x.id === t.dataset.id), dt = $('#rg-novo'); if (!f || !dt) return; dt.open = true; $('#rg_ft').value = f.nome; $('#rg_fu').value = f.url; if (f.orgao) $('#rg_o').value = f.orgao; $('#rg_n').focus(); dt.scrollIntoView({ block: 'center' }); toast('Fonte preenchida. Informe a obrigação e as datas que a fonte comprova.'); }
+};
 /* ---------- Oportunidades adicionais (release e regulatório) ---------- */
 function mkOpp(c, base, crit) { const o = { id: `${c.key}::${base.ruleId}`, key: c.key, cliente: c.name, setorial: [], sols: [], contratacao: (c.productsIdent || []).map(p => p.nome), validar: null, baseOK: true, extraBase: [], jaIdent: [], ...base, crit }; o.score = scoreOpp(o, S.meta.weights); o.conf = confLevel(o); o.prio = prioLabel(o.score); return o; }
 function consOpps(c) {

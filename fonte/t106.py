@@ -11,7 +11,7 @@ J=lambda t: json.loads(t) if t and t[0] in '{[' else {}
 run=uuid.uuid4().hex[:6]; U='ra%s@totvs.com.br'%run; hu={'x-test-user':U,'x-test-sub':'ra'+run}; hadm={'x-test-user':'renan.oscar@totvs.com.br','x-test-sub':'sub-renan-001'}
 # 1) cotas persistentes
 u0=J(http('GET','/api/uso',headers=hu)[1])
-ck('consumo próprio: começa zerado, com limites por operação e contagem no banco', u0.get('ok') and u0.get('persistente')==True and all(x['usado']==0 and x['limite']>0 for x in u0['itens']) and len(u0['itens'])==5, u0)
+ck('consumo próprio: começa zerado, com limites por operação e contagem no banco', u0.get('ok') and u0.get('persistente')==True and all(x['usado']==0 and x['limite']>0 for x in u0['itens']) and len(u0['itens'])==6, u0)
 ped={'versao':1,'pedidoId':'t','tipo':'ia_teste','provedor':'gemini','modelo':'x','buscaWeb':False}
 cods=[http('POST','/api/ia/teste',ped,hu)[0] for _ in range(63)]
 ck('cota diária: 60 testes de provedor passam, do 61º em diante 429', all(c!=429 for c in cods[:60]) and cods[60:]==[429,429,429], cods[57:])

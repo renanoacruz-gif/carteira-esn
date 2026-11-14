@@ -26,5 +26,6 @@ crons = ["0 12 * * MON-FRI", "0 17 * * MON-FRI", "10,20 12,17 * * MON-FRI", "40 
 # Segredos (NÃO coloque valores aqui). Chaves de IA ficam com cada executivo, no navegador dele.
 #   wrangler secret put VAPID_PUBLIC     # lembrete diário: gerar o par com `node fonte/gerar_vapid.mjs`
 #   wrangler secret put VAPID_PRIVATE
+#   wrangler secret put BRAVE_API_KEY    # opcional: busca dedicada (Brave Search). Alternativa: TAVILY_API_KEY. Com as duas, defina a variável BUSCA_PROVEDOR (brave|tavily)
 #   wrangler secret put APP_TOKEN        # opcional: só para a página manual /backend
 # NUNCA defina ALLOW_TEST_USER em produção (existe só para testes locais).

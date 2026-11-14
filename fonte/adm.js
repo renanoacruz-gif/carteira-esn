@@ -118,7 +118,7 @@ const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e 
 function telAvisoUmaVez() { if (!TEL.on) return; try { if (lsGet('adm.aviso') === '1') return; lsSet('adm.aviso', '1'); setTimeout(() => toast('Registramos eventos de uso (recurso, data, resultado), sem conteúdo de carteira. Detalhes em Configurações → Conta.'), 1500); } catch { /* ok */ } }
 
 /* ---------------- Painel Administrador ---------------- */
-const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null };
+const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null, reg: null, regBusy: '' };
 window.__PAINEL = false;
 function admPainelOn(v) {
   window.__PAINEL = v === true;
@@ -146,6 +146,7 @@ async function admLoad() {
     await admCatLoad(true);
     try { ADMV.aud = (await admApi('/api/adm/auditoria')).itens; } catch { ADMV.aud = null; }
     try { ADMV.integ = await admApi('/api/adm/integracoes'); } catch { ADMV.integ = null; }
+    try { ADMV.reg = await admApi('/api/adm/regfontes', { op: 'estado' }); } catch { ADMV.reg = null; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -212,7 +213,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admIntegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admIntegCard() + admRegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += admAudCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
@@ -328,6 +329,23 @@ function admCatCard() {
   ${c.exec.length ? `<details style="margin-top:10px"><summary class="sm">Últimas execuções</summary><ul class="sm">${c.exec.map(x => `<li>${esc(fmtDate(x.ts))} — ${esc(x.fonte)} · ${esc(x.op)}: ${x.lidas} lida(s), ${x.novas} nova(s), ${x.erros} erro(s)${x.detalhe ? ' — ' + esc(x.detalhe) : ''}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
 const admCatSelecionadas = () => Object.keys(ADMV.catSel).filter(k => ADMV.catSel[k] && (ADMV.cat?.paginas || []).some(p => p.chave === k));
+/* Radar regulatório: fontes oficiais que o servidor verifica 1x por dia útil. Só aponta que a página mudou. */
+const ADM_REG_EST = { ok: ['Lida', 'p-ok'], nao_testada: ['Não verificada', 'p-info'], indisponivel: ['Indisponível', 'p-warn'], bloqueada_robots: ['Leitura não permitida pelo site', 'p-warn'], autenticacao_necessaria: ['Exige login', 'p-bad'], nao_encontrada: ['Não encontrada', 'p-bad'], formato: ['Não é página HTML', 'p-warn'], invalida: ['Endereço inválido', 'p-bad'] };
+function admRegCard() {
+  const g = ADMV.reg; if (!g) return ''; const F = g.fontes || [];
+  return `<div class="card" id="adm-reg"><h3>Radar regulatório — fontes oficiais monitoradas <span class="pill p-info">${F.length}/${g.max}</span></h3>
+  <p class="sm muted">Cadastre a página oficial que lista publicações (Receita Federal, eSocial, SPED, SEFAZ, documentação TOTVS). O servidor a relê 1 vez por dia útil, respeitando o robots.txt, e <b>só registra que o texto mudou</b> — não interpreta norma nem cria evento. Cada executivo vê o aviso em “Releases e regulatório”, abre a fonte e registra o evento com vigência e prazo comprovados. Páginas com conteúdo rotativo podem acusar mudança sem novidade.</p>
+  ${F.length ? `<div class="tw"><table><thead><tr><th>Fonte</th><th>Órgão</th><th>Estado</th><th>Última leitura</th><th>Mudança detectada</th><th></th></tr></thead><tbody>${F.map(f => { const e = ADM_REG_EST[f.estado] || [f.estado, 'p-info']; return `<tr class="${f.ativo ? '' : 'arq'}"><td><b>${esc(f.nome)}</b><div class="sm"><a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">${esc(f.url.slice(0, 90))}</a></div></td><td class="sm">${esc(f.orgao || '—')}</td><td><span class="pill ${e[1]}">${esc(e[0])}</span>${f.ativo ? '' : ' <span class="pill p-off">pausada</span>'}${f.erro ? `<div class="sm muted">${esc(f.erro)}</div>` : ''}</td><td class="sm">${f.vista_em ? esc(dtBR(f.vista_em)) : '—'}</td><td class="sm">${f.mudou_em ? esc(dtBR(f.mudou_em)) : 'nenhuma desde o cadastro'}</td><td class="nw"><button class="btn ghost sm" data-a="admRegVer" data-id="${esc(f.id)}"${ADMV.regBusy ? ' disabled' : ''}>Verificar agora</button><button class="btn ghost sm" data-a="admRegAtivo" data-id="${esc(f.id)}" data-on="${f.ativo ? '0' : '1'}">${f.ativo ? 'Pausar' : 'Retomar'}</button><button class="btn ghost sm" data-a="admRegDel" data-id="${esc(f.id)}">Remover</button></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="sm">Nenhuma fonte cadastrada. Sem fontes, o radar não faz nenhuma leitura e o registro de eventos continua manual.</p>'}
+  <div class="row addr"><input id="rf_n" placeholder="Nome (ex.: Portal SPED — notícias)" style="min-width:230px"><input id="rf_o" placeholder="Órgão" style="width:150px"><input id="rf_u" placeholder="https://… (gov.br, jus.br, leg.br ou totvs.com)" style="min-width:320px"><button class="btn pri sm" data-a="admRegAdd"${ADMV.regBusy ? ' disabled' : ''}>${ADMV.regBusy ? esc(ADMV.regBusy) : 'Cadastrar e verificar'}</button></div></div>`;
+}
+async function admRegOp(corpo, msg) { if (ADMV.regBusy) return null; ADMV.regBusy = msg; render(); try { const j = await admApi('/api/adm/regfontes', corpo); ADMV.reg = { ...ADMV.reg, fontes: j.fontes }; return j; } catch (e) { toast(e.message); return null; } finally { ADMV.regBusy = ''; render(); } }
+const admRegMsg = v => v.estado !== 'ok' ? `Não foi possível ler: ${v.erro || v.estado}` : v.primeira ? 'Fonte lida. Linha de base registrada.' : v.alterou ? 'A página mudou desde a última leitura.' : 'Sem mudança desde a última leitura.';
+const ADM_REG_ACT = {
+  admRegAdd: async () => { const j = await admRegOp({ op: 'adicionar', nome: $('#rf_n').value, orgao: $('#rf_o').value, url: $('#rf_u').value }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },
+  admRegVer: async t => { const j = await admRegOp({ op: 'verificar', id: t.dataset.id }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },
+  admRegAtivo: t => admRegOp({ op: 'ativar', id: t.dataset.id, ativo: t.dataset.on === '1' }, 'Salvando…'),
+  admRegDel: t => { if (confirm('Remover esta fonte do radar regulatório? Os eventos já registrados pelos executivos não são afetados.')) admRegOp({ op: 'remover', id: t.dataset.id, confirmar: t.dataset.id }, 'Removendo…'); }
+};
 const ADM_CAT_ACT = {
   admCatTestar: async t => { const j = await admCatOp({ op: 'testar', fonte: t.dataset.f }, 'Testando a conexão com a fonte…'); if (j) toast(j.teste.estado === 'ok' ? `Fonte acessível: ${j.teste.links} link(s) internos encontrados.` : `Fonte não acessível: ${j.teste.erro || j.teste.estado}`); },
   admCatDesc: async t => { const j = await admCatOp({ op: 'descobrir', fonte: t.dataset.f }, 'Lendo o próximo lote de páginas…'); if (j) toast(`${j.lote.lidas} lida(s), ${j.lote.novas} nova(s), ${j.lote.erros} erro(s).${j.lote.parou ? ' ' + j.lote.parou : ''}`); },

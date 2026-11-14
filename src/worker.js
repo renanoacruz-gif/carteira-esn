@@ -224,13 +224,13 @@ async function lkReadBody(r, max) { // lê até "max" bytes; se passar, devolve 
   const out = new Uint8Array(Math.min(n, max)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return { bytes: out, truncado };
 }
 /* GET seguro: https + domínio TOTVS em todo salto, credencial só para hosts do TDN, limite de tamanho e de tempo. */
-async function lkFetch(url, env, ctx, max) {
+async function lkFetch(url, env, ctx, max, allow) { /* allow: lista de domínios própria de quem chama (radar regulatório); sem ela, vale a lista TOTVS */
   let cur = url, autenticado = false;
   for (let salto = 0; salto <= LKCFG.maxSaltos; salto++) {
     let u; try { u = new URL(cur); } catch { return { erro: lkErr('requisicao_invalida', 'URL inválida.') }; }
     if (u.username || u.password) return { erro: lkErr('requisicao_invalida', 'URL com usuário/senha embutidos não é aceita. Use o link simples ou anexe o arquivo manualmente.') };
     if (u.port && u.port !== '443') return { erro: lkErr('dominio_nao_permitido', 'Porta não padrão não é aceita (somente HTTPS 443). Alternativa: baixe e anexe o arquivo manualmente.') };
-    if (u.protocol !== 'https:' || !LK_ALLOW.test(u.hostname)) return { erro: lkErr('dominio_nao_permitido', 'Domínio fora da lista permitida (totvs.com, totvs.com.br e subdomínios): ' + u.hostname) };
+    if (u.protocol !== 'https:' || !(allow || LK_ALLOW).test(u.hostname)) return { erro: lkErr('dominio_nao_permitido', (allow ? 'Domínio fora da lista de fontes oficiais permitidas: ' : 'Domínio fora da lista permitida (totvs.com, totvs.com.br e subdomínios): ') + u.hostname) };
     if (ctx.sub >= LKCFG.maxSub) return { erro: lkErr('muito_grande', 'Limite de acessos por pedido atingido.') };
     ctx.sub++; const ac = new AbortController(), tm = setTimeout(() => ac.abort(), LKCFG.timeoutMs); let r;
     try { r = await fetch(u.href, { method: 'GET', redirect: 'manual', signal: ac.signal, headers: { 'user-agent': 'AnalisadorCarteira-Importador/1.0', accept: 'text/html,application/pdf,application/vnd.openxmlformats-officedocument.*;q=0.9,*/*;q=0.5', ...lkAuthHeaders(u.hostname, env) } }); }
@@ -698,13 +698,14 @@ async function handleInner(req, env0, ctx) {
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
-  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: 'cbd1a6d1e263' });
+  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: '5207e25dac0f' });
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
   if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
   if (url.pathname.startsWith('/api/push/')) return pushRota(req, env0, au, url);
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
   if (url.pathname === '/api/uso' && req.method === 'GET') return usoProprio(env0, au);
+  if (url.pathname === '/api/regfontes' && req.method === 'GET') return regPublico(env0);
   if (au.user && COTA_DIA[url.pathname] && req.method === 'POST') { const ct = await cotaDia(env0, au.user, url.pathname); if (ct) return J({ ok: false, erro: { codigo: 'cota_diaria', mensagem: `Limite diário desta operação atingido (${ct.max} por dia por usuário). Volta ao normal amanhã.`, repetir: false } }, 429); }
   if (ADM_ROTAS[url.pathname] && au.user) { const t0 = Date.now(), rc = url.pathname === '/api/ia' ? req.clone() : req, resp = await rotasApi(req, env, au, url); await admMedir(env0, ctx, au, url.pathname, rc, t0, resp); return resp; }
   return rotasApi(req, env, au, url);
@@ -716,6 +717,7 @@ async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/status') return handleStatus(env);
   if (url.pathname === '/api/planilha' && req.method === 'POST') { const w = usoLimite('pl:' + (au.user || 'token'), 30); if (w) return usoErro(w); return handlePlanilha(req); }
   if (url.pathname === '/api/cnpj' && req.method === 'POST') return handleCnpj(req, env);
+  if (url.pathname === '/api/busca' && req.method === 'POST') return handleBusca(req, env);
   if (url.pathname === '/api/ia' && req.method === 'POST') return handleIa(req, env, false);
   if (url.pathname === '/api/ia/teste' && req.method === 'POST') return handleIa(req, env, true);
   if (url.pathname === '/api/ocr') { if (!env.GEMINI_API_KEY) return J({ ok: false, erro: { codigo: 'chave_ausente', mensagem: 'Segredo GEMINI_API_KEY não configurado neste backend (OCR usa Gemini).' } }, 503); return handleOcr(req, env); }
@@ -770,6 +772,7 @@ const ADM_FUNCS = {
   pesquisa_ic: { rot: 'Pesquisa na Inteligência Comercial', util: 1, org: 's' },
   radar_regulatorio: { rot: 'Radar regulatório / marcos', util: 1, org: 's' },
   cnpj_consulta: { rot: 'Consulta de CNPJ', util: 1, org: 's' },
+  busca_dedicada: { rot: 'Busca dedicada (provedor de pesquisa)', util: 1, org: 's' },
   solucao_importar: { rot: 'Importação de soluções (texto, arquivo, link)', util: 1, org: 'sc' },
   recomendacao_leitura: { rot: 'Validação/descarte de recomendação', util: 1, org: 'c' },
   relatorio_exportar: { rot: 'Exportação de relatório', util: 1, org: 'c' },
@@ -800,6 +803,7 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS cat_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, url TEXT NOT NULL, estado TEXT NOT NULL, erro TEXT, autenticado INTEGER NOT NULL DEFAULT 0, testada_em TEXT, ultima_sinc TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_paginas (chave TEXT PRIMARY KEY, url TEXT NOT NULL, fonte TEXT NOT NULL, pai TEXT, titulo TEXT, prof INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL, erro TEXT, hash TEXT, filhos INTEGER, vista_em TEXT, alterada_em TEXT, revisada_em TEXT)',
   'CREATE INDEX IF NOT EXISTS cat_pag_fe ON cat_paginas(fonte, estado, prof)',
+  'CREATE TABLE IF NOT EXISTS reg_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, orgao TEXT, url TEXT NOT NULL, ativo INTEGER NOT NULL DEFAULT 1, estado TEXT NOT NULL, erro TEXT, hash TEXT, titulo TEXT, criada_em TEXT, vista_em TEXT, mudou_em TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_exec (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, fonte TEXT NOT NULL, op TEXT NOT NULL, lidas INTEGER NOT NULL DEFAULT 0, novas INTEGER NOT NULL DEFAULT 0, erros INTEGER NOT NULL DEFAULT 0, detalhe TEXT)'
 ];
 const admDb = env => env && env.DB && typeof env.DB.prepare === 'function' ? env.DB : null;
@@ -921,7 +925,7 @@ async function admAcesso(env, au) {
   } catch { await admFalha(env); }
 }
 /* eventos medidos no servidor (não dependem do navegador) */
-const ADM_ROTAS = { '/api/ia': 'pesquisa_ic', '/api/ia/teste': 'integracao_teste', '/api/status': 'integracao_teste', '/api/cnpj': 'cnpj_consulta', '/api/importar': 'solucao_importar', '/api/ocr': 'ocr_leitura' };
+const ADM_ROTAS = { '/api/ia': 'pesquisa_ic', '/api/ia/teste': 'integracao_teste', '/api/status': 'integracao_teste', '/api/cnpj': 'cnpj_consulta', '/api/importar': 'solucao_importar', '/api/ocr': 'ocr_leitura', '/api/busca': 'busca_dedicada' };
 async function admMedir(env, ctx, au, path, req, t0, resp) {
   try {
     let func = ADM_ROTAS[path]; if (!func || !au.user) return;
@@ -1081,9 +1085,9 @@ function catRobotsOk(reg, u) {
   for (const [perm, pad] of reg) { let re; try { re = new RegExp('^' + pad.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')); } catch { continue; } if (re.test(alvo) && (!melhor || pad.length > melhor[1].length || (pad.length === melhor[1].length && perm))) melhor = [perm, pad]; }
   return melhor ? melhor[0] : true;
 }
-async function catRobots(host, env, ctx) {
+async function catRobots(host, env, ctx, allow) {
   const c = CAT_MEM.robots.get(host); if (c && Date.now() - c.em < CAT_CFG.robotsTtlMs) return c;
-  const r = await lkFetch('https://' + host + '/robots.txt', env, ctx, 200000); let o;
+  const r = await lkFetch('https://' + host + '/robots.txt', env, ctx, 200000, allow); let o;
   if (r.erro) o = r.erro.codigo === 'nao_encontrado' ? { ok: true, reg: [], em: Date.now() } : r.erro.codigo === 'autenticacao_necessaria' ? { ok: true, reg: [], em: Date.now(), nota: 'robots.txt atrás de login' } : { ok: false, erro: r.erro.mensagem, em: 0 };
   else o = { ok: true, reg: /html/.test(r.ct) ? [] : catRobotsParse(new TextDecoder().decode(r.bytes)), em: Date.now() };
   if (o.ok) CAT_MEM.robots.set(host, o); return o;
@@ -1196,10 +1200,84 @@ async function admCatalogo(req, env) {
   }
   return inval('Operação desconhecida.');
 }
+/* ===== Radar regulatório: fontes OFICIAIS cadastradas pelo administrador, verificadas 1x por dia útil =====
+   Só domínios oficiais (lista abaixo), respeitando robots.txt. O radar NÃO interpreta norma nem cria evento: registra apenas que o texto da página
+   mudou e quando. Quem lê a fonte e registra o evento (com vigência e prazo comprovados) é o executivo, em "Releases e regulatório". */
+const REG_ALLOW = /(^|\.)(gov\.br|jus\.br|leg\.br|totvs\.com|totvs\.com\.br)$/i, REG_MAX = 20, REG_LOTE = 6;
+function regUrl(v) { let u; try { u = new URL(String(v || '').trim()); } catch { return null; } if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443') || !REG_ALLOW.test(u.hostname) || u.href.length > 400) return null; u.hash = ''; return u; }
+async function regVerificar(db, env, f) {
+  const ctx = { sub: 0 }, agora = new Date().toISOString(), u = regUrl(f.url); let estado = 'ok', erro = null, hash = f.hash || null, titulo = f.titulo || '', mudou = f.mudou_em || null, alterou = false;
+  if (!u) { estado = 'invalida'; erro = 'Endereço fora da lista de fontes oficiais permitidas.'; }
+  else { const rb = await catRobots(u.hostname, env, ctx, REG_ALLOW);
+    if (!rb.ok) { estado = 'indisponivel'; erro = 'robots.txt: ' + rb.erro; }
+    else if (!catRobotsOk(rb.reg, u.href)) { estado = 'bloqueada_robots'; erro = 'O robots.txt do site não permite a leitura automática desta página.'; }
+    else { const r = await lkFetch(u.href, env, ctx, LKCFG.maxHtml, REG_ALLOW);
+      if (r.erro) { estado = r.erro.codigo === 'autenticacao_necessaria' ? 'autenticacao_necessaria' : r.erro.codigo === 'nao_encontrado' ? 'nao_encontrada' : 'indisponivel'; erro = r.erro.mensagem; }
+      else if (!/html/.test(r.ct)) { estado = 'formato'; erro = 'A fonte não é uma página HTML (cadastre a página que lista as publicações).'; }
+      else { const reg = lkRegion(decodeHtml(r.bytes, r.ct)), h = await catHash(stripTags(reg.html).slice(0, 200000)); titulo = catTxt(reg.titulo, 200); if (hash && hash !== h) { mudou = agora; alterou = true; } hash = h; } } }
+  await db.prepare('UPDATE reg_fontes SET estado=?, erro=?, hash=?, titulo=?, vista_em=?, mudou_em=? WHERE id=?').bind(estado, erro, hash, titulo, agora, mudou, f.id).run();
+  return { id: f.id, estado, erro, alterou, primeira: estado === 'ok' && !f.hash };
+}
+async function regAuto(env) {
+  const db = admDb(env); if (!db) return null; await admInit(env); const corte = new Date(Date.now() - 20 * 3600e3).toISOString(), out = [];
+  for (const f of ((await db.prepare("SELECT * FROM reg_fontes WHERE ativo=1 AND (vista_em IS NULL OR vista_em < ?) ORDER BY COALESCE(vista_em,'') LIMIT ?").bind(corte, REG_LOTE).all()).results || [])) { out.push(await regVerificar(db, env, f)); await new Promise(r => setTimeout(r, CAT_CFG.pausaMs)); }
+  return out;
+}
+const REG_COLS = 'id,nome,orgao,url,ativo,estado,erro,titulo,criada_em,vista_em,mudou_em';
+async function regPublico(env) { const db = admDb(env); if (!db) return J({ ok: true, fontes: [] }); try { await admInit(env); return J({ ok: true, fontes: (await db.prepare("SELECT id,nome,orgao,url,estado,vista_em,mudou_em FROM reg_fontes WHERE ativo=1 ORDER BY nome").all()).results || [] }); } catch { return J({ ok: true, fontes: [] }); } }
+async function admRegFontes(req, env) {
+  const db = admDb(env); await admInit(env); let q; try { q = await req.json(); } catch { q = {}; } const op = String(q.op || 'estado');
+  const inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400), lista = async () => (await db.prepare('SELECT ' + REG_COLS + ' FROM reg_fontes ORDER BY nome').all()).results || [];
+  if (op === 'estado') return J({ ok: true, fontes: await lista(), max: REG_MAX });
+  if (op === 'adicionar') {
+    const nome = catTxt(q.nome, 80), orgao = catTxt(q.orgao, 60), u = regUrl(q.url); if (nome.length < 3) return inval('Informe o nome da fonte.');
+    if (!u) return inval('Informe um endereço https de fonte oficial (domínios gov.br, jus.br, leg.br ou totvs.com/.com.br).');
+    const todas = await lista(); if (todas.length >= REG_MAX) return inval('Limite de ' + REG_MAX + ' fontes.'); if (todas.some(x => lkKey(x.url) === lkKey(u.href))) return inval('Esta fonte já está cadastrada.');
+    const id = 'rf_' + (await catHash(lkKey(u.href))).slice(0, 12); await db.prepare("INSERT INTO reg_fontes(id,nome,orgao,url,ativo,estado,criada_em) VALUES(?,?,?,?,1,'nao_testada',?)").bind(id, nome, orgao, u.href, new Date().toISOString()).run();
+    const f = await db.prepare('SELECT * FROM reg_fontes WHERE id=?').bind(id).first(); return J({ ok: true, verificacao: await regVerificar(db, env, f), fontes: await lista() });
+  }
+  const f = await db.prepare('SELECT * FROM reg_fontes WHERE id=?').bind(String(q.id || '')).first(); if (!f) return inval('Fonte desconhecida.');
+  if (op === 'remover') { if (q.confirmar !== f.id) return inval('Confirmação ausente.'); await db.prepare('DELETE FROM reg_fontes WHERE id=?').bind(f.id).run(); return J({ ok: true, fontes: await lista() }); }
+  if (op === 'ativar') { await db.prepare('UPDATE reg_fontes SET ativo=? WHERE id=?').bind(q.ativo === false ? 0 : 1, f.id).run(); return J({ ok: true, fontes: await lista() }); }
+  if (op === 'verificar') { const k = 'reg:' + f.id, t = CAT_MEM.rate.get(k) || 0; if (Date.now() - t < 5000) return J({ ok: false, erro: { codigo: 'muitas_requisicoes', mensagem: 'Aguarde alguns segundos entre as verificações da mesma fonte.' } }, 429); CAT_MEM.rate.set(k, Date.now()); return J({ ok: true, verificacao: await regVerificar(db, env, f), fontes: await lista() }); }
+  return inval('Operação desconhecida.');
+}
+/* ===== Busca dedicada: contrato único para provedores de pesquisa =====
+   Cada provedor é um adaptador { nome, seg (nome do segredo no servidor), buscar(q, n, chave) → [{ titulo, url, trecho, data }] }.
+   Sem segredo configurado não há busca e nada é simulado. A chave nunca sai do servidor. Resultado é INDÍCIO: o executivo confere a fonte. */
+const BUSCA_CFG = { timeoutMs: 9000, maxN: 8 };
+async function buscaHttp(url, init) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), BUSCA_CFG.timeoutMs); let r;
+  try { r = await fetch(url, { ...init, signal: ac.signal }); } catch (e) { clearTimeout(tm); throw lkErr(e?.name === 'AbortError' ? 'tempo_esgotado' : 'indisponivel', 'O provedor de busca não respondeu.'); } clearTimeout(tm);
+  if (r.status === 401 || r.status === 403) throw lkErr('chave_invalida', 'O provedor recusou a chave configurada no servidor.'); if (r.status === 429) throw lkErr('limite_de_uso', 'O provedor de busca atingiu o limite de uso.');
+  if (!r.ok) throw lkErr(r.status >= 500 ? 'indisponivel' : 'erro_provedor', 'O provedor de busca respondeu HTTP ' + r.status + '.');
+  try { return await r.json(); } catch { throw lkErr('resposta_invalida', 'O provedor devolveu uma resposta que não é JSON.'); }
+}
+const BUSCA_PROV = {
+  brave: { nome: 'Brave Search', seg: 'BRAVE_API_KEY', async buscar(q, n, chave) { const j = await buscaHttp('https://api.search.brave.com/res/v1/web/search?' + new URLSearchParams({ q, count: String(n) }), { headers: { accept: 'application/json', 'x-subscription-token': chave } }); return (Array.isArray(j?.web?.results) ? j.web.results : []).map(x => ({ titulo: x?.title, url: x?.url, trecho: x?.description, data: x?.page_age })); } },
+  tavily: { nome: 'Tavily', seg: 'TAVILY_API_KEY', async buscar(q, n, chave) { const j = await buscaHttp('https://api.tavily.com/search', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + chave }, body: JSON.stringify({ query: q, max_results: n }) }); return (Array.isArray(j?.results) ? j.results : []).map(x => ({ titulo: x?.title, url: x?.url, trecho: x?.content, data: x?.published_date })); } }
+};
+function buscaProv(env) { const p = String(env.BUSCA_PROVEDOR || '').toLowerCase().trim(); if (p) return BUSCA_PROV[p] && env[BUSCA_PROV[p].seg] ? p : null; return Object.keys(BUSCA_PROV).find(k => env[BUSCA_PROV[k].seg]) || null; }
+export function buscaNormalizar(itens, n) {
+  const out = [], vis = new Set();
+  for (const x of (Array.isArray(itens) ? itens : [])) {
+    let u; try { u = new URL(String(x?.url || '')); } catch { continue; } if (u.protocol !== 'https:' || u.username || u.password) continue; const k = lkKey(u.href); if (vis.has(k)) continue; vis.add(k);
+    const titulo = catTxt(stripTags(x?.titulo), 200); if (!titulo) continue; const d = String(x?.data || ''), dt = /^\d{4}-\d{2}-\d{2}/.test(d) && !isNaN(Date.parse(d)) ? d.slice(0, 10) : null; /* data só quando o provedor informa em formato verificável; nunca presumida */
+    out.push({ titulo, url: u.href.slice(0, 500), host: u.hostname.replace(/^www\./, ''), trecho: catTxt(stripTags(x?.trecho), 400), data: dt }); if (out.length >= n) break;
+  }
+  return out;
+}
+async function handleBusca(req, env) {
+  let q; try { q = await req.json(); } catch { q = {}; } const termo = catTxt(q.q, 200), n = Math.min(BUSCA_CFG.maxN, Math.max(1, q.n | 0 || 6));
+  if (termo.length < 3) return J({ ok: false, erro: lkErr('requisicao_invalida', 'Informe o que pesquisar (mínimo 3 caracteres).') }, 400);
+  const p = buscaProv(env); if (!p) return J({ ok: false, erro: lkErr('provedor_nao_configurado', 'Nenhum provedor de busca dedicada está configurado no servidor. Registre a pesquisa manualmente, com fonte, link e data.') }, 503);
+  try { const res = buscaNormalizar(await BUSCA_PROV[p].buscar(termo, n, String(env[BUSCA_PROV[p].seg])), n); return J({ ok: true, provedor: BUSCA_PROV[p].nome, consultadoEm: new Date().toISOString(), termo, resultados: res, aviso: 'Resultado de busca é indício: abra a fonte e confirme que trata desta empresa antes de registrar.' }); }
+  catch (e) { const er = e && e.codigo ? e : lkErr('erro_desconhecido', 'Falha na busca.'); return J({ ok: false, erro: er }, er.codigo === 'limite_de_uso' ? 429 : 502); }
+}
 /* ===== Cotas diárias por usuário, gravadas no banco (valem para todas as instâncias; a contagem é atômica) =====
    Só para rotas que geram custo ou tráfego externo. O limite por minuto em memória continua como primeira barreira. */
-const COTA_DIA = { '/api/ia': 400, '/api/ia/teste': 60, '/api/ocr': 200, '/api/importar': 200, '/api/cnpj': 400 };
-const COTA_ROT = { '/api/ia': 'Pesquisa e análise com IA', '/api/ia/teste': 'Teste de provedor de IA', '/api/ocr': 'Leitura de imagem (OCR)', '/api/importar': 'Importação por link', '/api/cnpj': 'Consulta de CNPJ' };
+const COTA_DIA = { '/api/ia': 400, '/api/ia/teste': 60, '/api/ocr': 200, '/api/importar': 200, '/api/cnpj': 400, '/api/busca': 100 };
+const COTA_ROT = { '/api/ia': 'Pesquisa e análise com IA', '/api/ia/teste': 'Teste de provedor de IA', '/api/ocr': 'Leitura de imagem (OCR)', '/api/importar': 'Importação por link', '/api/cnpj': 'Consulta de CNPJ', '/api/busca': 'Busca dedicada (provedor de pesquisa)' };
 function cotaMax(env, rota) { let o = null; try { o = env.COTAS_DIA ? JSON.parse(env.COTAS_DIA) : null; } catch { o = null; } const v = o && Number.isInteger(o[rota]) && o[rota] > 0 ? o[rota] : COTA_DIA[rota]; return v || 0; }
 async function cotaDia(env, user, rota) {
   const max = cotaMax(env, rota), db = admDb(env); if (!max || !user || !db) return null;
@@ -1208,7 +1286,7 @@ async function cotaDia(env, user, rota) {
 }
 async function usoProprio(env, au) {
   const db = admDb(env), hoje = new Date().toISOString().slice(0, 10), m = {}; if (db && au.user) { try { await admInit(env); for (const r of ((await db.prepare('SELECT rota, n FROM uso_dia WHERE dia=? AND usuario=?').bind(hoje, au.user).all()).results || [])) m[r.rota] = r.n; } catch { /* sem banco */ } }
-  return J({ ok: true, dia: hoje, persistente: !!db, itens: Object.keys(COTA_DIA).map(r => ({ rota: r, rot: COTA_ROT[r], usado: m[r] || 0, limite: cotaMax(env, r) })) });
+  const bp = buscaProv(env); return J({ ok: true, dia: hoje, persistente: !!db, busca: bp ? BUSCA_PROV[bp].nome : null, itens: Object.keys(COTA_DIA).map(r => ({ rota: r, rot: COTA_ROT[r], usado: m[r] || 0, limite: cotaMax(env, r) })) });
 }
 /* ===== Integrações e Inteligência (painel): estado real de cada serviço, pela última execução registrada. Nenhum segredo é devolvido. ===== */
 const INT_AUTH = ['chave_invalida', 'sem_permissao', 'autenticacao_necessaria', 'nao_autorizado', 'chave_ausente', 'sem_creditos'], INT_IND = ['indisponivel', 'tempo_esgotado', 'tempo_esgotado_pagina', 'limite_de_uso', 'limite_local'];
@@ -1233,6 +1311,8 @@ async function admInteg(env) {
   const mapF = { ok: 'conectado', nao_testada: 'nao_testado', autenticacao_necessaria: 'falha_autenticacao', indisponivel: 'indisponivel', nao_encontrada: 'intervencao', bloqueada_robots: 'intervencao' };
   for (const f of ((await db.prepare('SELECT id,nome,estado,erro,testada_em,ultima_sinc FROM cat_fontes ORDER BY id').all()).results || [])) itens.push({ id: 'fonte_' + f.id, nome: 'Catálogo — ' + f.nome, estado: mapF[f.estado] || 'intervencao', ultima: f.testada_em || null, codigo: f.estado === 'ok' ? '' : f.estado, obs: (f.erro ? f.erro + ' ' : '') + (f.ultima_sinc ? 'Última leitura: ' + f.ultima_sinc.slice(0, 10) + '.' : 'Nenhuma leitura ainda.') });
   const auto = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='cat_auto'").first(), uAuto = await db.prepare("SELECT ts, erros FROM cat_exec WHERE op='auto' ORDER BY id DESC LIMIT 1").first();
+  { const rg = await db.prepare("SELECT COUNT(*) n, SUM(CASE WHEN estado='ok' THEN 1 ELSE 0 END) ok, MAX(vista_em) u FROM reg_fontes WHERE ativo=1").first(); itens.push({ id: 'radar_reg', nome: 'Radar regulatório — fontes oficiais monitoradas', estado: !rg || !rg.n ? 'nao_configurado' : !rg.u ? 'nao_testado' : rg.ok ? 'conectado' : 'intervencao', ultima: rg ? rg.u : null, codigo: '', obs: !rg || !rg.n ? 'Nenhuma fonte cadastrada. Cadastre abaixo, em "Radar regulatório".' : `${rg.ok || 0} de ${rg.n} fonte(s) lida(s) com sucesso. Verificação 1 vez por dia útil; só aponta que a página mudou.` }); }
+  { const bp = buscaProv(env), uB = await ult('busca_dedicada'); itens.push({ id: 'busca', nome: 'Busca dedicada (provedor de pesquisa)', estado: intEstado(!!bp, uB), ultima: uB ? uB.ts : null, codigo: uB && uB.resultado !== 'ok' ? cod(uB) : '', obs: bp ? `Provedor: ${BUSCA_PROV[bp].nome}. A chave fica só no servidor.` : 'Nenhum provedor configurado. Adaptadores prontos, ainda não homologados com chave real: ' + Object.values(BUSCA_PROV).map(x => `${x.nome} (segredo ${x.seg})`).join(', ') + '.' }); }
   itens.push({ id: 'agendada', nome: 'Leitura agendada das fontes', estado: !(auto && auto.valor === '1') ? 'nao_configurado' : !uAuto ? 'nao_testado' : 'conectado', ultima: uAuto ? uAuto.ts : null, codigo: '', obs: auto && auto.valor === '1' ? '1 lote por horário agendado, em dias úteis.' : 'Desligada. Ligue no bloco do Catálogo de soluções.' });
   let push = { conf: false, subs: 0, ult: null }; try { push.conf = pushOk(env); const r = await db.prepare('SELECT COUNT(*) n, MAX(ultimo_ok) u FROM push_subs').first(); push.subs = r?.n || 0; push.ult = r?.u || null; } catch { /* tabela ainda não criada */ }
   itens.push({ id: 'push', nome: 'Lembrete diário (notificações)', estado: !push.conf ? 'nao_configurado' : !push.ult ? 'nao_testado' : 'conectado', ultima: push.ult, codigo: '', obs: `${push.subs} aparelho(s) inscrito(s).` });
@@ -1242,13 +1322,14 @@ async function admInteg(env) {
   return { itens, consumo: Object.keys(COTA_DIA).map(r => { const x = con.find(y => y.rota === r) || {}; return { rota: r, rot: COTA_ROT[r], hoje: x.hoje || 0, sete: x.sete || 0, usuarios: x.usuarios || 0, pico_usuario_hoje: x.pico || 0, limite: cotaMax(env, r) }; }), em: new Date().toISOString() };
 }
 /* Trilha de auditoria das ações administrativas que alteram algo (quem, quando, o quê, resultado). Sem conteúdo de carteira nem segredos. */
-const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'] };
+const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'], regfontes: ['estado'] };
 function admAudDescrever(rota, q) {
   const t = (v, n = 80) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').slice(0, n), r = rota.replace('/api/adm/', '');
   if (r === 'roster') return { acao: 'previstos.' + t(q.op || 'add', 20), detalhe: q.op === 'import' ? `${Array.isArray(q.itens) ? q.itens.length : 0} e-mail(s)` : t(q.email) + (q.novo_email ? ' → ' + t(q.novo_email) : '') + (q.tudo ? ' (inclui registro de acesso)' : '') };
   if (r === 'config') return { acao: 'configuracao.alterar', detalhe: Object.keys(q || {}).map(k => t(k, 30)).slice(0, 8).join(', ') };
   if (r === 'purgar') return { acao: 'retencao.aplicar', detalhe: '' };
   if (r === 'catalogo') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.catalogo.includes(op)) return null; return { acao: 'catalogo.' + op, detalhe: [q.fonte && 'fonte ' + t(q.fonte, 20), Array.isArray(q.chaves) && q.chaves.length + ' página(s)', q.estado && '→ ' + t(q.estado, 20), q.ligar != null && (q.ligar === true ? 'ligar' : 'desligar')].filter(Boolean).join(' ') }; }
+  if (r === 'regfontes') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.regfontes.includes(op)) return null; return { acao: 'radar_regulatorio.' + op, detalhe: [q.id && 'fonte ' + t(q.id, 30), q.nome && t(q.nome, 60), q.url && t(q.url, 120)].filter(Boolean).join(' • ') }; }
   if (r === 'sugestoes') return { acao: 'sugestao.marcar_lida', detalhe: '' };
   return { acao: t(r, 40), detalhe: '' };
 }
@@ -1266,11 +1347,12 @@ async function admRotaInterna(req, env, au, url) {
     if (url.pathname === '/api/adm/roster' && req.method === 'POST') return admRoster(req, env, au);
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/catalogo' && req.method === 'POST') return admCatalogo(req, env);
+    if (url.pathname === '/api/adm/regfontes' && req.method === 'POST') return admRegFontes(req, env);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto, admRegFontes, regAuto, regPublico, handleBusca, buscaProv, BUSCA_PROV };
 
 async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg;
@@ -1489,7 +1571,7 @@ async function pushAdocao(env, quando) {
   return { configurado: cfg, aparelhos: ap.n || 0, usuarios: ap.u || 0, aparelhos_com_falha: ap.c || 0, com_resumo_recente: resumos.n || 0, ultimos_7_dias: s7, historico: hist.slice(0, 28), alertas };
 }
 
-export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil(catAuto(env, vigia && /^40 12 /.test(String(ev.cron))).catch(e => console.error('cat_auto', String(e && e.message || e)))); /* catálogo: só age se o administrador ligou a leitura agendada */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
+export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil(catAuto(env, vigia && /^40 12 /.test(String(ev.cron))).catch(e => console.error('cat_auto', String(e && e.message || e)))); /* catálogo: só age se o administrador ligou a leitura agendada */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(regAuto(env).catch(e => console.error('reg_auto', String(e && e.message || e)))); /* radar regulatório: 1x por dia útil, só as fontes que o administrador cadastrou */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
 
 /* Página mínima servida em "/": cola o pedido (JSON baixado do aplicativo), envia, baixa a resposta. A senha (APP_TOKEN) fica só na memória da página. */
 const PAGE = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Backend Gemini — Gestão de Carteira TOTVS ESN</title><meta name="viewport" content="width=device-width,initial-scale=1">

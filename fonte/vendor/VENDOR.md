@@ -11,3 +11,17 @@ Servidas de `/vendor/*` pelo próprio Worker (sem CDN em tempo de execução). O
 | pdf.worker.min.js | pdfjs-dist@3.11.174 | feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b |
 
 Pendência conhecida: xlsx 0.18.5 tem CVE-2023-30533 (poluição de protótipo) e CVE-2024-22363 (ReDoS), corrigidos em ≥0.19.3/0.20.2, distribuídos apenas por cdn.sheetjs.com. Mitigação aplicada em core.js (guarda de protótipo após XLSX.read) — atualizar o arquivo quando possível.
+
+## OCR local (carregado só quando o executivo escolhe "Ler neste aparelho")
+
+Arquivos mantidos só em `public/vendor/tess/` (não passam pelo build; não há cópia em `fonte/`). Origem: pacotes npm `tesseract.js`, `tesseract.js-core` e `@tesseract.js-data/por`.
+
+| Arquivo | Pacote@versão | SHA-256 (início) |
+|---|---|---|
+| public/vendor/tess/tesseract.min.js | tesseract.js@5.1.1 | a8e29918d098b2b0 |
+| public/vendor/tess/worker.min.js | tesseract.js@5.1.1 | aca1229639fc9907 |
+| public/vendor/tess/tesseract-core-simd-lstm.wasm.js | tesseract.js-core@5.1.1 | ce20eda9533cbed1 |
+| public/vendor/tess/tesseract-core-lstm.wasm.js | tesseract.js-core@5.1.1 | 8f04aa0cc81e7bde |
+| public/vendor/tess/lang/por.traineddata.gz | @tesseract.js-data/por (4.0.0_best_int) | dacebc1386ddaaf8 |
+
+Licença Apache-2.0. Roda inteiro no navegador (WebAssembly): a imagem não sai do aparelho. Exige `'wasm-unsafe-eval'` na CSP (só compilação de WebAssembly; `eval` de JavaScript continua bloqueado).

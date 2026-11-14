@@ -5,6 +5,7 @@ const VEND = {
   jszip: { u: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', ok: () => !!window.JSZip },
   jspdf: { u: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', ok: () => !!window.jspdf?.jsPDF },
   pdfjs: { u: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', ok: () => !!window.pdfjsLib },
+  tess: { u: '/vendor/tess/tesseract.min.js', ok: () => !!window.Tesseract }, /* OCR local: só existe na versão hospedada */
 };
 const _vp = {};
 /* Resolve true quando a biblioteca está pronta; false se não carregou (rede/bloqueio). Chamadas simultâneas compartilham o mesmo carregamento; falha não fica em cache. */
