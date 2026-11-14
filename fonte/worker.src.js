@@ -224,13 +224,13 @@ async function lkReadBody(r, max) { // lê até "max" bytes; se passar, devolve 
   const out = new Uint8Array(Math.min(n, max)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return { bytes: out, truncado };
 }
 /* GET seguro: https + domínio TOTVS em todo salto, credencial só para hosts do TDN, limite de tamanho e de tempo. */
-async function lkFetch(url, env, ctx, max) {
+async function lkFetch(url, env, ctx, max, allow) { /* allow: lista de domínios própria de quem chama (radar regulatório); sem ela, vale a lista TOTVS */
   let cur = url, autenticado = false;
   for (let salto = 0; salto <= LKCFG.maxSaltos; salto++) {
     let u; try { u = new URL(cur); } catch { return { erro: lkErr('requisicao_invalida', 'URL inválida.') }; }
     if (u.username || u.password) return { erro: lkErr('requisicao_invalida', 'URL com usuário/senha embutidos não é aceita. Use o link simples ou anexe o arquivo manualmente.') };
     if (u.port && u.port !== '443') return { erro: lkErr('dominio_nao_permitido', 'Porta não padrão não é aceita (somente HTTPS 443). Alternativa: baixe e anexe o arquivo manualmente.') };
-    if (u.protocol !== 'https:' || !LK_ALLOW.test(u.hostname)) return { erro: lkErr('dominio_nao_permitido', 'Domínio fora da lista permitida (totvs.com, totvs.com.br e subdomínios): ' + u.hostname) };
+    if (u.protocol !== 'https:' || !(allow || LK_ALLOW).test(u.hostname)) return { erro: lkErr('dominio_nao_permitido', (allow ? 'Domínio fora da lista de fontes oficiais permitidas: ' : 'Domínio fora da lista permitida (totvs.com, totvs.com.br e subdomínios): ') + u.hostname) };
     if (ctx.sub >= LKCFG.maxSub) return { erro: lkErr('muito_grande', 'Limite de acessos por pedido atingido.') };
     ctx.sub++; const ac = new AbortController(), tm = setTimeout(() => ac.abort(), LKCFG.timeoutMs); let r;
     try { r = await fetch(u.href, { method: 'GET', redirect: 'manual', signal: ac.signal, headers: { 'user-agent': 'AnalisadorCarteira-Importador/1.0', accept: 'text/html,application/pdf,application/vnd.openxmlformats-officedocument.*;q=0.9,*/*;q=0.5', ...lkAuthHeaders(u.hostname, env) } }); }
@@ -705,6 +705,7 @@ async function handleInner(req, env0, ctx) {
   if (url.pathname.startsWith('/api/push/')) return pushRota(req, env0, au, url);
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
   if (url.pathname === '/api/uso' && req.method === 'GET') return usoProprio(env0, au);
+  if (url.pathname === '/api/regfontes' && req.method === 'GET') return regPublico(env0);
   if (au.user && COTA_DIA[url.pathname] && req.method === 'POST') { const ct = await cotaDia(env0, au.user, url.pathname); if (ct) return J({ ok: false, erro: { codigo: 'cota_diaria', mensagem: `Limite diário desta operação atingido (${ct.max} por dia por usuário). Volta ao normal amanhã.`, repetir: false } }, 429); }
   if (ADM_ROTAS[url.pathname] && au.user) { const t0 = Date.now(), rc = url.pathname === '/api/ia' ? req.clone() : req, resp = await rotasApi(req, env, au, url); await admMedir(env0, ctx, au, url.pathname, rc, t0, resp); return resp; }
   return rotasApi(req, env, au, url);
@@ -716,6 +717,7 @@ async function rotasApi(req, env, au, url) {
   if (url.pathname === '/api/status') return handleStatus(env);
   if (url.pathname === '/api/planilha' && req.method === 'POST') { const w = usoLimite('pl:' + (au.user || 'token'), 30); if (w) return usoErro(w); return handlePlanilha(req); }
   if (url.pathname === '/api/cnpj' && req.method === 'POST') return handleCnpj(req, env);
+  if (url.pathname === '/api/busca' && req.method === 'POST') return handleBusca(req, env);
   if (url.pathname === '/api/ia' && req.method === 'POST') return handleIa(req, env, false);
   if (url.pathname === '/api/ia/teste' && req.method === 'POST') return handleIa(req, env, true);
   if (url.pathname === '/api/ocr') { if (!env.GEMINI_API_KEY) return J({ ok: false, erro: { codigo: 'chave_ausente', mensagem: 'Segredo GEMINI_API_KEY não configurado neste backend (OCR usa Gemini).' } }, 503); return handleOcr(req, env); }
@@ -755,7 +757,7 @@ async function processar(q, env, base, t0) {
 
 /*__ADM__*/
 /*__PUSH__*/
-export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil(catAuto(env, vigia && /^40 12 /.test(String(ev.cron))).catch(e => console.error('cat_auto', String(e && e.message || e)))); /* catálogo: só age se o administrador ligou a leitura agendada */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
+export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil(catAuto(env, vigia && /^40 12 /.test(String(ev.cron))).catch(e => console.error('cat_auto', String(e && e.message || e)))); /* catálogo: só age se o administrador ligou a leitura agendada */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(regAuto(env).catch(e => console.error('reg_auto', String(e && e.message || e)))); /* radar regulatório: 1x por dia útil, só as fontes que o administrador cadastrou */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
 
 /* Página mínima servida em "/": cola o pedido (JSON baixado do aplicativo), envia, baixa a resposta. A senha (APP_TOKEN) fica só na memória da página. */
 const PAGE = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Backend Gemini — Gestão de Carteira TOTVS ESN</title><meta name="viewport" content="width=device-width,initial-scale=1">

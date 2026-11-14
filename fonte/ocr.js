@@ -32,7 +32,7 @@ async function ocrPrep(files) {
 function ocrPedirAut(ids) {
   const recs = ids.map(id => S.ocr.find(o => o.id === id)).filter(Boolean); if (!recs.length) return;
   const modo = bkModo(), dest = bkPronto() ? bkUrl() : '(backend não configurado)';
-  MODALS.ocrauth = { t: 'Autorizar envio para leitura por OCR?', b: `${esc(recs.map(r => `${r.nome} (${(r.tam / 1024).toFixed(0)} KB)`).join('; '))}. ${aiTarefa('ocr').prov === 'pagina' ? 'O conteúdo será enviado ao <b>Claude (Anthropic) pelo claude.ai, através desta página</b>, para transcrição (sem backend e sem chave).' : `O conteúdo será enviado ao backend ${esc(dest)} e, de lá, ao <b>Google Gemini</b> para transcrição.`} Imagens e PDFs podem conter <b>nomes, CNPJ, valores e outros dados de clientes</b>. ${modo === 'manual' && aiTarefa('ocr').prov !== 'pagina' ? 'Neste ambiente não há chamada direta: será gerado um arquivo de pedido (contém a imagem) para você enviar ao backend. ' : ''}Nada é enviado sem esta autorização; o original fica guardado na sua conta e a chave do provedor nunca passa pelo navegador.`, ok: ['ocrAutOk', 'Autorizar envio e ler', 'pri'], cancel: 'ocrAutNo' };
+  MODALS.ocrauth = { t: 'Autorizar envio para leitura por OCR?', b: `${esc(recs.map(r => `${r.nome} (${(r.tam / 1024).toFixed(0)} KB)`).join('; '))}. ${aiTarefa('ocr').prov === 'pagina' ? 'O conteúdo será enviado ao <b>Claude (Anthropic) pelo claude.ai, através desta página</b>, para transcrição (sem backend e sem chave).' : `O conteúdo será enviado ao backend ${esc(dest)} e, de lá, ao <b>Google Gemini</b> para transcrição.`} Imagens e PDFs podem conter <b>nomes, CNPJ, valores e outros dados de clientes</b>. ${modo === 'manual' && aiTarefa('ocr').prov !== 'pagina' ? 'Neste ambiente não há chamada direta: será gerado um arquivo de pedido (contém a imagem) para você enviar ao backend. ' : ''}Nada é enviado sem esta autorização; o original fica guardado na sua conta e a chave do provedor nunca passa pelo navegador.`, ok: ['ocrAutOk', 'Autorizar envio e ler', 'pri'], cancel: 'ocrAutNo', ...(window.__HOSTED__ ? { alt: ['ocrAutLocal', 'Ler neste aparelho (não envia nada)', ''] } : {}) };
   UI.confirm = 'ocrauth'; render();
 }
 async function ocrEnviar(rec) {
@@ -46,17 +46,54 @@ async function ocrEnviar(rec) {
   } catch (e) { if (ep !== DM.epoch) return; rec.estado = 'erro'; rec.erro = String(e.message || e).slice(0, 300); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); }
   render();
 }
+/* 2b) OCR local: Tesseract em WebAssembly, dentro do navegador. A imagem NÃO sai do aparelho e nenhuma IA é usada.
+   PDF escaneado é convertido página a página (até OCL_MAX_PAG); há progresso, cancelamento e liberação de memória a cada página. */
+const OCL_MAX_PAG = 15, OCL = { id: null, cancel: false, w: null };
+async function ocrLocalWorker(onProg) {
+  if (!(await vend('tess'))) throw new Error('OCR local indisponível neste ambiente.');
+  return Tesseract.createWorker('por', 1, { workerPath: '/vendor/tess/worker.min.js', corePath: '/vendor/tess', langPath: '/vendor/tess/lang', gzip: true, cacheMethod: 'none', workerBlobURL: false, logger: m => { if (m && m.status === 'recognizing text') onProg(m.progress || 0); } });
+}
+async function ocrLocal(rec) {
+  if (OCL.id) return toast('Já há uma leitura local em andamento. Aguarde ou cancele.');
+  const ep = DM.epoch; OCL.id = rec.id; OCL.cancel = false; rec.estado = 'lendo'; rec.erro = null; rec.local = { pag: 0, de: 0, pct: 0 }; rec.pedidoId = 'ocrl_' + uid(); touchG('ocr', rec.id); render();
+  const prog = () => { const el = document.querySelector(`.oc[data-id="${rec.id}"] .oc-prog`); if (el) el.textContent = rec.local.de > 1 ? `Página ${rec.local.pag} de ${rec.local.de} — ${Math.round(rec.local.pct * 100)}%` : `${Math.round(rec.local.pct * 100)}%`; };
+  const avisos = ['Leitura feita neste aparelho (OCR local): a imagem não foi enviada a nenhum servidor.'], partes = []; let truncPag = false;
+  try {
+    if (!(await ocrimgEnsure(rec))) throw new Error('Imagem original indisponível; reenvie o arquivo.');
+    const bin = atob(ocImgB64(rec.id)), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    OCL.w = await ocrLocalWorker(p => { rec.local.pct = p; prog(); }); if (ep !== DM.epoch || OCL.cancel) throw Object.assign(new Error('cancelado'), { cancel: true });
+    if (rec.mime === 'application/pdf') {
+      if (!(await vend('pdfjs'))) throw new Error('Biblioteca PDF indisponível.'); pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
+      const pdf = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise, n = Math.min(pdf.numPages, OCL_MAX_PAG); truncPag = pdf.numPages > n; rec.local.de = n; let semTexto = 0;
+      for (let i = 1; i <= n; i++) {
+        if (OCL.cancel || ep !== DM.epoch) throw Object.assign(new Error('cancelado'), { cancel: true });
+        rec.local.pag = i; rec.local.pct = 0; prog(); const pg = await pdf.getPage(i), vp0 = pg.getViewport({ scale: 1 }), sc = Math.min(2.2, 2400 / Math.max(vp0.width, vp0.height)), vp = pg.getViewport({ scale: sc });
+        const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height); await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const r = await OCL.w.recognize(cv), t = String(r?.data?.text || '').trim(); cv.width = cv.height = 0; pg.cleanup(); /* libera a memória da página */
+        if (t.replace(/\s/g, '').length < 12) semTexto++; partes.push(`--- página ${i} ---\n${t}`);
+      }
+      if (semTexto) avisos.push(`${semTexto} página(s) sem texto legível.`); if (truncPag) avisos.push(`PDF com ${pdf.numPages} páginas: lidas as ${n} primeiras (limite da leitura local).`); try { await pdf.destroy(); } catch { /* ok */ }
+    } else { rec.local.de = 1; rec.local.pag = 1; const r = await OCL.w.recognize(new Blob([bytes], { type: rec.mime })); partes.push(String(r?.data?.text || '')); }
+    if (ep !== DM.epoch) return;
+    delete rec.local; await ocrClienteResposta({ ok: true, pedidoId: rec.pedidoId, provedor: 'local', texto: partes.join('\n\n'), modelo: 'OCR local (Tesseract, português)', consultadoEm: nowISO(), truncado: truncPag, avisos });
+  } catch (e) {
+    if (ep !== DM.epoch) return; delete rec.local;
+    if (e && e.cancel) { rec.estado = 'autorizar'; rec.erro = null; toast('Leitura local cancelada. Nada foi enviado.'); }
+    else { rec.estado = 'erro'; rec.erro = ('OCR local: ' + String(e && e.message || e)).slice(0, 300); intLog({ sistema: 'ocr_local', op: 'ocr', estado: 'erro', msg: rec.erro }); }
+    touchG('ocr', rec.id); render();
+  } finally { try { if (OCL.w) await OCL.w.terminate(); } catch { /* já encerrado */ } OCL.w = null; OCL.id = null; }
+}
 /* 3) resposta do backend (direta ou arquivo importado) */
 async function ocrClienteResposta(j) {
   const rec = S.ocr.find(o => o.pedidoId && o.pedidoId === j.pedidoId); if (!rec) throw new Error('Resposta de OCR sem pedido correspondente neste navegador (outra sessão, já importada ou registro excluído).');
-  if (!j.ok || typeof j.texto !== 'string') { rec.estado = 'erro'; rec.erro = `${j.erro?.codigo || 'erro'}: ${s4(j.erro?.mensagem, 300) || 'resposta sem texto'}`; if (j.provedor !== 'pagina') intSet('ocr', { ok: false, msg: j.erro?.codigo || 'erro' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); render(); return true; }
+  if (!j.ok || typeof j.texto !== 'string') { rec.estado = 'erro'; rec.erro = `${j.erro?.codigo || 'erro'}: ${s4(j.erro?.mensagem, 300) || 'resposta sem texto'}`; if (j.provedor !== 'pagina' && j.provedor !== 'local') intSet('ocr', { ok: false, msg: j.erro?.codigo || 'erro' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); render(); return true; }
   let omit = 0; const lines = j.texto.split(/\r?\n/).filter(l => { if (SECRET_RE.test(l)) { omit++; return false; } return true; }), txt = lines.join('\n');
   rec.texto = txt.slice(0, OC_TXT); rec.truncado = !!j.truncado || txt.length > OC_TXT; rec.modelo = s4(j.modelo, 60); rec.consultadoEm = s4(j.consultadoEm, 40); rec.omitidas = omit;
   rec.avisos = [...cap(j.avisos, 4).map(a => s4(a, 240)), ...(omit ? [`${omit} linha(s) omitida(s) por parecerem credenciais.`] : [])];
   const util = rec.texto.replace(/\[ileg[ií]vel\]|\s/gi, '');
   if (util.length < 12) { rec.estado = 'ilegivel'; rec.erro = 'O OCR não encontrou texto legível. Envie uma imagem mais nítida (maior resolução, sem reflexo) ou digite os dados.'; }
   else { rec.estado = 'lido'; rec.erro = null; ocrIdentificar(rec); }
-  if (j.provedor !== 'pagina') intSet('ocr', { ok: rec.estado === 'lido', msg: rec.estado === 'lido' ? 'leitura concluída' : 'sem texto legível' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: rec.estado === 'lido' ? 'ok' : 'aviso', msg: `${rec.nome}: ${rec.estado}` }); render(); return true;
+  if (j.provedor !== 'pagina' && j.provedor !== 'local') intSet('ocr', { ok: rec.estado === 'lido', msg: rec.estado === 'lido' ? 'leitura concluída' : 'sem texto legível' }); touchG('ocr', rec.id); intLog({ sistema: j.provedor === 'local' ? 'ocr_local' : 'ia', op: 'ocr', estado: rec.estado === 'lido' ? 'ok' : 'aviso', msg: `${rec.nome}: ${rec.estado}` }); render(); return true;
 }
 /* 4) identificação do cliente: CNPJ válido (com papel no documento) e código; só associa sozinho se for inequívoco */
 function ocrIdentificar(rec) {
@@ -106,9 +143,10 @@ function ocrCard(rec) {
   const [el, ek] = ocEstL[rec.estado] || [rec.estado, 'off'], cl = S.clients[rec.assoc?.key], t = rec.textoCorrigido ?? rec.texto;
   let h = `<div class="card oc" data-id="${esc(rec.id)}"><div class="row" style="justify-content:space-between;gap:8px"><div><b>${esc(rec.nome)}</b> <span class="muted sm">${(rec.tam / 1024).toFixed(0)} KB • enviado em ${esc(dtBR(rec.at))}</span></div><div>${pill('OCR', 'info')} ${pill(el, ek)}${rec.incorporado ? ' ' + pill('incorporado ao cliente', 'ok') : ''}</div></div>`;
   if (rec.erro) h += `<div class="alert b sm" role="alert">${esc(rec.erro)}</div>`;
-  if (rec.estado === 'autorizar') h += `<p class="sm muted">O arquivo está guardado, mas <b>nada foi enviado</b>. <button class="btn pri sm" data-a="ocPedir" data-id="${esc(rec.id)}">Revisar e autorizar envio</button></p>`;
+  if (rec.estado === 'autorizar') h += `<p class="sm muted">O arquivo está guardado, mas <b>nada foi enviado</b>. <button class="btn pri sm" data-a="ocPedir" data-id="${esc(rec.id)}">Revisar e autorizar envio</button>${window.__HOSTED__ ? ` <button class="btn sm" data-a="ocLocal" data-id="${esc(rec.id)}">Ler neste aparelho (não envia nada)</button>` : ''}</p>`;
+  if (rec.estado === 'lendo' && rec.local) h += `<div class="alert i sm busy" role="status"><b>Lendo neste aparelho…</b> <span class="oc-prog">${rec.local.de > 1 ? `Página ${rec.local.pag} de ${rec.local.de}` : 'preparando'}</span> <button class="btn ghost sm" data-a="ocLocalX">Cancelar</button><div class="sm muted">Na primeira vez o leitor (cerca de 9 MB) é baixado; depois fica em cache.</div></div>`;
   if (rec.estado === 'aguardando_resposta') h += `<p class="sm muted">Pedido gerado como arquivo. Envie-o ao backend e importe a resposta (JSON) abaixo. <label class="btn ghost sm" style="cursor:pointer">Importar resposta<input type="file" id="f-ai2" accept=".json,application/json" hidden></label></p>`;
-  if (['erro', 'ilegivel', 'aguardando_resposta'].includes(rec.estado)) h += `<div class="row sm"><button class="btn ghost sm" data-a="ocPedir" data-id="${esc(rec.id)}">Reenviar (nova autorização)</button></div>`;
+  if (['erro', 'ilegivel', 'aguardando_resposta'].includes(rec.estado)) h += `<div class="row sm"><button class="btn ghost sm" data-a="ocPedir" data-id="${esc(rec.id)}">Reenviar (nova autorização)</button>${window.__HOSTED__ && rec.estado !== 'aguardando_resposta' ? `<button class="btn ghost sm" data-a="ocLocal" data-id="${esc(rec.id)}">Tentar neste aparelho (não envia nada)</button>` : ''}</div>`;
   if (rec.estado === 'lido') {
     const ids = rec.ids?.cnpjs || [];
     h += `<dl class="sm"><dt>Identificação</dt><dd>${cl ? `Associado a <b>${esc(cl.name)}</b> — ${esc(rec.assoc.por)} <button class="btn ghost sm" data-a="ocDesassoc" data-id="${esc(rec.id)}">Desfazer</button>` : rec.decisao === 'ambiguo' ? `<span class="pill p-warn">ambíguo</span> ${esc(rec.nota || '')} — escolha o cliente abaixo.` : rec.sugestao ? `<span class="pill p-warn">sugerido</span> ${esc(S.clients[rec.sugestao.key]?.name || '')} (${esc(rec.sugestao.by)}) — confirme abaixo.` : '<span class="pill p-warn">sem cliente identificado</span> nenhum CNPJ/código da carteira no texto — escolha manualmente.'}</dd>
@@ -127,13 +165,15 @@ function ocrCard(rec) {
 function ocrPanel() {
   const list = S.ocr.filter(o => o.origem !== 'print');
   return `<div class="card"><h3>Leitura por OCR <span class="muted sm">(imagens e PDFs escaneados)</span></h3>
-  <label class="drop" data-drop="f-ocr"><b>Prints, imagens e documentos escaneados</b><br><span class="muted sm">PNG, JPG, WEBP ou PDF escaneado, até 3 MB cada. O texto é lido por OCR no backend — <b>só depois da sua autorização</b>.</span><input type="file" id="f-ocr" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" hidden></label>
+  <label class="drop" data-drop="f-ocr"><b>Prints, imagens e documentos escaneados</b><br><span class="muted sm">PNG, JPG, WEBP ou PDF escaneado, até 3 MB cada. O texto é lido por OCR — <b>por IA, só depois da sua autorização</b>, ou <b>neste aparelho, sem enviar nada</b>.</span><input type="file" id="f-ocr" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" hidden></label>
   <p class="sm muted">O cliente é identificado por CNPJ válido ou código TOTVS no texto; se houver dúvida, você escolhe. Documentos com texto (PDF com texto, DOCX, XLSX, TXT) seguem pelo cartão 3 e não usam OCR. O backup JSON não inclui as imagens nem as leituras de OCR (ficam na base da sua conta).</p>
   ${UI.oc.msg ? `<div class="alert i sm">${esc(UI.oc.msg)}</div>` : ''}${list.length ? list.map(ocrCard).join('') : '<p class="sm muted">Nenhuma imagem enviada ainda.</p>'}</div>`;
 }
 const OC_ACT = {
   ocAutOk: () => { UI.confirm = null; const ids = UI.oc.fila.slice(); UI.oc.fila = []; render(); ids.map(id => S.ocr.find(o => o.id === id)).filter(Boolean).forEach(r => ocrEnviar(r)); },
   ocrAutOk: () => OC_ACT.ocAutOk(), ocrAutNo: () => { UI.confirm = null; UI.oc.fila = []; toast('Envio cancelado: nada foi enviado. Os arquivos continuam guardados, aguardando autorização.'); render(); },
+  ocrAutLocal: () => { UI.confirm = null; const ids = UI.oc.fila.slice(); UI.oc.fila = []; render(); (async () => { for (const id of ids) { const r = S.ocr.find(o => o.id === id); if (r) await ocrLocal(r); } })(); },
+  ocLocal: t => { const r = S.ocr.find(o => o.id === t.dataset.id); if (r) ocrLocal(r); }, ocLocalX: () => { OCL.cancel = true; toast('Cancelando a leitura local…'); },
   ocPedir: t => { UI.oc.fila = [t.dataset.id]; ocrPedirAut([t.dataset.id]); },
   ocAssoc: t => { const k = $(`select[data-id="ocs_${t.dataset.id}"]`)?.value; ocrAssociar(t.dataset.id, k); },
   ocDesassoc: t => ocrDesassociar(t.dataset.id), ocInc: t => ocrIncorporar(t.dataset.id), ocDel: t => ocrExcluir(t.dataset.id),

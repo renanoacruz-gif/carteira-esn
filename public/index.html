@@ -894,6 +894,7 @@ const VEND = {
   jszip: { u: '/vendor/jszip.min.js?v=978d62b574', ok: () => !!window.JSZip },
   jspdf: { u: '/vendor/jspdf.umd.min.js?v=e53ce4fac9', ok: () => !!window.jspdf?.jsPDF },
   pdfjs: { u: '/vendor/pdf.min.js?v=a4641a2626', ok: () => !!window.pdfjsLib },
+  tess: { u: '/vendor/tess/tesseract.min.js', ok: () => !!window.Tesseract }, /* OCR local: só existe na versão hospedada */
 };
 const _vp = {};
 /* Resolve true quando a biblioteca está pronta; false se não carregou (rede/bloqueio). Chamadas simultâneas compartilham o mesmo carregamento; falha não fica em cache. */
@@ -2663,6 +2664,23 @@ function applic(r, c) {
 function regForClient(c) { return regsOk().map(r => ({ r, ap: applic(r, c), t: regTiming(r) })); }
 const regNear = x => x.t.some(t => (t.k === 'prazo' && t.d <= alertDays()[0]) || (t.k === 'futuro' && t.d <= alertDays()[0]) || (t.k === 'vigor' && t.d >= -180) || (t.k === 'vencido' && t.d >= -180) || t.k === 'teste');
 
+/* Radar regulatório (versão hospedada): fontes oficiais que o servidor relê 1x por dia útil. O aviso diz apenas que a página mudou;
+   o evento só existe depois que o executivo abre a fonte e o registra. "Já conferi" fica em S.meta.regVisto (por usuário). */
+const RGF = { d: null, t: 0, busy: false };
+async function rgfCarregar() { if (!window.__HOSTED__ || RGF.busy || Date.now() - RGF.t < 300000) return; RGF.busy = true; try { const r = await fetch('/api/regfontes', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); if (r.ok) { const j = await r.json(); RGF.d = Array.isArray(j.fontes) ? j.fontes : []; RGF.t = Date.now(); if (UI.view === 'refs') render(); } } catch { /* offline: o registro manual continua */ } finally { RGF.busy = false; } }
+const rgfPend = () => (RGF.d || []).filter(f => f.mudou_em && (S.meta.regVisto || {})[f.id] !== f.mudou_em);
+function rgfCard() {
+  if (!window.__HOSTED__) return ''; rgfCarregar(); const F = RGF.d; if (!F) return '';
+  if (!F.length) return '<div class="card" id="rgf"><h3>Radar regulatório</h3><p class="sm muted">Nenhuma fonte oficial está sendo monitorada. O administrador cadastra as fontes no Painel Administrador; até lá, registre os eventos manualmente abaixo, com a fonte oficial.</p></div>';
+  const P = rgfPend(), ids = new Set(P.map(f => f.id));
+  return `<div class="card" id="rgf"><h3>Radar regulatório <span class="pill ${P.length ? 'p-warn' : 'p-ok'}">${P.length ? P.length + ' fonte(s) com mudança a conferir' : 'sem mudança a conferir'}</span></h3>
+  <p class="sm muted">${F.length} fonte(s) oficial(is) relida(s) 1 vez por dia útil. O radar <b>só aponta que a página mudou</b>: não diz o que mudou e não cria evento. Abra a fonte; se houver norma nova, registre o evento com publicação, vigência e prazo comprovados.</p>
+  ${[...P, ...F.filter(f => !ids.has(f.id))].map(f => `<div class="row sm" style="gap:8px;padding:6px 0;border-top:1px solid var(--bd2)"><span style="flex:1"><b>${esc(f.nome)}</b>${f.orgao ? ` <span class="muted">— ${esc(f.orgao)}</span>` : ''}<div class="muted">${ids.has(f.id) ? `<b>Página alterada em ${esc(dtBR(f.mudou_em))}</b> — a conferir` : f.estado !== 'ok' ? 'Não foi possível ler na última tentativa' : f.vista_em ? 'Sem mudança a conferir • lida em ' + esc(dtBR(f.vista_em)) : 'Ainda não lida'}</div></span><a class="btn ghost sm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">Abrir fonte</a>${ids.has(f.id) ? `<button class="btn sm" data-a="rgfUsar" data-id="${esc(f.id)}">Registrar evento desta fonte</button><button class="btn ghost sm" data-a="rgfVisto" data-id="${esc(f.id)}">Já conferi</button>` : ''}</div>`).join('')}</div>`;
+}
+const RGF_ACT = {
+  rgfVisto: t => { const f = (RGF.d || []).find(x => x.id === t.dataset.id); if (!f) return; S.meta.regVisto = { ...(S.meta.regVisto || {}), [f.id]: f.mudou_em }; touchMeta(); render(); },
+  rgfUsar: t => { const f = (RGF.d || []).find(x => x.id === t.dataset.id), dt = $('#rg-novo'); if (!f || !dt) return; dt.open = true; $('#rg_ft').value = f.nome; $('#rg_fu').value = f.url; if (f.orgao) $('#rg_o').value = f.orgao; $('#rg_n').focus(); dt.scrollIntoView({ block: 'center' }); toast('Fonte preenchida. Informe a obrigação e as datas que a fonte comprova.'); }
+};
 /* ---------- Oportunidades adicionais (release e regulatório) ---------- */
 function mkOpp(c, base, crit) { const o = { id: `${c.key}::${base.ruleId}`, key: c.key, cliente: c.name, setorial: [], sols: [], contratacao: (c.productsIdent || []).map(p => p.nome), validar: null, baseOK: true, extraBase: [], jaIdent: [], ...base, crit }; o.score = scoreOpp(o, S.meta.weights); o.conf = confLevel(o); o.prio = prioLabel(o.score); return o; }
 function consOpps(c) {
@@ -4951,7 +4969,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = 'cbd1a6d1e263';
+const BUILD = '5207e25dac0f';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -5252,7 +5270,7 @@ function extBlock(c) {
   <div class="grid g3">${INT_EXT.map(x => `<label class="sm">${esc(x.nome)}<input type="text" data-c="extSet" data-key="${esc(c.key)}" data-s="${x.id}" value="${esc(e[x.id] || '')}" placeholder="id no sistema (opcional)" maxlength="80"></label>`).join('')}</div></details>`;
 }
 const USO = { d: null, t: 0, busy: false };
-async function usoCarregar() { if (!window.__HOSTED__ || USO.busy || Date.now() - USO.t < 60000) return; USO.busy = true; try { const r = await fetch('/api/uso', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); if (r.ok) { USO.d = await r.json(); USO.t = Date.now(); if (UI.view === 'integra') render(); } } catch { /* sem efeito */ } finally { USO.busy = false; } }
+async function usoCarregar() { if (!window.__HOSTED__ || USO.busy || Date.now() - USO.t < 60000) return; USO.busy = true; try { const r = await fetch('/api/uso', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); if (r.ok) { const prim = !USO.d; USO.d = await r.json(); USO.t = Date.now(); if (UI.view === 'integra' || (prim && UI.view === 'cliente')) render(); } } catch { /* sem efeito */ } finally { USO.busy = false; } }
 function usoCard() { if (!window.__HOSTED__) return ''; usoCarregar(); const u = USO.d; if (!u || !u.ok) return ''; return `<div class="card" id="uso-card"><h3>Seu consumo hoje</h3><p class="sm muted">Limites diários por usuário para operações que geram custo ou acesso externo. A contagem fica no servidor e zera à meia-noite (UTC).</p><div class="tw"><table><thead><tr><th>Operação</th><th class="num">Usado hoje</th><th class="num">Limite</th></tr></thead><tbody>${u.itens.map(x => `<tr><td>${esc(x.rot)}</td><td class="num">${x.usado}${x.usado >= x.limite ? ' <span class="pill p-warn">limite atingido</span>' : ''}</td><td class="num">${x.limite}</td></tr>`).join('')}</tbody></table></div></div>`; }
 function vIntegra() {
   const acao = x => ({ ia: `<button class="btn ghost sm" data-a="nav" data-v="ia">Configurar e testar</button>`, cnpj: `<button class="btn ghost sm" data-a="nav" data-v="cnpj">Abrir consulta</button>`, tdn: `<button class="btn ghost sm" data-a="nav" data-v="importar">Importar link</button>` }[x.id] || '');
@@ -6068,7 +6086,7 @@ async function ocrPrep(files) {
 function ocrPedirAut(ids) {
   const recs = ids.map(id => S.ocr.find(o => o.id === id)).filter(Boolean); if (!recs.length) return;
   const modo = bkModo(), dest = bkPronto() ? bkUrl() : '(backend não configurado)';
-  MODALS.ocrauth = { t: 'Autorizar envio para leitura por OCR?', b: `${esc(recs.map(r => `${r.nome} (${(r.tam / 1024).toFixed(0)} KB)`).join('; '))}. ${aiTarefa('ocr').prov === 'pagina' ? 'O conteúdo será enviado ao <b>Claude (Anthropic) pelo claude.ai, através desta página</b>, para transcrição (sem backend e sem chave).' : `O conteúdo será enviado ao backend ${esc(dest)} e, de lá, ao <b>Google Gemini</b> para transcrição.`} Imagens e PDFs podem conter <b>nomes, CNPJ, valores e outros dados de clientes</b>. ${modo === 'manual' && aiTarefa('ocr').prov !== 'pagina' ? 'Neste ambiente não há chamada direta: será gerado um arquivo de pedido (contém a imagem) para você enviar ao backend. ' : ''}Nada é enviado sem esta autorização; o original fica guardado na sua conta e a chave do provedor nunca passa pelo navegador.`, ok: ['ocrAutOk', 'Autorizar envio e ler', 'pri'], cancel: 'ocrAutNo' };
+  MODALS.ocrauth = { t: 'Autorizar envio para leitura por OCR?', b: `${esc(recs.map(r => `${r.nome} (${(r.tam / 1024).toFixed(0)} KB)`).join('; '))}. ${aiTarefa('ocr').prov === 'pagina' ? 'O conteúdo será enviado ao <b>Claude (Anthropic) pelo claude.ai, através desta página</b>, para transcrição (sem backend e sem chave).' : `O conteúdo será enviado ao backend ${esc(dest)} e, de lá, ao <b>Google Gemini</b> para transcrição.`} Imagens e PDFs podem conter <b>nomes, CNPJ, valores e outros dados de clientes</b>. ${modo === 'manual' && aiTarefa('ocr').prov !== 'pagina' ? 'Neste ambiente não há chamada direta: será gerado um arquivo de pedido (contém a imagem) para você enviar ao backend. ' : ''}Nada é enviado sem esta autorização; o original fica guardado na sua conta e a chave do provedor nunca passa pelo navegador.`, ok: ['ocrAutOk', 'Autorizar envio e ler', 'pri'], cancel: 'ocrAutNo', ...(window.__HOSTED__ ? { alt: ['ocrAutLocal', 'Ler neste aparelho (não envia nada)', ''] } : {}) };
   UI.confirm = 'ocrauth'; render();
 }
 async function ocrEnviar(rec) {
@@ -6082,17 +6100,54 @@ async function ocrEnviar(rec) {
   } catch (e) { if (ep !== DM.epoch) return; rec.estado = 'erro'; rec.erro = String(e.message || e).slice(0, 300); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); }
   render();
 }
+/* 2b) OCR local: Tesseract em WebAssembly, dentro do navegador. A imagem NÃO sai do aparelho e nenhuma IA é usada.
+   PDF escaneado é convertido página a página (até OCL_MAX_PAG); há progresso, cancelamento e liberação de memória a cada página. */
+const OCL_MAX_PAG = 15, OCL = { id: null, cancel: false, w: null };
+async function ocrLocalWorker(onProg) {
+  if (!(await vend('tess'))) throw new Error('OCR local indisponível neste ambiente.');
+  return Tesseract.createWorker('por', 1, { workerPath: '/vendor/tess/worker.min.js', corePath: '/vendor/tess', langPath: '/vendor/tess/lang', gzip: true, cacheMethod: 'none', workerBlobURL: false, logger: m => { if (m && m.status === 'recognizing text') onProg(m.progress || 0); } });
+}
+async function ocrLocal(rec) {
+  if (OCL.id) return toast('Já há uma leitura local em andamento. Aguarde ou cancele.');
+  const ep = DM.epoch; OCL.id = rec.id; OCL.cancel = false; rec.estado = 'lendo'; rec.erro = null; rec.local = { pag: 0, de: 0, pct: 0 }; rec.pedidoId = 'ocrl_' + uid(); touchG('ocr', rec.id); render();
+  const prog = () => { const el = document.querySelector(`.oc[data-id="${rec.id}"] .oc-prog`); if (el) el.textContent = rec.local.de > 1 ? `Página ${rec.local.pag} de ${rec.local.de} — ${Math.round(rec.local.pct * 100)}%` : `${Math.round(rec.local.pct * 100)}%`; };
+  const avisos = ['Leitura feita neste aparelho (OCR local): a imagem não foi enviada a nenhum servidor.'], partes = []; let truncPag = false;
+  try {
+    if (!(await ocrimgEnsure(rec))) throw new Error('Imagem original indisponível; reenvie o arquivo.');
+    const bin = atob(ocImgB64(rec.id)), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    OCL.w = await ocrLocalWorker(p => { rec.local.pct = p; prog(); }); if (ep !== DM.epoch || OCL.cancel) throw Object.assign(new Error('cancelado'), { cancel: true });
+    if (rec.mime === 'application/pdf') {
+      if (!(await vend('pdfjs'))) throw new Error('Biblioteca PDF indisponível.'); pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
+      const pdf = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise, n = Math.min(pdf.numPages, OCL_MAX_PAG); truncPag = pdf.numPages > n; rec.local.de = n; let semTexto = 0;
+      for (let i = 1; i <= n; i++) {
+        if (OCL.cancel || ep !== DM.epoch) throw Object.assign(new Error('cancelado'), { cancel: true });
+        rec.local.pag = i; rec.local.pct = 0; prog(); const pg = await pdf.getPage(i), vp0 = pg.getViewport({ scale: 1 }), sc = Math.min(2.2, 2400 / Math.max(vp0.width, vp0.height)), vp = pg.getViewport({ scale: sc });
+        const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height); await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const r = await OCL.w.recognize(cv), t = String(r?.data?.text || '').trim(); cv.width = cv.height = 0; pg.cleanup(); /* libera a memória da página */
+        if (t.replace(/\s/g, '').length < 12) semTexto++; partes.push(`--- página ${i} ---\n${t}`);
+      }
+      if (semTexto) avisos.push(`${semTexto} página(s) sem texto legível.`); if (truncPag) avisos.push(`PDF com ${pdf.numPages} páginas: lidas as ${n} primeiras (limite da leitura local).`); try { await pdf.destroy(); } catch { /* ok */ }
+    } else { rec.local.de = 1; rec.local.pag = 1; const r = await OCL.w.recognize(new Blob([bytes], { type: rec.mime })); partes.push(String(r?.data?.text || '')); }
+    if (ep !== DM.epoch) return;
+    delete rec.local; await ocrClienteResposta({ ok: true, pedidoId: rec.pedidoId, provedor: 'local', texto: partes.join('\n\n'), modelo: 'OCR local (Tesseract, português)', consultadoEm: nowISO(), truncado: truncPag, avisos });
+  } catch (e) {
+    if (ep !== DM.epoch) return; delete rec.local;
+    if (e && e.cancel) { rec.estado = 'autorizar'; rec.erro = null; toast('Leitura local cancelada. Nada foi enviado.'); }
+    else { rec.estado = 'erro'; rec.erro = ('OCR local: ' + String(e && e.message || e)).slice(0, 300); intLog({ sistema: 'ocr_local', op: 'ocr', estado: 'erro', msg: rec.erro }); }
+    touchG('ocr', rec.id); render();
+  } finally { try { if (OCL.w) await OCL.w.terminate(); } catch { /* já encerrado */ } OCL.w = null; OCL.id = null; }
+}
 /* 3) resposta do backend (direta ou arquivo importado) */
 async function ocrClienteResposta(j) {
   const rec = S.ocr.find(o => o.pedidoId && o.pedidoId === j.pedidoId); if (!rec) throw new Error('Resposta de OCR sem pedido correspondente neste navegador (outra sessão, já importada ou registro excluído).');
-  if (!j.ok || typeof j.texto !== 'string') { rec.estado = 'erro'; rec.erro = `${j.erro?.codigo || 'erro'}: ${s4(j.erro?.mensagem, 300) || 'resposta sem texto'}`; if (j.provedor !== 'pagina') intSet('ocr', { ok: false, msg: j.erro?.codigo || 'erro' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); render(); return true; }
+  if (!j.ok || typeof j.texto !== 'string') { rec.estado = 'erro'; rec.erro = `${j.erro?.codigo || 'erro'}: ${s4(j.erro?.mensagem, 300) || 'resposta sem texto'}`; if (j.provedor !== 'pagina' && j.provedor !== 'local') intSet('ocr', { ok: false, msg: j.erro?.codigo || 'erro' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: 'erro', msg: rec.erro }); render(); return true; }
   let omit = 0; const lines = j.texto.split(/\r?\n/).filter(l => { if (SECRET_RE.test(l)) { omit++; return false; } return true; }), txt = lines.join('\n');
   rec.texto = txt.slice(0, OC_TXT); rec.truncado = !!j.truncado || txt.length > OC_TXT; rec.modelo = s4(j.modelo, 60); rec.consultadoEm = s4(j.consultadoEm, 40); rec.omitidas = omit;
   rec.avisos = [...cap(j.avisos, 4).map(a => s4(a, 240)), ...(omit ? [`${omit} linha(s) omitida(s) por parecerem credenciais.`] : [])];
   const util = rec.texto.replace(/\[ileg[ií]vel\]|\s/gi, '');
   if (util.length < 12) { rec.estado = 'ilegivel'; rec.erro = 'O OCR não encontrou texto legível. Envie uma imagem mais nítida (maior resolução, sem reflexo) ou digite os dados.'; }
   else { rec.estado = 'lido'; rec.erro = null; ocrIdentificar(rec); }
-  if (j.provedor !== 'pagina') intSet('ocr', { ok: rec.estado === 'lido', msg: rec.estado === 'lido' ? 'leitura concluída' : 'sem texto legível' }); touchG('ocr', rec.id); intLog({ sistema: 'ia', op: 'ocr', estado: rec.estado === 'lido' ? 'ok' : 'aviso', msg: `${rec.nome}: ${rec.estado}` }); render(); return true;
+  if (j.provedor !== 'pagina' && j.provedor !== 'local') intSet('ocr', { ok: rec.estado === 'lido', msg: rec.estado === 'lido' ? 'leitura concluída' : 'sem texto legível' }); touchG('ocr', rec.id); intLog({ sistema: j.provedor === 'local' ? 'ocr_local' : 'ia', op: 'ocr', estado: rec.estado === 'lido' ? 'ok' : 'aviso', msg: `${rec.nome}: ${rec.estado}` }); render(); return true;
 }
 /* 4) identificação do cliente: CNPJ válido (com papel no documento) e código; só associa sozinho se for inequívoco */
 function ocrIdentificar(rec) {
@@ -6142,9 +6197,10 @@ function ocrCard(rec) {
   const [el, ek] = ocEstL[rec.estado] || [rec.estado, 'off'], cl = S.clients[rec.assoc?.key], t = rec.textoCorrigido ?? rec.texto;
   let h = `<div class="card oc" data-id="${esc(rec.id)}"><div class="row" style="justify-content:space-between;gap:8px"><div><b>${esc(rec.nome)}</b> <span class="muted sm">${(rec.tam / 1024).toFixed(0)} KB • enviado em ${esc(dtBR(rec.at))}</span></div><div>${pill('OCR', 'info')} ${pill(el, ek)}${rec.incorporado ? ' ' + pill('incorporado ao cliente', 'ok') : ''}</div></div>`;
   if (rec.erro) h += `<div class="alert b sm" role="alert">${esc(rec.erro)}</div>`;
-  if (rec.estado === 'autorizar') h += `<p class="sm muted">O arquivo está guardado, mas <b>nada foi enviado</b>. <button class="btn pri sm" data-a="ocPedir" data-id="${esc(rec.id)}">Revisar e autorizar envio</button></p>`;
+  if (rec.estado === 'autorizar') h += `<p class="sm muted">O arquivo está guardado, mas <b>nada foi enviado</b>. <button class="btn pri sm" data-a="ocPedir" data-id="${esc(rec.id)}">Revisar e autorizar envio</button>${window.__HOSTED__ ? ` <button class="btn sm" data-a="ocLocal" data-id="${esc(rec.id)}">Ler neste aparelho (não envia nada)</button>` : ''}</p>`;
+  if (rec.estado === 'lendo' && rec.local) h += `<div class="alert i sm busy" role="status"><b>Lendo neste aparelho…</b> <span class="oc-prog">${rec.local.de > 1 ? `Página ${rec.local.pag} de ${rec.local.de}` : 'preparando'}</span> <button class="btn ghost sm" data-a="ocLocalX">Cancelar</button><div class="sm muted">Na primeira vez o leitor (cerca de 9 MB) é baixado; depois fica em cache.</div></div>`;
   if (rec.estado === 'aguardando_resposta') h += `<p class="sm muted">Pedido gerado como arquivo. Envie-o ao backend e importe a resposta (JSON) abaixo. <label class="btn ghost sm" style="cursor:pointer">Importar resposta<input type="file" id="f-ai2" accept=".json,application/json" hidden></label></p>`;
-  if (['erro', 'ilegivel', 'aguardando_resposta'].includes(rec.estado)) h += `<div class="row sm"><button class="btn ghost sm" data-a="ocPedir" data-id="${esc(rec.id)}">Reenviar (nova autorização)</button></div>`;
+  if (['erro', 'ilegivel', 'aguardando_resposta'].includes(rec.estado)) h += `<div class="row sm"><button class="btn ghost sm" data-a="ocPedir" data-id="${esc(rec.id)}">Reenviar (nova autorização)</button>${window.__HOSTED__ && rec.estado !== 'aguardando_resposta' ? `<button class="btn ghost sm" data-a="ocLocal" data-id="${esc(rec.id)}">Tentar neste aparelho (não envia nada)</button>` : ''}</div>`;
   if (rec.estado === 'lido') {
     const ids = rec.ids?.cnpjs || [];
     h += `<dl class="sm"><dt>Identificação</dt><dd>${cl ? `Associado a <b>${esc(cl.name)}</b> — ${esc(rec.assoc.por)} <button class="btn ghost sm" data-a="ocDesassoc" data-id="${esc(rec.id)}">Desfazer</button>` : rec.decisao === 'ambiguo' ? `<span class="pill p-warn">ambíguo</span> ${esc(rec.nota || '')} — escolha o cliente abaixo.` : rec.sugestao ? `<span class="pill p-warn">sugerido</span> ${esc(S.clients[rec.sugestao.key]?.name || '')} (${esc(rec.sugestao.by)}) — confirme abaixo.` : '<span class="pill p-warn">sem cliente identificado</span> nenhum CNPJ/código da carteira no texto — escolha manualmente.'}</dd>
@@ -6163,13 +6219,15 @@ function ocrCard(rec) {
 function ocrPanel() {
   const list = S.ocr.filter(o => o.origem !== 'print');
   return `<div class="card"><h3>Leitura por OCR <span class="muted sm">(imagens e PDFs escaneados)</span></h3>
-  <label class="drop" data-drop="f-ocr"><b>Prints, imagens e documentos escaneados</b><br><span class="muted sm">PNG, JPG, WEBP ou PDF escaneado, até 3 MB cada. O texto é lido por OCR no backend — <b>só depois da sua autorização</b>.</span><input type="file" id="f-ocr" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" hidden></label>
+  <label class="drop" data-drop="f-ocr"><b>Prints, imagens e documentos escaneados</b><br><span class="muted sm">PNG, JPG, WEBP ou PDF escaneado, até 3 MB cada. O texto é lido por OCR — <b>por IA, só depois da sua autorização</b>, ou <b>neste aparelho, sem enviar nada</b>.</span><input type="file" id="f-ocr" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" hidden></label>
   <p class="sm muted">O cliente é identificado por CNPJ válido ou código TOTVS no texto; se houver dúvida, você escolhe. Documentos com texto (PDF com texto, DOCX, XLSX, TXT) seguem pelo cartão 3 e não usam OCR. O backup JSON não inclui as imagens nem as leituras de OCR (ficam na base da sua conta).</p>
   ${UI.oc.msg ? `<div class="alert i sm">${esc(UI.oc.msg)}</div>` : ''}${list.length ? list.map(ocrCard).join('') : '<p class="sm muted">Nenhuma imagem enviada ainda.</p>'}</div>`;
 }
 const OC_ACT = {
   ocAutOk: () => { UI.confirm = null; const ids = UI.oc.fila.slice(); UI.oc.fila = []; render(); ids.map(id => S.ocr.find(o => o.id === id)).filter(Boolean).forEach(r => ocrEnviar(r)); },
   ocrAutOk: () => OC_ACT.ocAutOk(), ocrAutNo: () => { UI.confirm = null; UI.oc.fila = []; toast('Envio cancelado: nada foi enviado. Os arquivos continuam guardados, aguardando autorização.'); render(); },
+  ocrAutLocal: () => { UI.confirm = null; const ids = UI.oc.fila.slice(); UI.oc.fila = []; render(); (async () => { for (const id of ids) { const r = S.ocr.find(o => o.id === id); if (r) await ocrLocal(r); } })(); },
+  ocLocal: t => { const r = S.ocr.find(o => o.id === t.dataset.id); if (r) ocrLocal(r); }, ocLocalX: () => { OCL.cancel = true; toast('Cancelando a leitura local…'); },
   ocPedir: t => { UI.oc.fila = [t.dataset.id]; ocrPedirAut([t.dataset.id]); },
   ocAssoc: t => { const k = $(`select[data-id="ocs_${t.dataset.id}"]`)?.value; ocrAssociar(t.dataset.id, k); },
   ocDesassoc: t => ocrDesassociar(t.dataset.id), ocInc: t => ocrIncorporar(t.dataset.id), ocDel: t => ocrExcluir(t.dataset.id),
@@ -6876,12 +6934,45 @@ function emPanel(c) {
   const e = UI.em?.key === c.key ? UI.em : null, T = aiTarefa('mercado'), st = iaStatusOf(T.prov), sug = (c.sugFatos || []).filter(x => x.estado === 'pendente');
   let h = `<h4>Pesquisa da empresa e do mercado (IA com busca web)</h4><div class="row sm"><button class="btn pri sm" data-a="emPrep" data-k="${esc(c.key)}">${e?.prev ? 'Fechar' : 'Pesquisar empresa e mercado'}</button><span class="muted">${esc(AI_PROV[T.prov].nome)} / ${esc(T.modelo)} — ${esc(st.l)}</span></div>`;
   if (e?.prev) { const d = emDados(c); h += `<div class="alert i sm"><b>Será enviado ao provedor:</b> razão social “${esc(d.nome)}”, local ${esc(d.local || '—')}, site ${esc(d.site || '—')}, atividade ${esc(d.atividade || '—')}, segmento ${esc(d.segmento || '—')}. <b>Não será enviado:</b> CNPJ, valores, fichas, documentos nem observações.<div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="emEnviar" data-k="${esc(c.key)}">Autorizar e enviar</button></div></div>`; }
+  h += bdPanel(c);
   if (e?.busy) h += '<p class="sm muted">Pesquisando…</p>'; if (e?.err) h += `<div class="alert b sm" role="alert">${esc(e.err)}</div>`; if (e?.aviso) h += `<div class="alert i sm">${esc(e.aviso)}</div>`;
   if (e?.rep) h += `<div class="alert i sm">${e.rep.novos} sugestão(ões) nova(s) a confirmar • ${e.rep.dup} duplicada(s) • ${e.rep.semFonte} sem fonte descartada(s) • ${e.rep.ambig} com identidade ambígua${e.rep.rej ? ` • ${e.rep.rej} de fonte que você já rejeitou (ignorada)` : ''}. ${e.rep.usouBusca ? '' : '<b>Busca web não utilizada:</b> conteúdo do conhecimento do modelo, sem fonte verificada. '}${e.rep.homonimos.length ? 'Nomes semelhantes citados: ' + e.rep.homonimos.map(esc).join('; ') + '. ' : ''}${e.rep.avisos.map(esc).join(' ')}</div>`;
   h += sug.length ? `<p class="sm"><b>${sug.length} sugestão(ões) da IA aguardando sua confirmação</b> ${chip('NECESSITA VALIDAÇÃO')} — só viram fato após você confirmar que a fonte é sobre esta empresa.</p>` + sug.map(s => `<div class="opp"><div class="row"><b>${esc(EM_TOP[s.topico])}</b>${pill('identidade: ' + s.identidadeIA, s.identidadeIA === 'confirmada' ? 'ok' : s.identidadeIA === 'provavel' ? 'warn' : 'bad')}${s.verificada ? pill('fonte citada na busca', 'ok') : pill('fonte não verificada', 'warn')}<span class="sp"></span><button class="btn pri sm" data-a="sgConf" data-k="${esc(c.key)}" data-id="${s.id}">Confirmar identidade e registrar</button><button class="btn ghost sm" data-a="sgArq" data-k="${esc(c.key)}" data-id="${s.id}" title="Guarda sem registrar como fato; pode ser restaurado">Arquivar</button><button class="btn ghost sm" data-a="sgDesc" data-k="${esc(c.key)}" data-id="${s.id}" title="A fonte não volta a ser sugerida para este cliente">Rejeitar</button></div><div class="sm">${esc(s.texto)}</div><div class="sm muted">${link({ t: s.fonteNome || 'fonte', u: s.url })} • ${s.data ? esc(fmtD(s.data)) : 'sem data'} • ${esc(s.evidIdent || 'sem evidência de identidade')}${s.impl ? ' • implicação (hipótese): ' + esc(s.impl) : ''}</div></div>`).join('') : '';
   { const fora = (c.sugFatos || []).filter(x => x.estado === 'descartado' || x.estado === 'arquivado'); if (fora.length) h += `<details class="sm" id="sg-fora"><summary>Rejeitados e arquivados (${fora.length})</summary>${fora.map(s => `<div class="row sm" style="gap:8px;padding:4px 0;border-top:1px solid var(--bd2)">${pill(s.estado === 'descartado' ? 'rejeitado' : 'arquivado', s.estado === 'descartado' ? 'bad' : 'off')}<span style="flex:1">${esc(s.texto.slice(0, 160))} <span class="muted">— ${esc(s.fonteNome || hostOf(s.url) || 'fonte')}</span></span><button class="btn ghost sm" data-a="sgRest" data-k="${esc(c.key)}" data-id="${s.id}">Restaurar</button></div>`).join('')}</details>`; }
   return h + (st.k !== 'verificado' ? '<p class="muted sm">Sem provedor testado, não há pesquisa automática: registre fatos manualmente (fonte, link e data). Nada é simulado.</p>' : '');
 }
+/* Busca dedicada (versão hospedada): provedor de pesquisa configurado no servidor. Vai só razão social e cidade, com autorização.
+   Resultado é indício: entra como sugestão PENDENTE, com identidade "ambígua" até o executivo confirmar. Sem provedor, nada é simulado. */
+function bdPanel(c) {
+  if (!window.__HOSTED__) return ''; usoCarregar(); if (!USO.d) return ''; const prov = USO.d.busca, b = UI.bd?.key === c.key ? UI.bd : null;
+  if (!prov) return '<p class="sm muted" id="bd-off"><b>Busca dedicada: não configurada.</b> Nenhum provedor de pesquisa está ligado ao servidor; registre fatos manualmente (fonte, link e data). Nada é simulado.</p>';
+  const d = emDados(c), q = [d.nome, c.city].filter(Boolean).join(' ');
+  let h = `<div class="row sm" id="bd"><button class="btn sm" data-a="bdPrep" data-k="${esc(c.key)}">${b?.prev ? 'Fechar' : 'Buscar notícias (' + esc(prov) + ')'}</button><span class="muted">Busca dedicada, sem IA: devolve links para você conferir.</span></div>`;
+  if (b?.prev) h += `<div class="alert i sm"><b>Será enviado ao provedor de busca:</b> “${esc(q)}”. <b>Não será enviado:</b> CNPJ, valores, fichas, documentos nem observações.<div class="row" style="margin-top:6px"><button class="btn pri sm" data-a="bdBuscar" data-k="${esc(c.key)}">Autorizar e buscar</button></div></div>`;
+  if (b?.busy) h += '<p class="sm muted">Buscando…</p>'; if (b?.err) h += `<div class="alert b sm" role="alert">${esc(b.err)}</div>`;
+  if (b?.res) h += `<div class="alert i sm">${b.res.length} resultado(s) de ${esc(b.prov)} em ${esc(dtBR(b.em))}. <b>São indícios</b>: abra a fonte e confirme que trata desta empresa.</div>` + b.res.map((r, i) => `<div class="opp"><div class="row"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"><b>${esc(r.titulo)}</b></a><span class="sp"></span>${r.ok ? pill('guardada', 'ok') : `<button class="btn ghost sm" data-a="bdGuardar" data-k="${esc(c.key)}" data-i="${i}">Guardar como sugestão</button>`}</div><div class="sm muted">${esc(r.host)}${r.data ? ' • ' + esc(fmtD(r.data)) : ' • sem data informada pelo provedor'}</div>${r.trecho ? `<div class="sm">${esc(r.trecho)}</div>` : ''}</div>`).join('');
+  return h;
+}
+const BD_ACT = {
+  bdPrep: t => { const k = t.dataset.k; UI.bd = UI.bd?.key === k && UI.bd.prev ? null : { key: k, prev: true }; render(); },
+  bdBuscar: async t => {
+    const c = S.clients[t.dataset.k]; if (!c || UI.bd?.busy) return; const q = [emDados(c).nome, c.city].filter(Boolean).join(' ');
+    if (new RegExp(CNPJ_TXT.source).test(q) || new RegExp(MONEY_TXT.source).test(q)) return toast('A consulta ainda contém CNPJ ou valores.');
+    UI.bd = { key: c.key, busy: true }; render();
+    try { const r = await fetch('/api/busca', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', redirect: 'manual', body: JSON.stringify({ q, n: 6 }) }); let j = null; try { j = await r.json(); } catch { /* sem corpo */ }
+      if (!j || !j.ok) { const m = j?.erro?.mensagem || 'A busca não respondeu.'; UI.bd = { key: c.key, err: m }; intLog({ sistema: 'busca', op: 'noticias', estado: 'erro', msg: m }); }
+      else { UI.bd = { key: c.key, prov: s4(j.provedor, 40), em: j.consultadoEm, res: cap(j.resultados, 8).filter(x => /^https:\/\//i.test(String(x?.url || ''))).map(x => ({ titulo: s4(x.titulo, 200), url: s4(x.url, 500), host: s4(x.host, 120), trecho: s4(x.trecho, 400), data: mkIso(x.data) || '' })) }; intLog({ sistema: 'busca', op: 'noticias', estado: 'ok', msg: `${UI.bd.res.length} resultado(s)`, n: UI.bd.res.length }); USO.t = 0; } }
+    catch (e) { UI.bd = { key: c.key, err: 'Sem conexão com o servidor.' }; }
+    render();
+  },
+  bdGuardar: t => {
+    const c = S.clients[t.dataset.k], b = UI.bd, r = b?.key === c?.key ? b.res?.[+t.dataset.i] : null; if (!c || !r) return; c.sugFatos ||= [];
+    if ((c.sgRej || []).includes(normUrl(r.url))) return toast('Você já rejeitou esta fonte para este cliente.');
+    if (c.sugFatos.some(y => normUrl(y.url) === normUrl(r.url)) || (c.fatos || []).some(y => normUrl(y.url) === normUrl(r.url))) { r.ok = true; render(); return toast('Esta fonte já está nas sugestões ou nos fatos do cliente.'); }
+    c.sugFatos.unshift({ id: 'sg_' + uid(), topico: 'noticia', texto: [r.titulo, r.trecho].filter(Boolean).join(' — ').slice(0, 500), fonteNome: r.host, url: r.url, data: r.data || '', verificada: true, identidadeIA: 'ambigua', evidIdent: 'Resultado de busca dedicada; identidade não verificada.', impl: '', at: nowISO(), prov: b.prov, usouBusca: true, estado: 'pendente' });
+    c.sugFatos = c.sugFatos.slice(0, 40); r.ok = true; touchC(c.key); render(); toast('Guardada como sugestão pendente. Confirme a identidade antes de virar fato.');
+  }
+};
 const SG_ACT = {
   emPrep: t => emPrep(t.dataset.k), emEnviar: t => emEnviar(t.dataset.k), sgConf: t => sgConfirmar(t.dataset.k, t.dataset.id), sgDesc: t => sgDescartar(t.dataset.k, t.dataset.id), sgArq: t => sgArquivar(t.dataset.k, t.dataset.id), sgRest: t => sgRestaurar(t.dataset.k, t.dataset.id),
   rxCopiar: async t => { const c = S.clients[t.dataset.k]; if (!c) return; const txt = rxRoteiro(c); try { await navigator.clipboard.writeText(txt); toast('Roteiro copiado.'); } catch (e) { offer(`roteiro-${norm(c.name).replace(/\W+/g, '-').slice(0, 40)}.txt`, txt); toast('Cópia bloqueada neste ambiente: arquivo gerado.'); } },
@@ -7772,9 +7863,10 @@ function vRefs() {
   ${ms.length ? `<div class="tw"><table><thead><tr><th>Produto</th><th>Release</th><th>Marco</th><th>Data</th><th>Fonte</th><th>Consulta</th><th>Clientes nesta release</th><th></th></tr></thead><tbody>${ms.map(m => { const n = cs.filter(c => relRows(c).some(r => r.marco?.id === m.id)).length; return `<tr class="${m.st === 'arquivado' ? 'arq' : ''}"><td>${esc(m.produto)}</td><td><b>${esc(m.release)}</b></td><td class="sm">${esc(m.tipo)}${m.obs ? `<div class="muted">${esc(m.obs)}</div>` : ''}</td><td>${edit('marcos', m, 'data', m.data)}</td><td class="sm">${srcLink(m.fonte)}${isStale(m.consultadoEm) ? ' ' + pill('fonte precisa de atualização', 'warn') : ''}</td><td class="nw sm">${fmtD(m.consultadoEm)}</td><td>${n}</td><td><button class="btn ghost sm" data-a="recArq" data-col="marcos" data-id="${m.id}">${m.st === 'arquivado' ? 'Reativar' : 'Arquivar'}</button>${histDet(m.hist)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="muted">Nenhum marco aprovado.</p>'}
   <div class="row addr"><select id="mk_p">${['Protheus', 'RM', 'Datasul', 'Logix'].map(x => `<option>${x}</option>`).join('')}</select><input id="mk_r" placeholder="12.1.2510" style="width:100px"><input id="mk_t" value="Expiração do release" style="width:160px"><input id="mk_d" type="date"><input id="mk_ft" placeholder="Título da fonte oficial" style="width:200px"><input id="mk_fu" placeholder="URL" style="width:200px"><button class="btn ghost sm" data-a="mkNew">Registrar marco</button></div>
   <div class="row addr"><input id="ed_motivo" placeholder="Motivo/fonte da próxima alteração de data (obrigatório para editar)" style="min-width:420px" value="${esc(UI.edMotivo || '')}"></div></div>`;
+  h += rgfCard();
   h += `<div class="card"><h3>Calendário fiscal e regulatório</h3>${rs.length ? `<div class="tw"><table><thead><tr><th>Obrigação ou mudança</th><th>Órgão</th><th>Fonte</th><th>Publicação</th><th>Vigência</th><th>Prazo</th><th>Testes</th><th>Clientes</th><th></th></tr></thead><tbody>${rs.map(r => { const ap = cs.map(c => applic(r, c).state); const n = s => ap.filter(x => x === s).length;
     return `<tr class="${r.st === 'arquivado' ? 'arq' : ''}"><td><b>${esc(r.nome)}</b><div class="sm muted">${esc(r.criterios?.nota || '')}</div><div class="sm">Confiança: ${esc(r.confianca || '—')}${r.obsData ? ' • ' + esc(r.obsData) : ''}</div></td><td class="sm">${esc(r.orgao)}</td><td class="sm">${srcLink(r.fonte)}${r.fonte?.oficial === false ? ' ' + pill('secundária', 'warn') : ''}${r.fonte2 ? '<br>' + srcLink(r.fonte2) : ''}<div class="muted">consulta ${fmtD(r.consultadoEm)}</div></td><td>${edit('regulatorio', r, 'publicacao', r.publicacao)}</td><td>${edit('regulatorio', r, 'vigencia', r.vigencia)}</td><td>${edit('regulatorio', r, 'prazo', r.prazo)}</td><td class="sm">${r.testes ? `${fmtD(r.testes.ini)}${r.testes.fim ? ' a ' + fmtD(r.testes.fim) : ''}<div class="muted">${esc(r.testes.desc || '')}</div>` : '—'}</td><td class="sm nw">${pill(n('aplicavel') + ' aplicável', n('aplicavel') ? 'bad' : 'off')}<br>${pill(n('potencial') + ' a validar', n('potencial') ? 'warn' : 'off')}<br>${n('nao_aplicavel')} não aplicável</td><td><button class="btn ghost sm" data-a="recArq" data-col="regulatorio" data-id="${r.id}">${r.st === 'arquivado' ? 'Reativar' : 'Arquivar'}</button>${histDet(r.hist)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="muted">Nenhum evento aprovado.</p>'}
-  <details><summary class="sm">Registrar novo evento</summary><div class="grid g3"><input id="rg_n" placeholder="Obrigação ou mudança"><input id="rg_o" placeholder="Órgão responsável"><input id="rg_ft" placeholder="Título da fonte oficial"><input id="rg_fu" placeholder="URL da fonte"><label class="sm">Publicação <input id="rg_pub" type="date"></label><label class="sm">Vigência <input id="rg_vig" type="date"></label><label class="sm">Prazo <input id="rg_pz" type="date"></label><label class="sm">Testes início <input id="rg_ti" type="date"></label><label class="sm">Testes fim <input id="rg_tf" type="date"></label></div>
+  <details id="rg-novo"><summary class="sm">Registrar novo evento</summary><div class="grid g3"><input id="rg_n" placeholder="Obrigação ou mudança"><input id="rg_o" placeholder="Órgão responsável"><input id="rg_ft" placeholder="Título da fonte oficial"><input id="rg_fu" placeholder="URL da fonte"><label class="sm">Publicação <input id="rg_pub" type="date"></label><label class="sm">Vigência <input id="rg_vig" type="date"></label><label class="sm">Prazo <input id="rg_pz" type="date"></label><label class="sm">Testes início <input id="rg_ti" type="date"></label><label class="sm">Testes fim <input id="rg_tf" type="date"></label></div>
   <div class="row sm">Regimes: ${REGIMES.map(x => `<label><input type="checkbox" class="rg_reg" value="${x}"> ${x}</label>`).join(' ')}</div><div class="row sm">Operações: ${Object.entries(OPS).map(([k, l]) => `<label><input type="checkbox" class="rg_op" value="${k}"> ${l}</label>`).join(' ')}</div><div class="row sm">Ações: ${Object.entries(ACOES_REG).map(([k, l]) => `<label><input type="checkbox" class="rg_ac" value="${k}"> ${l}</label>`).join(' ')}</div>
   <div class="row"><input id="rg_ufs" placeholder="UFs (vazio = todas), ex.: PR, SC" style="width:200px"><input id="rg_nota" placeholder="Critérios adicionais / observação" style="min-width:300px"><button class="btn ghost sm" data-a="rgNew">Registrar evento</button></div></details></div>`;
   return relCarteiraCard() + h;
@@ -10657,7 +10749,7 @@ const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e 
 function telAvisoUmaVez() { if (!TEL.on) return; try { if (lsGet('adm.aviso') === '1') return; lsSet('adm.aviso', '1'); setTimeout(() => toast('Registramos eventos de uso (recurso, data, resultado), sem conteúdo de carteira. Detalhes em Configurações → Conta.'), 1500); } catch { /* ok */ } }
 
 /* ---------------- Painel Administrador ---------------- */
-const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null };
+const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null, reg: null, regBusy: '' };
 window.__PAINEL = false;
 function admPainelOn(v) {
   window.__PAINEL = v === true;
@@ -10685,6 +10777,7 @@ async function admLoad() {
     await admCatLoad(true);
     try { ADMV.aud = (await admApi('/api/adm/auditoria')).itens; } catch { ADMV.aud = null; }
     try { ADMV.integ = await admApi('/api/adm/integracoes'); } catch { ADMV.integ = null; }
+    try { ADMV.reg = await admApi('/api/adm/regfontes', { op: 'estado' }); } catch { ADMV.reg = null; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -10751,7 +10844,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admIntegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admIntegCard() + admRegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += admAudCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
@@ -10867,6 +10960,23 @@ function admCatCard() {
   ${c.exec.length ? `<details style="margin-top:10px"><summary class="sm">Últimas execuções</summary><ul class="sm">${c.exec.map(x => `<li>${esc(fmtDate(x.ts))} — ${esc(x.fonte)} · ${esc(x.op)}: ${x.lidas} lida(s), ${x.novas} nova(s), ${x.erros} erro(s)${x.detalhe ? ' — ' + esc(x.detalhe) : ''}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
 const admCatSelecionadas = () => Object.keys(ADMV.catSel).filter(k => ADMV.catSel[k] && (ADMV.cat?.paginas || []).some(p => p.chave === k));
+/* Radar regulatório: fontes oficiais que o servidor verifica 1x por dia útil. Só aponta que a página mudou. */
+const ADM_REG_EST = { ok: ['Lida', 'p-ok'], nao_testada: ['Não verificada', 'p-info'], indisponivel: ['Indisponível', 'p-warn'], bloqueada_robots: ['Leitura não permitida pelo site', 'p-warn'], autenticacao_necessaria: ['Exige login', 'p-bad'], nao_encontrada: ['Não encontrada', 'p-bad'], formato: ['Não é página HTML', 'p-warn'], invalida: ['Endereço inválido', 'p-bad'] };
+function admRegCard() {
+  const g = ADMV.reg; if (!g) return ''; const F = g.fontes || [];
+  return `<div class="card" id="adm-reg"><h3>Radar regulatório — fontes oficiais monitoradas <span class="pill p-info">${F.length}/${g.max}</span></h3>
+  <p class="sm muted">Cadastre a página oficial que lista publicações (Receita Federal, eSocial, SPED, SEFAZ, documentação TOTVS). O servidor a relê 1 vez por dia útil, respeitando o robots.txt, e <b>só registra que o texto mudou</b> — não interpreta norma nem cria evento. Cada executivo vê o aviso em “Releases e regulatório”, abre a fonte e registra o evento com vigência e prazo comprovados. Páginas com conteúdo rotativo podem acusar mudança sem novidade.</p>
+  ${F.length ? `<div class="tw"><table><thead><tr><th>Fonte</th><th>Órgão</th><th>Estado</th><th>Última leitura</th><th>Mudança detectada</th><th></th></tr></thead><tbody>${F.map(f => { const e = ADM_REG_EST[f.estado] || [f.estado, 'p-info']; return `<tr class="${f.ativo ? '' : 'arq'}"><td><b>${esc(f.nome)}</b><div class="sm"><a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">${esc(f.url.slice(0, 90))}</a></div></td><td class="sm">${esc(f.orgao || '—')}</td><td><span class="pill ${e[1]}">${esc(e[0])}</span>${f.ativo ? '' : ' <span class="pill p-off">pausada</span>'}${f.erro ? `<div class="sm muted">${esc(f.erro)}</div>` : ''}</td><td class="sm">${f.vista_em ? esc(dtBR(f.vista_em)) : '—'}</td><td class="sm">${f.mudou_em ? esc(dtBR(f.mudou_em)) : 'nenhuma desde o cadastro'}</td><td class="nw"><button class="btn ghost sm" data-a="admRegVer" data-id="${esc(f.id)}"${ADMV.regBusy ? ' disabled' : ''}>Verificar agora</button><button class="btn ghost sm" data-a="admRegAtivo" data-id="${esc(f.id)}" data-on="${f.ativo ? '0' : '1'}">${f.ativo ? 'Pausar' : 'Retomar'}</button><button class="btn ghost sm" data-a="admRegDel" data-id="${esc(f.id)}">Remover</button></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="sm">Nenhuma fonte cadastrada. Sem fontes, o radar não faz nenhuma leitura e o registro de eventos continua manual.</p>'}
+  <div class="row addr"><input id="rf_n" placeholder="Nome (ex.: Portal SPED — notícias)" style="min-width:230px"><input id="rf_o" placeholder="Órgão" style="width:150px"><input id="rf_u" placeholder="https://… (gov.br, jus.br, leg.br ou totvs.com)" style="min-width:320px"><button class="btn pri sm" data-a="admRegAdd"${ADMV.regBusy ? ' disabled' : ''}>${ADMV.regBusy ? esc(ADMV.regBusy) : 'Cadastrar e verificar'}</button></div></div>`;
+}
+async function admRegOp(corpo, msg) { if (ADMV.regBusy) return null; ADMV.regBusy = msg; render(); try { const j = await admApi('/api/adm/regfontes', corpo); ADMV.reg = { ...ADMV.reg, fontes: j.fontes }; return j; } catch (e) { toast(e.message); return null; } finally { ADMV.regBusy = ''; render(); } }
+const admRegMsg = v => v.estado !== 'ok' ? `Não foi possível ler: ${v.erro || v.estado}` : v.primeira ? 'Fonte lida. Linha de base registrada.' : v.alterou ? 'A página mudou desde a última leitura.' : 'Sem mudança desde a última leitura.';
+const ADM_REG_ACT = {
+  admRegAdd: async () => { const j = await admRegOp({ op: 'adicionar', nome: $('#rf_n').value, orgao: $('#rf_o').value, url: $('#rf_u').value }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },
+  admRegVer: async t => { const j = await admRegOp({ op: 'verificar', id: t.dataset.id }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },
+  admRegAtivo: t => admRegOp({ op: 'ativar', id: t.dataset.id, ativo: t.dataset.on === '1' }, 'Salvando…'),
+  admRegDel: t => { if (confirm('Remover esta fonte do radar regulatório? Os eventos já registrados pelos executivos não são afetados.')) admRegOp({ op: 'remover', id: t.dataset.id, confirmar: t.dataset.id }, 'Removendo…'); }
+};
 const ADM_CAT_ACT = {
   admCatTestar: async t => { const j = await admCatOp({ op: 'testar', fonte: t.dataset.f }, 'Testando a conexão com a fonte…'); if (j) toast(j.teste.estado === 'ok' ? `Fonte acessível: ${j.teste.links} link(s) internos encontrados.` : `Fonte não acessível: ${j.teste.erro || j.teste.estado}`); },
   admCatDesc: async t => { const j = await admCatOp({ op: 'descobrir', fonte: t.dataset.f }, 'Lendo o próximo lote de páginas…'); if (j) toast(`${j.lote.lidas} lida(s), ${j.lote.novas} nova(s), ${j.lote.erros} erro(s).${j.lote.parou ? ' ' + j.lote.parou : ''}`); },
@@ -12247,7 +12357,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ATU_ACT, PT_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ADM_REG_ACT, RGF_ACT, BD_ACT, ATU_ACT, PT_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;
