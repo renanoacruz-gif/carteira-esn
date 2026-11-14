@@ -47,7 +47,7 @@ const ACT = {
   shGo: () => { if (shSave($('#sh_url').value, $('#sh_min').value, $('#sh_auto').checked)) shSync(true); }, shNow: () => shSync(true), shOff: () => { if (confirm('Desvincular a planilha? Os clientes e o histórico serão mantidos.')) shUnlink(); },
   fcGo: () => { if (fcSave($('#fc_url').value, $('#fc_min').value, $('#fc_auto').checked)) fcSync(true); }, fcNow: () => fcSync(true), fcOff: () => { if (confirm('Desvincular a planilha do Forecast? O histórico sincronizado será mantido.')) fcUnlink(); },
   fcPer: t => { UI.fc ||= {}; UI.fc.per = t.dataset.v; delete UI.fc.sel; render(); }, fcLinkGo: t => fcLinkConfirm(t.dataset.id, $('#fcl_' + t.dataset.id).value), fcLinkOff: t => fcLink(t.dataset.id, ''), fcLinkSug: t => { if (S.clients[t.dataset.k]) fcLink(t.dataset.id, t.dataset.k); },
-  empTab: t => { empUI().tab = t.dataset.v; render(); window.scrollTo(0, 0); }, empGo: t => empIr(JSON.parse(t.dataset.f)), empBase: t => empSetCfg('baseRecencia', t.dataset.v),
+  empTab: t => { empUI().tab = t.dataset.v; if (t.dataset.ir) UI.view = 'mrr'; render(); window.scrollTo(0, 0); }, empGo: t => empIr(JSON.parse(t.dataset.f)), empBase: t => empSetCfg('baseRecencia', t.dataset.v),
   empXlsx: () => empXlsx(), empPdf: () => empPdf(),
   empApply: () => empAplicar($('#emp_data')?.value), empCancel: () => { empUI().pend = null; render(); }, gstAddI: t => empGstAddI(t.dataset.k), gstDelI: t => empGstDelI(t.dataset.k, t.dataset.id),
   fcMore: () => { UI.fc ||= {}; UI.fc.lim = (UI.fc.lim || 150) + 150; render(); },
@@ -108,7 +108,7 @@ document.addEventListener('change', async e => {
   if (c === 'prtxt') { prTexto(t.dataset.id, v); return; }
   if (c === 'lkopt') { LK_OPT()[t.dataset.f] = Math.max(0, +v || 0); return; }
   if (c === 'valOrig' && files?.length) { valOrig(t.dataset.k, t.dataset.id, files[0]); t.value = ''; return; }
-  if (ptChange(c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
+  if (ptChange(t, c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
   switch (c) {
     case 'attach': await ingest(files, t.dataset.t, t.dataset.k); t.value = ''; break;
     case 'wsheet': { const w = UI.wiz; w.si = +v; w.h = detectHeader(w.sheets[w.si].rows); w.map = autoMap((w.sheets[w.si].rows[w.h] || []).map(String)); render(); break; }

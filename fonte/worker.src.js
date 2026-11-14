@@ -748,7 +748,7 @@ async function processar(q, env, base, t0) {
 
 /*__ADM__*/
 /*__PUSH__*/
-export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
+export default { fetch: (req, env, ctx) => handle(req, env, ctx), scheduled: (ev, env, ctx) => { const vigia = ev && /^40 /.test(String(ev.cron || '')); ctx.waitUntil(catAuto(env, vigia && /^40 12 /.test(String(ev.cron))).catch(e => console.error('cat_auto', String(e && e.message || e)))); /* catálogo: só age se o administrador ligou a leitura agendada */ if (vigia && /^40 12 /.test(String(ev.cron))) ctx.waitUntil(admPurgar(env).catch(e => console.error('purga_diaria', String(e && e.message || e)))); /* retenção: 1x por dia útil, no cron leve (não depende de tráfego) */ ctx.waitUntil((vigia ? pushVigia(env, ev.scheduledTime) : pushAgendado(env, ev && ev.scheduledTime)).catch(e => console.error('push_agendado', e && e.name))); } };
 
 /* Página mínima servida em "/": cola o pedido (JSON baixado do aplicativo), envia, baixa a resposta. A senha (APP_TOKEN) fica só na memória da página. */
 const PAGE = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Backend Gemini — Gestão de Carteira TOTVS ESN</title><meta name="viewport" content="width=device-width,initial-scale=1">

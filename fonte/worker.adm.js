@@ -389,6 +389,16 @@ async function catReler(db, env, f, n) {
   return { relidas, alteradas, erros, parou: '' };
 }
 async function catMapa(db) { return { paginas: (await db.prepare("SELECT chave,url,fonte,titulo,estado FROM cat_paginas WHERE vista_em IS NOT NULL AND estado<>'inacessivel' ORDER BY fonte, prof, rowid LIMIT 3000").all()).results || [] }; }
+/* leitura agendada (opcional, desligada por padrão): 1 lote por disparo do agendador, só em fonte já testada com sucesso */
+async function catAuto(env, releitura) {
+  const db = admDb(env); if (!db) return null; await admInit(env);
+  const on = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='cat_auto'").first(); if (!on || on.valor !== '1') return null;
+  const f = await db.prepare("SELECT f.* FROM cat_fontes f WHERE f.estado='ok' AND EXISTS (SELECT 1 FROM cat_paginas p WHERE p.fonte=f.id AND p.estado='pendente' AND p.prof<=?) ORDER BY COALESCE(f.ultima_sinc,'') LIMIT 1").bind(CAT_CFG.maxProf).first();
+  if (f) { const r = await catDescobrir(db, env, f); await catLog(db, f.id, 'auto', { lidas: r.lidas, novas: r.novas, erros: r.erros, detalhe: 'leitura agendada' + (r.parou ? ' — ' + r.parou : '') }); return { fonte: f.id, ...r }; }
+  if (!releitura) return null;
+  const g = await db.prepare("SELECT f.* FROM cat_fontes f WHERE f.estado='ok' AND EXISTS (SELECT 1 FROM cat_paginas p WHERE p.fonte=f.id AND p.estado IN ('candidata','importada')) ORDER BY COALESCE(f.ultima_sinc,'') LIMIT 1").first();
+  if (!g) return null; const r = await catReler(db, env, g); await db.prepare('UPDATE cat_fontes SET ultima_sinc=? WHERE id=?').bind(new Date().toISOString(), g.id).run(); return { fonte: g.id, ...r };
+}
 async function catEstado(db, q) {
   const fontes = (await db.prepare('SELECT * FROM cat_fontes ORDER BY id').all()).results || [], cont = {};
   for (const r of ((await db.prepare("SELECT fonte, estado e, COUNT(*) n FROM cat_paginas GROUP BY fonte, estado").all()).results || [])) (cont[r.fonte] = cont[r.fonte] || {})[r.e] = r.n;
@@ -402,13 +412,15 @@ async function catEstado(db, q) {
   for (const p of paginas) { const t = []; let k = p.pai, n = 0; while (k && anc.has(k) && n++ <= CAT_CFG.maxProf) { t.unshift(anc.get(k).titulo || ''); k = anc.get(k).pai; } p.trilha = t; p.mudou = !!(p.alterada_em && p.revisada_em && p.alterada_em > p.revisada_em); delete p.pai; }
   const mud = {}; for (const r of ((await db.prepare('SELECT fonte, COUNT(*) n FROM cat_paginas WHERE alterada_em IS NOT NULL AND revisada_em IS NOT NULL AND alterada_em > revisada_em GROUP BY fonte').all()).results || [])) mud[r.fonte] = r.n;
   const exec = (await db.prepare('SELECT ts,fonte,op,lidas,novas,erros,detalhe FROM cat_exec ORDER BY id DESC LIMIT 12').all()).results || [];
-  return { fontes: fontes.map(f => ({ ...f, autenticado: !!f.autenticado, contagem: cont[f.id] || {}, alteradas: mud[f.id] || 0 })), paginas, total: tot, pag, exec, limites: CAT_CFG };
+  const au = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='cat_auto'").first();
+  return { auto: !!au && au.valor === '1', fontes: fontes.map(f => ({ ...f, autenticado: !!f.autenticado, contagem: cont[f.id] || {}, alteradas: mud[f.id] || 0 })), paginas, total: tot, pag, exec, limites: CAT_CFG };
 }
 async function admCatalogo(req, env) {
   const db = admDb(env); await admInit(env); await catSeed(db); let q; try { q = await req.json(); } catch { q = {}; } const op = String(q.op || 'estado');
   const inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400);
   if (op === 'estado') return J({ ok: true, ...(await catEstado(db, q)) });
   if (op === 'mapa') return J({ ok: true, ...(await catMapa(db)) });
+  if (op === 'auto') { const v = q.ligar === true ? '1' : '0'; await db.prepare('INSERT INTO adm_cfg(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').bind('cat_auto', v).run(); return J({ ok: true, auto: v === '1' }); }
   if (op === 'testar' || op === 'descobrir' || op === 'limpar' || op === 'reler') {
     const f = await catFonte(db, q.fonte); if (!f) return inval('Fonte desconhecida.');
     if (op === 'limpar') { if (q.confirmar !== f.id) return inval('Confirmação ausente.'); const r = await db.prepare('DELETE FROM cat_paginas WHERE fonte=?').bind(f.id).run(); await catLog(db, f.id, 'limpar', { detalhe: (r.meta?.changes || 0) + ' página(s) removida(s) da fila' }); return J({ ok: true, removidas: r.meta?.changes || 0 }); }
@@ -438,4 +450,4 @@ async function admRota(req, env, au, url) {
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto };

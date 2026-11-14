@@ -5,6 +5,7 @@ const PT_CLS = { contratada: ['Contratada', 'ok'], possivel: ['Possivelmente uti
 const PT_ORD = ['potencial', 'validar', 'possivel', 'contratada', 'nao_ident', 'incompativel'];
 const PT_PESO = [['segmento', 'Segmento', 20], ['dor', 'Dor ou oportunidade', 25], ['compat', 'Compatibilidade', 20], ['compl', 'Complementaridade', 15], ['viab', 'Viabilidade', 10], ['mat', 'Maturidade do registro', 10]];
 const PT_LINHAS = ['Protheus', 'RM', 'Datasul', 'Winthor', 'Logix'];
+const PT_RES = { ganhou: 'Ganhou', perdeu: 'Perdeu', nao_aderiu: 'Não aderiu' };
 const ptLinhaDe = r => PT_LINHAS.find(l => new RegExp('(^|[^a-z])' + l.toLowerCase() + '($|[^a-z])').test(norm(r.linha || ''))) || '';
 /* contexto do cliente, calculado uma vez por classificação em lote */
 function ptCtx(c) {
@@ -52,7 +53,10 @@ function ptClass(X, r) {
     else if (sinal) { cls = 'potencial'; porque = [h && 'hipótese de dor', o && 'oportunidade do motor', segSol && 'aderência ao segmento'].filter(Boolean).join(' + ') + '.'; porque = porque[0].toUpperCase() + porque.slice(1); }
     else { cls = 'nao_ident'; porque = 'Sem indício registrado de uso ou de aderência.'; }
   }
-  return { id: r.id, cls, porque, score: cls === 'contratada' ? null : score, fatores: PT_PESO.map(([k, rot, peso]) => ({ k, rot, peso, ...F[k] })) };
+  /* desfecho registrado pelo executivo: não volta a recomendar o que já foi perdido ou não aderiu */
+  const res = c.ptRes?.[r.id];
+  if (res && cls !== 'contratada') { const q = `${PT_RES[res.st] || res.st} em ${fmtD(String(res.em || '').slice(0, 10))}`; if (res.st === 'ganhou') { cls = 'possivel'; porque = `Você registrou: ${q}. Ainda não aparece nos itens de contrato deste cliente.`; } else { cls = 'nao_ident'; porque = `Você registrou: ${q}. Não recomendar de novo sem fato novo.`; } }
+  return { id: r.id, cls, porque, score: cls === 'contratada' ? null : score, fatores: PT_PESO.map(([k, rot, peso]) => ({ k, rot, peso, ...F[k] })), res: res || null };
 }
 const ptSols = () => activeSols();
 function ptCliente(c) { const X = ptCtx(c); return ptSols().map(r => ({ r, ...ptClass(X, r) })); }
@@ -61,6 +65,24 @@ const ptRank = (a, b) => PT_ORD.indexOf(a.cls) - PT_ORD.indexOf(b.cls) || (b.sco
 const ptPill = x => pill(PT_CLS[x.cls][0], PT_CLS[x.cls][1]);
 const ptBarra = x => x.score == null ? '<span class="muted">—</span>' : `<span class="pt-sc" title="Pontuação de aderência"><span class="pt-bar"><i style="width:${x.score}%"></i></span><b>${x.score}</b></span>`;
 const ptExpl = x => `<details class="pt-ex"><summary class="sm">Ver pontuação por fator</summary><ul class="pt-ft">${x.fatores.map(f => `<li><b>${esc(f.rot)} ${f.pts}/${f.peso}</b> <span class="muted">— ${esc(f.motivo)}</span></li>`).join('')}</ul>${x.score == null ? '<div class="sm muted">Solução já contratada: a pontuação de aderência não se aplica.</div>' : ''}</details>`;
+const ptResSel = (c, x) => x.cls === 'contratada' && !x.res ? '' : `<label class="sm pt-res">Desfecho <select data-c="ptres" data-k="${esc(c.key)}" data-id="${esc(x.id)}" aria-label="Desfecho da recomendação"><option value="">sem registro</option>${Object.entries(PT_RES).map(([k, l]) => `<option value="${k}" ${x.res?.st === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+function ptResSet(key, id, st) {
+  const c = S.clients[key], r = S.solutions.find(x => x.id === id); if (!c || !r) return;
+  c.ptRes ||= {}; if (!PT_RES[st]) delete c.ptRes[id]; else { const antes = c.ptRes[id]; delete c.ptRes[id]; const sc = antes?.sc ?? ptClass(ptCtx(c), r).score; c.ptRes[id] = { st, em: nowISO(), sc: Number.isFinite(sc) ? sc : null }; }
+  touchC(key); toast(PT_RES[st] ? `Desfecho registrado: ${PT_RES[st]}.` : 'Desfecho removido.');
+}
+/* leva a candidata para a semana: cria a próxima ação da conta (nunca sobrescreve uma ação já definida) */
+function ptSemana(key, id) {
+  const c = S.clients[key], r = S.solutions.find(x => x.id === id); if (!c || !r) return;
+  const g = c.gst ||= {}; if (g.proximaAcao || g.dataAcao) return toast(`Este cliente já tem próxima ação${g.proximaAcao ? ': “' + g.proximaAcao.slice(0, 60) + '”' : ''}. Ajuste em Gestão da conta.`);
+  const d7 = new Date(Date.now() + 7 * 864e5); g.proximaAcao = `Conversa de descoberta: ${r.nome}`.slice(0, 200); g.dataAcao = d7.getFullYear() + '-' + String(d7.getMonth() + 1).padStart(2, '0') + '-' + String(d7.getDate()).padStart(2, '0'); if (!g.oportunidade) g.oportunidade = r.nome.slice(0, 120); g.em = nowISO();
+  touchC(key); toast(`Ação criada para ${fmtD(g.dataAcao)}. Ela aparece no Plano da semana e na Gestão da conta.`);
+}
+/* acerto das recomendações: desfechos registrados e a aderência que a solução tinha quando foram marcados */
+function ptAcerto() {
+  const o = {}; for (const c of clients()) for (const [id, x] of Object.entries(c.ptRes || {})) { if (!PT_RES[x.st]) continue; const a = o[x.st] ||= { n: 0, s: 0, ns: 0 }; a.n++; if (Number.isFinite(x.sc)) { a.s += x.sc; a.ns++; } }
+  return Object.keys(PT_RES).filter(k => o[k]).map(k => ({ k, rot: PT_RES[k], n: o[k].n, media: o[k].ns ? Math.round(o[k].s / o[k].ns) : null }));
+}
 function ptUI() { return UI.pt ||= { q: '', linha: '', tipo: '', pag: 0, sel: '', cls: '', cq: '', ccls: '' }; }
 const ptHay = r => norm(`${r.nome} ${r.sigla || ''} ${r.linha || ''} ${r.categoria || ''} ${(r.termos || []).join(' ')} ${r.finalidade || ''} ${(r.funcionalidades || []).map(x => x.t).join(' ')} ${(r.dores || []).map(x => x.t).join(' ')} ${(r.necessidades || []).map(n => NEED_LABEL[n] || n).join(' ')}`);
 /* busca: todas as palavras precisam aparecer (nome, linha, termos, funcionalidades, dores, necessidades); nome pesa mais */
@@ -77,6 +99,7 @@ function vPortfolio() {
   const nCli = clients().length;
   return `<div class="card"><h3>Portfólio TOTVS <span class="muted sm">(${all.length} solução(ões) na Base)</span></h3>
   <p class="sm muted">Escolha uma solução para ver <b>onde ela pode ser vendida</b> na sua carteira. A classificação usa só o que está registrado; o que falta aparece como “validar”.</p>
+  ${(ac => ac.length ? `<p class="sm" id="pt-acerto"><b>Desfechos registrados:</b> ${ac.map(x => `${x.n} ${esc(x.rot.toLowerCase())}${x.media != null ? ` (aderência média ${x.media})` : ''}`).join(' · ')}. <span class="muted">Se o que você ganha tem aderência parecida com o que perde, vale rever os pesos.</span></p>` : '')(ptAcerto())}
   <div class="row" style="gap:8px;flex-wrap:wrap"><input type="text" data-i="ptq" value="${esc(U.q)}" placeholder="Buscar por nome, linha, funcionalidade, dor ou necessidade" style="min-width:280px;flex:1"><select data-c="ptlinha" aria-label="Linha">${opt('', 'Todas as linhas', U.linha)}${linhas.map(l => opt(l, l, U.linha)).join('')}</select><select data-c="pttipo" aria-label="Tipo">${opt('', 'Todos os tipos', U.tipo)}${Object.entries(TIPOS).map(([k, v]) => opt(k, v, U.tipo)).join('')}</select></div>
   ${res.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th style="min-width:220px">Solução</th><th>Tipo</th><th>Linha / categoria</th><th>Registro</th><th class="num">Clientes que já têm</th><th></th></tr></thead><tbody>${res.slice(U.pag * POR, U.pag * POR + POR).map(({ r }) => `<tr><td><b>${esc(r.nome)}</b>${r.finalidade ? `<div class="sm muted">${esc(String(r.finalidade).slice(0, 110))}</div>` : ''}</td><td class="sm">${esc(TIPOS[r.tipo] || r.tipo)}</td><td class="sm">${esc(r.linha || '—')}${r.categoria ? ' · ' + esc(r.categoria) : ''}</td><td>${pill(r.status, r.status === 'Validado' ? 'ok' : r.status === 'Em revisão' ? 'info' : 'warn')}</td><td class="num">${tem.get(r.id) || 0}${nCli ? ` <span class="muted sm">de ${nCli}</span>` : ''}</td><td><button class="btn sm pri" data-a="ptSel" data-id="${esc(r.id)}">Onde posso vender?</button></td></tr>`).join('')}</tbody></table></div>
   <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm ghost" data-a="ptPag" data-d="-1" ${U.pag > 0 ? '' : 'disabled'}>Anterior</button><span class="sm muted">Página ${U.pag + 1} de ${pags} · ${res.length} resultado(s)</span><button class="btn sm ghost" data-a="ptPag" data-d="1" ${U.pag + 1 < pags ? '' : 'disabled'}>Próxima</button></div>` : '<p class="sm muted" style="margin-top:10px">Nenhuma solução encontrada com esse filtro.</p>'}</div>`;
@@ -89,7 +112,7 @@ function ptOnde(r) {
   <p class="sm muted">${esc(TIPOS[r.tipo] || r.tipo)}${r.linha ? ' · linha ' + esc(r.linha) : ''}${r.categoria ? ' · ' + esc(r.categoria) : ''} · registro ${esc(r.status)}${r.finalidade ? ' — ' + esc(String(r.finalidade).slice(0, 200)) : ''}</p>
   ${r.status !== 'Validado' ? '<div class="alert w"><b>Registro ainda não validado.</b> Confirme o conteúdo na fonte oficial antes de levar ao cliente.</div>' : ''}
   ${all.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">${chip('', 'Todos')}${PT_ORD.filter(k => n(k)).map(k => chip(k, PT_CLS[k][0])).join('')}</div>
-  <div class="tw"><table><thead><tr><th style="min-width:200px">Cliente</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 300).map(x => `<tr><td><a href="#" data-a="open" data-k="${esc(x.c.key)}"><b>${esc(x.c.name)}</b></a><div class="sm muted">${esc(x.c.segInfo?.id ? (segName(x.c.segInfo.id) || x.c.segInfo.id) : 'segmento não classificado')}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 300 ? `<p class="sm muted">Mostrando os 300 primeiros de ${lista.length}.</p>` : ''}` : '<p class="sm muted">Importe a carteira para ver onde esta solução pode ser vendida.</p>'}
+  <div class="tw"><table><thead><tr><th style="min-width:200px">Cliente</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 300).map(x => `<tr><td><a href="#" data-a="open" data-k="${esc(x.c.key)}"><b>${esc(x.c.name)}</b></a><div class="sm muted">${esc(x.c.segInfo?.id ? (segName(x.c.segInfo.id) || x.c.segInfo.id) : 'segmento não classificado')}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}${ptResSel(x.c, x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 300 ? `<p class="sm muted">Mostrando os 300 primeiros de ${lista.length}.</p>` : ''}` : '<p class="sm muted">Importe a carteira para ver onde esta solução pode ser vendida.</p>'}
   <p class="sm muted" style="margin-top:10px">Pontuação (0–100): segmento 20 · dor ou oportunidade 25 · compatibilidade 20 · complementaridade 15 · viabilidade 10 · maturidade do registro 10. É um apoio de priorização, não uma garantia de aderência nem de retorno.</p></div>`;
 }
 function ptTab(c) {
@@ -97,7 +120,7 @@ function ptTab(c) {
   const chip = (k, t) => `<button class="btn sm ${U.ccls === k ? 'pri' : 'ghost'}" data-a="ptCCls" data-k="${k}">${esc(t)} (${k ? n(k) : all.length})</button>`;
   return `<div class="card"><h3>Portfólio TOTVS neste cliente</h3><p class="sm muted">Cada solução da Base classificada para ${esc(c.name)}. A classificação usa só o que está registrado; “validar” indica o que precisa de confirmação antes de afirmar ao cliente.</p>
   <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">${chip('', 'Todas')}${PT_ORD.filter(k => n(k)).map(k => chip(k, PT_CLS[k][0])).join('')}<span class="sp"></span><input type="text" data-i="ptcq" value="${esc(U.cq || '')}" placeholder="Buscar solução" style="min-width:200px"></div>
-  ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b><div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
+  ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b><div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}${ptResSel(c, x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
 }
 /* ---------- Diagnóstico e briefing: soluções candidatas, só com conteúdo registrado ---------- */
 function ptCandidatas(c, n = 5) { return ptCliente(c).filter(x => x.cls === 'potencial' || x.cls === 'validar').sort(ptRank).slice(0, n); }
@@ -121,12 +144,13 @@ function ptDiagCard(c) {
   const li = (a, vazio) => a.length ? `<ul class="sm" style="margin:2px 0 0 16px">${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : `<div class="sm muted">${esc(vazio)}</div>`;
   return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno — ${cs.length} de maior aderência)</span></h3>
   <p class="sm muted">Consulta toda a Base de Soluções. Mostra só o que está registrado; o que não se sabe aparece em “Pendências”. Nenhum benefício, preço, integração ou retorno é presumido.</p>
-  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${ptBarra(x)}<span class="sp"></span><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
+  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${ptBarra(x)}<span class="sp"></span>${ptResSel(c, x)}<button class="btn sm" data-a="ptSemana" data-k="${esc(c.key)}" data-id="${esc(x.r.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
     <div class="grid g2" style="margin-top:6px"><div><div class="pt-h">Dor que resolve (registrada)</div>${li(f.dores, f.fin ? '' : 'Não registrada na Base.')}${!f.dores.length && f.fin ? `<div class="sm">Finalidade registrada: ${esc(f.fin)}</div>` : ''}<div class="pt-h">Evidência de aderência</div>${li(f.evid, '—')}<div class="pt-h">Pré-requisitos e dependências registrados</div>${li([...f.pre, ...f.dep], 'Não registrados.')}${f.restr.length ? `<div class="pt-h">Restrições registradas</div>${li(f.restr, '')}` : ''}</div>
     <div><div class="pt-h">Pendências (ainda não conhecido)</div>${li(f.pend, 'Nenhuma pendência de informação.')}<div class="pt-h">Perguntas de descoberta</div>${li(f.perg, '')}<div class="pt-h">Fonte oficial</div>${f.of.length ? `<ul class="sm" style="margin:2px 0 0 16px">${f.of.map(o => `<li><a href="${esc(o.u)}" target="_blank" rel="noopener noreferrer">${esc(o.t || o.u)}</a></li>`).join('')}</ul>` : '<div class="sm muted">Sem fonte oficial vinculada.</div>'}<div class="pt-h">Próxima ação</div><div class="sm">${esc(f.acao)}</div></div></div>${ptExpl(x)}</div>`; }).join('')}</div>`;
 }
 function ptBriefRows(c) { const cs = ptCandidatas(c, 3); return cs.length ? cs.map(x => [x.r.nome, `${PT_CLS[x.cls][0]} · aderência ${x.score}/100 — ${x.porque} Próxima ação: ${ptFicha(c, x).acao}`]) : null; }
 const PT_ACT = {
+  ptSemana: t => { ptSemana(t.dataset.k, t.dataset.id); render(); },
   ptSel: t => { const U = ptUI(); U.sel = t.dataset.id; U.cls = ''; render(); window.scrollTo(0, 0); },
   ptVoltar: () => { ptUI().sel = ''; render(); },
   ptPag: t => { const U = ptUI(); U.pag = Math.max(0, U.pag + (+t.dataset.d || 0)); render(); },
@@ -134,4 +158,4 @@ const PT_ACT = {
   ptCCls: t => { ptUI().ccls = t.dataset.k || ''; render(); },
   ptAbrirSol: t => { UI.solSel = t.dataset.id; UI.view = 'solucoes'; render(); window.scrollTo(0, 0); }
 };
-function ptChange(c, v) { const U = ptUI(); if (c === 'ptlinha') { U.linha = v; U.pag = 0; render(); return true; } if (c === 'pttipo') { U.tipo = v; U.pag = 0; render(); return true; } return false; }
+function ptChange(t, c, v) { if (c === 'ptres') { ptResSet(t.dataset.k, t.dataset.id, v); render(); return true; } const U = ptUI(); if (c === 'ptlinha') { U.linha = v; U.pag = 0; render(); return true; } if (c === 'pttipo') { U.tipo = v; U.pag = 0; render(); return true; } return false; }

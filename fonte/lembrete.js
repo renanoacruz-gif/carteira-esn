@@ -138,4 +138,4 @@ function lemReportar() {
 function lemIrParaHoje(tent) {
   setTimeout(() => { const e = document.getElementById('hoje'); if (e) { LEM.foco = false; e.scrollIntoView({ block: 'start', behavior: 'smooth' }); } else if (tent > 1) lemIrParaHoje(tent - 1); else LEM.foco = false; }, 350);
 }
-try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.lembrete) { LEM.foco = true; try { UI.view = 'geral'; render(); } catch { /* sem efeito */ } } }); } catch { /* sem service worker */ }
+try { if (LEM.sup) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.lembrete) { LEM.foco = true; try { if (new Date().getDay() === 1 && Object.values(S.clients).some(c => c.emp)) { empUI().tab = 'semana'; UI.view = 'mrr'; } else UI.view = 'geral'; render(); } catch { /* sem efeito */ } } }); } catch { /* sem service worker */ }
