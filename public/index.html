@@ -4971,7 +4971,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = '614effacf483';
+const BUILD = 'a40ba348cba2';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -9912,7 +9912,7 @@ async function enxCarregar(forcar) {
   catch { ENX.err = 'Sem conexão com o servidor. O catálogo volta quando a conexão voltar.'; } finally { ENX.busy = false; if (UI.view === 'portfolio' || UI.view === 'cliente') render(); }
 }
 async function enxAbrir(id) {
-  const U = ptUI(); U.esel = id; if (ENX.det[id] || ENX.detBusy === id) return render(); ENX.detBusy = id; render();
+  const U = ptUI(); U.esel = id; adUI().cmais = 0; if (ENX.det[id] || ENX.detBusy === id) return render(); ENX.detBusy = id; render();
   try { const r = await fetch('/api/enxoval?id=' + encodeURIComponent(id), { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); const j = r.ok ? await r.json() : null; if (j && j.ok && j.produto) ENX.det[id] = j.produto; else toast('Produto não encontrado no catálogo importado.'); }
   catch { toast('Sem conexão com o servidor.'); } finally { ENX.detBusy = ''; if (UI.view === 'portfolio') render(); }
 }
@@ -9947,7 +9947,7 @@ function enxFicha(id) {
   h += `<div class="card"><h3>O que a fonte documenta</h3><div class="row" style="gap:6px;flex-wrap:wrap" id="enx-topicos">${tp.map(([t, ok]) => pill(t + (ok ? '' : ': não confirmado'), ok ? 'ok' : 'warn')).join('')}</div>
   ${p.nv === 'ficha' ? `<p class="sm muted" style="margin-top:8px">Trecho inicial de cada seção da ficha técnica pública (limite de 700 caracteres por seção). Para o texto completo, abra a ficha.</p>${p.sec.map(s => `<div style="margin:${s[0] <= 2 ? '14px' : '8px'} 0 0 ${Math.max(0, s[0] - 2) * 14}px">${s[1] ? `<div class="${s[0] <= 2 ? '' : 'sm'}"><b>${esc(s[1])}</b></div>` : ''}${s[2] ? `<div class="sm">${esc(s[2])}</div>` : ''}</div>`).join('')}` : `<p class="sm" style="margin-top:8px">${p.nv === 'inativo' ? 'O produto aparece no Enxoval como inativo: não há página nem materiais.' : 'Não há ficha técnica pública lida para este produto. Funcionalidades, benefícios, integrações e requisitos estão <b>não confirmados</b>; consulte os materiais abaixo.'}</p>`}</div>`;
   h += `<div class="card"><h3>Materiais no Enxoval <span class="muted sm">(${p.mat.length})</span></h3>${p.mat.length ? `<p class="sm muted">Só título, selo e link — o conteúdo dos materiais não foi lido. Materiais internos exigem seu login TOTVS e não devem ser repassados a clientes.</p><div class="tw"><table><thead><tr><th>Material</th><th>Selo no Enxoval</th><th></th></tr></thead><tbody>${p.mat.map(m => `<tr><td>${esc(m[0])}</td><td>${pill((ENX_SELO[m[1]] || ENX_SELO['?'])[0], (ENX_SELO[m[1]] || ENX_SELO['?'])[1])}</td><td>${m[2] ? `<a href="${esc(m[2])}" target="_blank" rel="noopener noreferrer">Abrir</a>` : '<span class="muted sm">sem link</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted">Nenhum material listado.</p>'}</div>`;
-  return h;
+  return h + adClientesCard(id);
 }
 /* rascunho PRIVADO na Base: só o que a ficha documenta, cada item com a seção de origem; o resto fica declarado como não confirmado */
 function enxParaSol(p, coletadoEm) {
@@ -10022,6 +10022,7 @@ function adCalc(X, p) {
   else if (bloqueio) { cls = 'nao_rec'; porque = 'Bloqueio técnico: ' + bloqueio; }
   else if (v?.st === 'validada') { cls = 'confirmada'; porque = `Você confirmou necessidade e compatibilidade em ${fmtD(String(v.em || '').slice(0, 10))}.`; }
   else if (ad == null || cob < 30) { cls = 'insuf'; porque = `Só ${cob}% dos critérios têm informação. Complete o perfil do cliente antes de concluir.`; }
+  else if (D.setorial.nota === 0 && (D.dor.nota ?? 0) < 60) { cls = 'baixa'; porque = `Produto listado para outros segmentos (${segs.map(enxSegNome).join(', ')}) e sem dor registrada por você que o justifique neste cliente.`; } /* produto de outro segmento só sobe com dor dita pelo executivo */
   else if (!evid && ad >= 40) { cls = 'investigar'; porque = 'Só o segmento ou a linha coincidem: não há processo nem dor registrada que sustente recomendar. Use as perguntas de descoberta.'; } /* segmento sozinho nunca vira recomendação forte */
   else if (ad >= 70 && cob >= 50 && D.tecnologica.nota != null) { cls = 'alta'; porque = 'Forte indício de aderência; necessidades ainda exigem descoberta com o cliente.'; }
   else if (ad >= 55 && D.tecnologica.nota == null) { cls = 'condicional'; porque = 'Pode ser adequada, desde que requisitos e compatibilidade sejam confirmados.'; }
@@ -10049,6 +10050,17 @@ function adAcoes(c, x) {
   return (x.bloqueio ? '' : b('adVinc', 'Vincular ao cliente', 'pri')) + b('adFicha', 'Ver ficha') + (x.bloqueio ? '' : b('adDesc', 'Descartar'));
 }
 const adLinha = (c, x) => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><div><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${x.vinc?.st === 'vinculada' ? ' ' + pill('vinculada', 'info') : ''}</div>${x.p.grupo ? `<div class="sm muted">${esc(x.p.grupo)}${x.p.linha ? ' · Linha ' + esc(x.p.linha) : ''}</div>` : ''}${adKpi(x)}<div class="sm" style="margin-top:4px">${esc(x.porque)}</div>${adDims(x)}</div><div class="ad-acts">${adAcoes(c, x)}</div></div>`;
+/* visão inversa, no fim da ficha do produto no Catálogo Enxoval: quais clientes da carteira são aderentes a ESTA solução */
+function adSolucao(id) { const p = (ENX.idx || []).find(x => x.id === id); return p && p.nivel !== 'inativo' ? clients().map(c => ({ c, ...adCalc(adCtx(c), p) })) : null; }
+function adClientesCard(id) {
+  const all = adSolucao(id); if (!all) return ''; const nc = all.length, U = adUI();
+  if (!nc) return '<div class="card" id="ad-cli"><h3>Clientes aderentes a esta solução</h3><p class="sm muted">Sua carteira está vazia. Importe a carteira para ver em quais clientes esta solução se encaixa.</p></div>';
+  const n = k => all.filter(x => x.cls === k).length, ader = all.filter(x => AD_REC.includes(x.cls) || (x.vinc && x.vinc.st !== 'descartada')).sort((a, b) => adRank(a, b) || a.c.name.localeCompare(b.c.name, 'pt')), lim = 20 + (U.cmais || 0) * 40;
+  const fora = [['possui', 'já possuem'], ['nao_rec', 'não recomendada (bloqueio técnico ou descarte seu)'], ['baixa', 'baixa aderência'], ['insuf', 'dados insuficientes']].filter(([k]) => n(k)).map(([k, t]) => `<b>${n(k)}</b> ${t}`).join(' · ');
+  return `<div class="card" id="ad-cli"><h3>Clientes aderentes a esta solução <span class="muted sm">(${ader.length} de ${nc} na sua carteira)</span></h3>
+  <p class="sm muted">Mesmo motor da ficha do cliente: usa só o que está registrado de cada conta. Segmento sozinho não entra como aderente forte, e linha de ERP diferente bloqueia.${fora ? ' Fora da lista: ' + fora + '.' : ''}</p>
+  ${ader.length ? ader.slice(0, lim).map(x => `<div class="ad-row" data-adc="${esc(x.c.key)}"><div class="ad-m"><div><a href="#" data-a="open" data-k="${esc(x.c.key)}"><b>${esc(x.c.name)}</b></a> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${x.vinc?.st === 'vinculada' ? ' ' + pill('vinculada', 'info') : ''}</div><div class="sm muted">${esc(x.c.segInfo?.id ? (segName(x.c.segInfo.id) || x.c.segInfo.id) : 'segmento não classificado')}${baseLines(x.c).length ? ' · ' + esc(baseLines(x.c).join(', ')) : ''}</div>${adKpi(x)}<div class="sm" style="margin-top:4px">${esc(x.porque)}</div>${adDims(x)}</div><div class="ad-acts">${x.vinc && x.vinc.st !== 'descartada' ? `<button class="btn sm ghost" data-a="adSoltar" data-k="${esc(x.c.key)}" data-id="${esc(id)}">Desvincular</button>` : `<button class="btn sm pri" data-a="adVinc" data-k="${esc(x.c.key)}" data-id="${esc(id)}">Vincular ao cliente</button>`}<button class="btn sm ghost" data-a="open" data-k="${esc(x.c.key)}">Abrir cliente</button></div></div>`).join('') + (ader.length > lim ? `<div class="row" style="margin-top:8px"><button class="btn sm ghost" data-a="adCMais">Mostrar mais (${ader.length - lim} restante(s))</button></div>` : '') : '<p class="sm" style="margin-top:6px">Nenhum cliente da carteira tem indício suficiente para esta solução. Isso não quer dizer que não haja oportunidade: faltam processo ou dor registrada que sustentem a recomendação.</p>'}</div>`;
+}
 /* cartão que abre a ficha do cliente: vinculadas + as 3 mais aderentes */
 function adResumoCard(c) {
   if (!window.__HOSTED__) return ''; enxCarregar(); const all = adCliente(c); if (!all) return ENX.idx && !ENX.meta ? '<div class="card" id="ad-res"><h3>Soluções recomendadas</h3><p class="sm muted">O Catálogo Enxoval ainda não foi importado. Depois da importação, as soluções recomendadas para este cliente aparecem aqui.</p></div>' : '';
@@ -10082,6 +10094,7 @@ const AD_ACT = {
   adValidar: t => { if (!confirm('Confirmar aderência significa que VOCÊ validou com o cliente a necessidade e a compatibilidade técnica desta solução. Confirmar?')) return; const p = adMarcar(t.dataset.k, t.dataset.id, 'validada'); if (p) { render(); toast('Aderência confirmada por você.'); } },
   adSemana: t => { const c = S.clients[t.dataset.k], p = (ENX.idx || []).find(x => x.id === t.dataset.id); if (!c || !p) return; const g = c.gst ||= {}; if (g.proximaAcao || g.dataAcao) return toast(`Este cliente já tem próxima ação${g.proximaAcao ? ': “' + g.proximaAcao.slice(0, 60) + '”' : ''}. Ajuste em Gestão da conta.`); const d7 = new Date(Date.now() + 7 * 864e5); g.proximaAcao = `Conversa de descoberta: ${p.nome}`.slice(0, 200); g.dataAcao = d7.getFullYear() + '-' + String(d7.getMonth() + 1).padStart(2, '0') + '-' + String(d7.getDate()).padStart(2, '0'); g.em = nowISO(); touchC(c.key); render(); toast(`Ação criada para ${fmtD(g.dataAcao)}. Ela aparece no Plano da semana.`); },
   adFicha: t => { const U = ptUI(); U.aba = 'enx'; U.sel = ''; UI.view = 'portfolio'; enxAbrir(t.dataset.id); },
+  adCMais: () => { adUI().cmais = (adUI().cmais || 0) + 1; render(); },
   adCls: t => { const U = adUI(); U.cls = t.dataset.v || ''; U.mais = 0; render(); }, adMais: () => { adUI().mais = (adUI().mais || 0) + 1; render(); }
 };
 
