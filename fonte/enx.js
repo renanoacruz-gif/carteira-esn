@@ -15,7 +15,7 @@ async function enxCarregar(forcar) {
   catch { ENX.err = 'Sem conexão com o servidor. O catálogo volta quando a conexão voltar.'; } finally { ENX.busy = false; if (UI.view === 'portfolio' || UI.view === 'cliente') render(); }
 }
 async function enxAbrir(id) {
-  const U = ptUI(); U.esel = id; if (ENX.det[id] || ENX.detBusy === id) return render(); ENX.detBusy = id; render();
+  const U = ptUI(); U.esel = id; adUI().cmais = 0; if (ENX.det[id] || ENX.detBusy === id) return render(); ENX.detBusy = id; render();
   try { const r = await fetch('/api/enxoval?id=' + encodeURIComponent(id), { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); const j = r.ok ? await r.json() : null; if (j && j.ok && j.produto) ENX.det[id] = j.produto; else toast('Produto não encontrado no catálogo importado.'); }
   catch { toast('Sem conexão com o servidor.'); } finally { ENX.detBusy = ''; if (UI.view === 'portfolio') render(); }
 }
@@ -50,7 +50,7 @@ function enxFicha(id) {
   h += `<div class="card"><h3>O que a fonte documenta</h3><div class="row" style="gap:6px;flex-wrap:wrap" id="enx-topicos">${tp.map(([t, ok]) => pill(t + (ok ? '' : ': não confirmado'), ok ? 'ok' : 'warn')).join('')}</div>
   ${p.nv === 'ficha' ? `<p class="sm muted" style="margin-top:8px">Trecho inicial de cada seção da ficha técnica pública (limite de 700 caracteres por seção). Para o texto completo, abra a ficha.</p>${p.sec.map(s => `<div style="margin:${s[0] <= 2 ? '14px' : '8px'} 0 0 ${Math.max(0, s[0] - 2) * 14}px">${s[1] ? `<div class="${s[0] <= 2 ? '' : 'sm'}"><b>${esc(s[1])}</b></div>` : ''}${s[2] ? `<div class="sm">${esc(s[2])}</div>` : ''}</div>`).join('')}` : `<p class="sm" style="margin-top:8px">${p.nv === 'inativo' ? 'O produto aparece no Enxoval como inativo: não há página nem materiais.' : 'Não há ficha técnica pública lida para este produto. Funcionalidades, benefícios, integrações e requisitos estão <b>não confirmados</b>; consulte os materiais abaixo.'}</p>`}</div>`;
   h += `<div class="card"><h3>Materiais no Enxoval <span class="muted sm">(${p.mat.length})</span></h3>${p.mat.length ? `<p class="sm muted">Só título, selo e link — o conteúdo dos materiais não foi lido. Materiais internos exigem seu login TOTVS e não devem ser repassados a clientes.</p><div class="tw"><table><thead><tr><th>Material</th><th>Selo no Enxoval</th><th></th></tr></thead><tbody>${p.mat.map(m => `<tr><td>${esc(m[0])}</td><td>${pill((ENX_SELO[m[1]] || ENX_SELO['?'])[0], (ENX_SELO[m[1]] || ENX_SELO['?'])[1])}</td><td>${m[2] ? `<a href="${esc(m[2])}" target="_blank" rel="noopener noreferrer">Abrir</a>` : '<span class="muted sm">sem link</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted">Nenhum material listado.</p>'}</div>`;
-  return h;
+  return h + adClientesCard(id);
 }
 /* rascunho PRIVADO na Base: só o que a ficha documenta, cada item com a seção de origem; o resto fica declarado como não confirmado */
 function enxParaSol(p, coletadoEm) {
