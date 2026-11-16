@@ -91,7 +91,8 @@ function ptBusca(q) {
   const ts = norm(q).split(/\s+/).filter(t => t.length > 1), U = ptUI();
   return ptSols().map(r => { if (U.linha && (r.linha || '') !== U.linha) return null; if (U.tipo && r.tipo !== U.tipo) return null; if (!ts.length) return { r, w: 0 }; const hay = ptHay(r), nm = norm(r.nome); if (!ts.every(t => hay.includes(t))) return null; return { r, w: ts.reduce((a, t) => a + (nm.includes(t) ? 3 : 1), 0) }; }).filter(Boolean).sort((a, b) => b.w - a.w || a.r.nome.localeCompare(b.r.nome, 'pt'));
 }
-function vPortfolio() {
+function vPortfolio() { const U = ptUI(); if (U.aba === 'enx') return enxAbas() + enxView(); const h = vPortfolioBase(); return U.sel ? h : enxAbas() + h; }
+function vPortfolioBase() {
   const U = ptUI(), sel = U.sel && ptSols().find(r => r.id === U.sel);
   if (sel) return ptOnde(sel);
   const all = ptSols(), res = ptBusca(U.q), POR = 50, pags = Math.max(1, Math.ceil(res.length / POR)); if (U.pag >= pags) U.pag = 0;

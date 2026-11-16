@@ -706,6 +706,7 @@ async function handleInner(req, env0, ctx) {
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
   if (url.pathname === '/api/uso' && req.method === 'GET') return usoProprio(env0, au);
   if (url.pathname === '/api/regfontes' && req.method === 'GET') return regPublico(env0);
+  if (url.pathname === '/api/enxoval' && req.method === 'GET') return enxPublico(env0, url);
   if (au.user && COTA_DIA[url.pathname] && req.method === 'POST') { const ct = await cotaDia(env0, au.user, url.pathname); if (ct) return J({ ok: false, erro: { codigo: 'cota_diaria', mensagem: `Limite diário desta operação atingido (${ct.max} por dia por usuário). Volta ao normal amanhã.`, repetir: false } }, 429); }
   if (ADM_ROTAS[url.pathname] && au.user) { const t0 = Date.now(), rc = url.pathname === '/api/ia' ? req.clone() : req, resp = await rotasApi(req, env, au, url); await admMedir(env0, ctx, au, url.pathname, rc, t0, resp); return resp; }
   return rotasApi(req, env, au, url);

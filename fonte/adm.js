@@ -118,7 +118,7 @@ const TEL_AVISO = 'Eventos de uso são registrados para acompanhar a adoção e 
 function telAvisoUmaVez() { if (!TEL.on) return; try { if (lsGet('adm.aviso') === '1') return; lsSet('adm.aviso', '1'); setTimeout(() => toast('Registramos eventos de uso (recurso, data, resultado), sem conteúdo de carteira. Detalhes em Configurações → Conta.'), 1500); } catch { /* ok */ } }
 
 /* ---------------- Painel Administrador ---------------- */
-const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null, reg: null, regBusy: '' };
+const ADMV = { lem: null, data: null, loading: false, err: null, dias: 30, de: '', ate: '', func: '', sit: '', acc: '', msg: '', rosterTxt: '', edit: '', cat: null, catF: { fonte: '', estado: 'lida', q: '', pag: 0, mudou: false }, catBusy: '', catSel: {}, catMapa: null, reg: null, regBusy: '', enx: null, enxBusy: '' };
 window.__PAINEL = false;
 function admPainelOn(v) {
   window.__PAINEL = v === true;
@@ -147,6 +147,7 @@ async function admLoad() {
     try { ADMV.aud = (await admApi('/api/adm/auditoria')).itens; } catch { ADMV.aud = null; }
     try { ADMV.integ = await admApi('/api/adm/integracoes'); } catch { ADMV.integ = null; }
     try { ADMV.reg = await admApi('/api/adm/regfontes', { op: 'estado' }); } catch { ADMV.reg = null; }
+    try { ADMV.enx = await admApi('/api/adm/enxoval', { op: 'estado' }); } catch { ADMV.enx = null; }
     try { ADMV.lem = await admApi('/api/adm/lembrete'); } catch { ADMV.lem = { erro: true }; } /* falha do bloco de lembretes não derruba o painel */
   } catch (e) { ADMV.err = e; ADMV.data = null; } finally { ADMV.loading = false; if (UI.view === 'adm') render(); }
 }
@@ -213,7 +214,7 @@ function vAdm() {
     <div><b class="sm">Coleta de telemetria</b><ul class="sm"><li>Último evento: ${esc(fmtDate(sd.coleta.ultimo_evento))}</li><li>Eventos no período: ${sd.coleta.eventos_no_periodo}</li><li>Falhas relatadas pelos navegadores: ${sd.coleta.falhas_relatadas_pelos_navegadores}</li><li>Falhas de gravação no servidor: ${d.coleta_servidor.falhas_servidor}${d.coleta_servidor.ultima_falha ? ' (última ' + esc(fmtDate(d.coleta_servidor.ultima_falha)) + ')' : ''}</li></ul></div></div>
     <div class="sm" style="margin-top:8px"><b>Tentativas negadas ao painel (24 h):</b> ${d.tentativas_negadas.ultimas_24h} ${d.tentativas_negadas.ultimas.length ? `<details><summary>últimas</summary><ul>${d.tentativas_negadas.ultimas.map(t => `<li>${esc(fmtDate(t.ts))} — ${esc(t.motivo)} (${esc(t.rota)})${t.usuario ? ' — ' + esc(t.usuario) : ''}</li>`).join('')}</ul></details>` : ''}</div>
     <div class="sm" style="margin-top:8px"><b>Observação de CSP (modo relatório):</b> ${(d.csp || []).length ? `${(d.csp || []).reduce((a, x) => a + x.n, 0)} ocorrência(s) <details><summary>detalhes</summary><ul>${d.csp.map(x => `<li>${esc(x.diretiva)} → ${esc(x.alvo)}: ${esc(x.n)} (último ${esc(fmtDate(x.ultimo))})</li>`).join('')}</ul></details>` : '<span class="muted">nenhuma violação registrada — política ainda em observação, não imposta.</span>'}</div></div>`;
-  h += admIntegCard() + admRegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
+  h += admIntegCard() + admEnxCard() + admRegCard() + admCatCard() + admLemCard(ADMV.lem) + admSugCard(ADMV.sug) + admConviteCard();
   h += admAudCard();
   h += `<div class="card"><h3>Privacidade e retenção</h3><p class="sm">${esc(TEL_AVISO)}</p><p class="sm">Retenção atual: <b>${c.retencao_dias} dias</b> (eventos e tentativas negadas mais antigos são apagados automaticamente; última limpeza: ${esc(fmtDate(d.coleta_servidor.ultima_purga))}).</p><button class="btn ghost sm" data-a="admPurgar">Aplicar retenção agora</button></div>`;
   return h;
@@ -340,6 +341,33 @@ function admRegCard() {
 }
 async function admRegOp(corpo, msg) { if (ADMV.regBusy) return null; ADMV.regBusy = msg; render(); try { const j = await admApi('/api/adm/regfontes', corpo); ADMV.reg = { ...ADMV.reg, fontes: j.fontes }; return j; } catch (e) { toast(e.message); return null; } finally { ADMV.regBusy = ''; render(); } }
 const admRegMsg = v => v.estado !== 'ok' ? `Não foi possível ler: ${v.erro || v.estado}` : v.primeira ? 'Fonte lida. Linha de base registrada.' : v.alterou ? 'A página mudou desde a última leitura.' : 'Sem mudança desde a última leitura.';
+/* Catálogo Enxoval: o administrador importa o pacote coletado com o próprio login. O servidor nunca acessa o Enxoval. */
+function admEnxCard() {
+  const g = ADMV.enx; if (!g) return ''; const m = g.meta, ok = m && m.estado === 'concluido', nv = g.niveis || {};
+  return `<div class="card" id="adm-enx"><h3>Catálogo Enxoval ${ok ? `<span class="pill p-ok">${m.total} produto(s)</span>` : '<span class="pill p-info">vazio</span>'}</h3>
+  <p class="sm muted">O Enxoval de Vendas exige login, então o servidor não o lê. Aqui você importa o <b>pacote coletado</b> (arquivo .json). O catálogo vira referência somente leitura em Portfólio → Catálogo Enxoval; nenhum produto entra na Base de Soluções sem o executivo trazer e validar. A importação só substitui o catálogo anterior depois de receber tudo.</p>
+  ${ok ? `<p class="sm">Coletado em <b>${esc(fmtD(m.coletadoEm))}</b> • importado em ${esc(dtBR(m.importadoEm))} por ${esc(m.por || '—')}${m.rejeitados ? ` • ${m.rejeitados} registro(s) rejeitado(s) na validação` : ''}<br>Com ficha técnica: <b>${nv.ficha || 0}</b> • só descrição: <b>${nv.portal || 0}</b> • só materiais: <b>${nv.enxoval || 0}</b> • inativos: <b>${nv.inativo || 0}</b></p>` : '<p class="sm">Nenhum pacote importado.</p>'}
+  <div class="row addr"><input type="file" id="enx_f" accept=".json,application/json" aria-label="Pacote do Enxoval"><button class="btn pri sm" data-a="admEnxImp"${ADMV.enxBusy ? ' disabled' : ''}>${ADMV.enxBusy ? '<span id="enx-prog">' + esc(ADMV.enxBusy) + '</span>' : 'Importar pacote'}</button>${ok ? `<button class="btn ghost sm" data-a="admEnxDel"${ADMV.enxBusy ? ' disabled' : ''}>Esvaziar catálogo</button>` : ''}</div></div>`;
+}
+function admEnxLotes(prods) { const L = []; let cur = [], sz = 0; for (const p of prods) { const n = JSON.stringify(p).length; if (cur.length && (cur.length >= 30 || sz + n > 150000)) { L.push(cur); cur = []; sz = 0; } cur.push(p); sz += n; } if (cur.length) L.push(cur); return L; }
+async function admEnxImportar(pk) {
+  const prog = t => { ADMV.enxBusy = t; const el = $('#enx-prog'); if (el) el.textContent = t; else render(); };
+  try {
+    prog('Iniciando…'); const { lote } = await admApi('/api/adm/enxoval', { op: 'iniciar', formato: pk.formato, coletadoEm: pk.coletadoEm, total: pk.produtos.length }); let env = 0, rej = 0;
+    for (const itens of admEnxLotes(pk.produtos)) { const j = await admApi('/api/adm/enxoval', { op: 'lote', lote, itens }); env += itens.length; rej += j.rejeitados || 0; prog(`Enviando ${env} de ${pk.produtos.length}…`); }
+    prog('Conferindo…'); const fim = await admApi('/api/adm/enxoval', { op: 'concluir', lote }); ADMV.enx = fim; ENX.idx = null; ENX.det = {}; ENX.t = 0; toast(`Catálogo importado: ${fim.total} produto(s)${rej ? `, ${rej} rejeitado(s)` : ''}.`);
+  } catch (e) { toast('Importação interrompida: ' + e.message + ' O catálogo anterior foi mantido.'); try { ADMV.enx = await admApi('/api/adm/enxoval', { op: 'estado' }); } catch { /* mantém o que havia */ } }
+  finally { ADMV.enxBusy = ''; render(); }
+}
+const ADM_ENX_ACT = {
+  admEnxImp: async () => {
+    if (ADMV.enxBusy) return; const f = $('#enx_f')?.files?.[0]; if (!f) return toast('Escolha o arquivo do pacote (.json).'); if (f.size > 8e6) return toast('Arquivo acima de 8 MB: não parece um pacote do Enxoval.');
+    let pk; try { pk = JSON.parse((await f.text()).replace(/^﻿/, '')); } catch { return toast('O arquivo não é um JSON válido.'); }
+    if (pk?.formato !== 'enxoval-pacote/1' || !Array.isArray(pk.produtos) || !pk.produtos.length) return toast('Este arquivo não é um pacote do Enxoval (formato enxoval-pacote/1).');
+    if (!confirm(`Importar ${pk.produtos.length} produto(s) coletado(s) em ${fmtD(pk.coletadoEm)}? O catálogo atual será substituído só ao final, se tudo chegar.`)) return; admEnxImportar(pk);
+  },
+  admEnxDel: async () => { if (!confirm('Esvaziar o Catálogo Enxoval para todos os executivos? Os rascunhos já trazidos para as Bases não são afetados.')) return; try { ADMV.enx = await admApi('/api/adm/enxoval', { op: 'limpar', confirmar: 'LIMPAR' }); ENX.idx = null; ENX.t = 0; toast('Catálogo esvaziado.'); } catch (e) { toast(e.message); } render(); }
+};
 const ADM_REG_ACT = {
   admRegAdd: async () => { const j = await admRegOp({ op: 'adicionar', nome: $('#rf_n').value, orgao: $('#rf_o').value, url: $('#rf_u').value }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },
   admRegVer: async t => { const j = await admRegOp({ op: 'verificar', id: t.dataset.id }, 'Lendo a fonte…'); if (j) toast(admRegMsg(j.verificacao)); },

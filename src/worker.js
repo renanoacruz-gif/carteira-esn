@@ -698,7 +698,7 @@ async function handleInner(req, env0, ctx) {
   const au = await authn(req, env0, ctx); if (!au.ok) return J({ ok: false, erro: au.erro }, au.status);
   const env = comChave(req, env0, au.user);
   if (url.pathname === '/api/me') { const p = ctx && ctx.waitUntil ? admAcesso(env0, au) : await admAcesso(env0, au); if (ctx && ctx.waitUntil) ctx.waitUntil(p); const pn = (await admPermitido(env0, au)).ok; return J({ ok: true, id: au.user, nome: nomeDeEmail(au.user), admin: au.admin, painel: pn, hospedado: !!au.user }); }
-  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: '5207e25dac0f' });
+  if (url.pathname === '/api/versao' && req.method === 'GET') return J({ ok: true, v: '4001195bda08' });
   if (url.pathname === '/api/ev') return admIngestar(req, env0, au);
   if (url.pathname === '/api/sug' && req.method === 'POST') return admSugerir(req, env0, au);
   if (url.pathname === '/api/csp') return admCsp(req, env0, au);
@@ -706,6 +706,7 @@ async function handleInner(req, env0, ctx) {
   if (url.pathname.startsWith('/api/adm/')) return admRota(req, env0, au, url);
   if (url.pathname === '/api/uso' && req.method === 'GET') return usoProprio(env0, au);
   if (url.pathname === '/api/regfontes' && req.method === 'GET') return regPublico(env0);
+  if (url.pathname === '/api/enxoval' && req.method === 'GET') return enxPublico(env0, url);
   if (au.user && COTA_DIA[url.pathname] && req.method === 'POST') { const ct = await cotaDia(env0, au.user, url.pathname); if (ct) return J({ ok: false, erro: { codigo: 'cota_diaria', mensagem: `Limite diário desta operação atingido (${ct.max} por dia por usuário). Volta ao normal amanhã.`, repetir: false } }, 429); }
   if (ADM_ROTAS[url.pathname] && au.user) { const t0 = Date.now(), rc = url.pathname === '/api/ia' ? req.clone() : req, resp = await rotasApi(req, env, au, url); await admMedir(env0, ctx, au, url.pathname, rc, t0, resp); return resp; }
   return rotasApi(req, env, au, url);
@@ -803,6 +804,7 @@ const ADM_DDL = [
   'CREATE TABLE IF NOT EXISTS cat_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, url TEXT NOT NULL, estado TEXT NOT NULL, erro TEXT, autenticado INTEGER NOT NULL DEFAULT 0, testada_em TEXT, ultima_sinc TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_paginas (chave TEXT PRIMARY KEY, url TEXT NOT NULL, fonte TEXT NOT NULL, pai TEXT, titulo TEXT, prof INTEGER NOT NULL DEFAULT 0, estado TEXT NOT NULL, erro TEXT, hash TEXT, filhos INTEGER, vista_em TEXT, alterada_em TEXT, revisada_em TEXT)',
   'CREATE INDEX IF NOT EXISTS cat_pag_fe ON cat_paginas(fonte, estado, prof)',
+  'CREATE TABLE IF NOT EXISTS enx_prod (id TEXT NOT NULL, lote TEXT NOT NULL, nome TEXT NOT NULL, seg TEXT, grupo TEXT, linha TEXT, nivel TEXT NOT NULL, nmat INTEGER NOT NULL DEFAULT 0, dados TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (id, lote))',
   'CREATE TABLE IF NOT EXISTS reg_fontes (id TEXT PRIMARY KEY, nome TEXT NOT NULL, orgao TEXT, url TEXT NOT NULL, ativo INTEGER NOT NULL DEFAULT 1, estado TEXT NOT NULL, erro TEXT, hash TEXT, titulo TEXT, criada_em TEXT, vista_em TEXT, mudou_em TEXT)',
   'CREATE TABLE IF NOT EXISTS cat_exec (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, fonte TEXT NOT NULL, op TEXT NOT NULL, lidas INTEGER NOT NULL DEFAULT 0, novas INTEGER NOT NULL DEFAULT 0, erros INTEGER NOT NULL DEFAULT 0, detalhe TEXT)'
 ];
@@ -1242,6 +1244,58 @@ async function admRegFontes(req, env) {
   if (op === 'verificar') { const k = 'reg:' + f.id, t = CAT_MEM.rate.get(k) || 0; if (Date.now() - t < 5000) return J({ ok: false, erro: { codigo: 'muitas_requisicoes', mensagem: 'Aguarde alguns segundos entre as verificações da mesma fonte.' } }, 429); CAT_MEM.rate.set(k, Date.now()); return J({ ok: true, verificacao: await regVerificar(db, env, f), fontes: await lista() }); }
   return inval('Operação desconhecida.');
 }
+/* ===== Catálogo Enxoval: pacote importado pelo administrador (coleta autorizada, feita com o login dele) =====
+   O servidor NÃO acessa o Enxoval (exige login). O administrador envia um pacote JSON em lotes; cada produto é validado e saneado aqui.
+   O conteúdo é referência somente leitura: nada entra na Base de Soluções sem o executivo trazer e validar. Nada é completado por suposição:
+   o nível (ficha | portal | enxoval | inativo) diz quanto de documentação existe. Texto importado é DADO, nunca instrução. */
+const ENX_CFG = { maxCorpo: 400000, maxLote: 40, maxProd: 1500, maxSec: 60, maxMat: 20 }, ENX_NIVEL = ['ficha', 'portal', 'enxoval', 'inativo'], ENX_SELO = ['E', 'I', 'C', '?'];
+const enxUrl = (v, hosts) => { let u; try { u = new URL(String(v || '')); } catch { return ''; } if (u.protocol !== 'https:' || u.username || u.password || u.href.length > 600) return ''; if (hosts && !hosts.test(u.hostname)) return ''; return u.href; };
+const ENX_TOTVS = /(^|\.)totvs\.com$/i;
+export function enxLimpar(x) {
+  const id = String(x?.id || '').toLowerCase(); if (!/^[a-z0-9][a-z0-9-]{1,90}$/.test(id)) return null; const nome = catTxt(stripTags(x.n), 160); if (nome.length < 2) return null;
+  const nivel = ENX_NIVEL.includes(x.nv) ? x.nv : 'enxoval', arr = v => Array.isArray(v) ? v : [];
+  const seg = arr(x.seg).map(v => String(v || '').toLowerCase()).filter(v => /^[a-z][a-z-]{1,40}$/.test(v)).slice(0, 14);
+  const sec = nivel === 'ficha' ? arr(x.sec).slice(0, ENX_CFG.maxSec).map(z => [Math.min(4, Math.max(0, arr(z)[0] | 0)), catTxt(stripTags(arr(z)[1]), 120), catTxt(stripTags(arr(z)[2]), 800)]).filter(z => z[1] || z[2]) : [];
+  const mat = arr(x.mat).slice(0, ENX_CFG.maxMat).map(z => [catTxt(stripTags(arr(z)[0]), 80), ENX_SELO.includes(arr(z)[1]) ? arr(z)[1] : '?', enxUrl(arr(z)[2])]).filter(z => z[0]);
+  return { id, n: nome, seg, todos: !!x.todos, g: catTxt(stripTags(x.g), 80), lin: catTxt(stripTags(x.lin), 30), nv: nivel, d: catTxt(stripTags(x.d), 400), ue: enxUrl(x.ue, /^enxoval\.totvs\.com$/i), up: enxUrl(x.up, ENX_TOTVS), uf: enxUrl(x.uf, ENX_TOTVS), sec, mat };
+}
+async function enxMeta(db) { const r = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='enx_meta'").first(); try { return r ? JSON.parse(r.valor) : null; } catch { return null; } }
+async function enxMetaSet(db, m) { await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('enx_meta',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify(m)).run(); }
+async function enxResumo(db) { const meta = await enxMeta(db), niv = {}; for (const r of ((await db.prepare('SELECT nivel, COUNT(*) n FROM enx_prod' + (meta?.lote && meta.estado === 'concluido' ? ' WHERE lote=?' : '') + ' GROUP BY nivel').bind(...(meta?.lote && meta.estado === 'concluido' ? [meta.lote] : [])).all()).results || [])) niv[r.nivel] = r.n; return { meta, niveis: niv, total: Object.values(niv).reduce((a, b) => a + b, 0) }; }
+async function admEnxoval(req, env, au) {
+  const db = admDb(env); await admInit(env); if (+(req.headers.get('content-length') || 0) > ENX_CFG.maxCorpo) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Lote acima de 400 KB.' } }, 413);
+  let raw = ''; try { raw = await req.text(); } catch { /* vazio */ } if (raw.length > ENX_CFG.maxCorpo) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Lote acima de 400 KB.' } }, 413);
+  let q; try { q = JSON.parse(raw || '{}'); } catch { q = {}; } const op = String(q.op || 'estado'), inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400), agora = new Date().toISOString();
+  if (op === 'estado') return J({ ok: true, ...(await enxResumo(db)) });
+  if (op === 'iniciar') {
+    const total = q.total | 0, col = String(q.coletadoEm || ''); if (q.formato !== 'enxoval-pacote/1') return inval('Formato de pacote desconhecido.'); if (total < 1 || total > ENX_CFG.maxProd) return inval('Quantidade de produtos fora do limite.'); if (!/^\d{4}-\d{2}-\d{2}$/.test(col) || isNaN(Date.parse(col)) || Date.parse(col) > Date.now() + 864e5) return inval('Data de coleta inválida.');
+    const lote = 'enx_' + agora.replace(/\D/g, '').slice(0, 17) + Math.random().toString(36).slice(2, 6), ant = await enxMeta(db);
+    await db.prepare('DELETE FROM enx_prod WHERE lote<>?').bind(ant?.estado === 'concluido' ? ant.lote : '').run(); /* sobras de importações interrompidas */
+    await enxMetaSet(db, { ...(ant?.estado === 'concluido' ? { anterior: { lote: ant.lote, coletadoEm: ant.coletadoEm, total: ant.total } } : {}), lote: ant?.estado === 'concluido' ? ant.lote : '', estado: ant?.estado === 'concluido' ? 'concluido' : 'vazio', coletadoEm: ant?.coletadoEm || '', total: ant?.total || 0, importadoEm: ant?.importadoEm || '', por: ant?.por || '', pendente: { lote, total, coletadoEm: col, recebidos: 0, rejeitados: 0, iniciadoEm: agora } });
+    return J({ ok: true, lote });
+  }
+  if (op === 'lote') {
+    const meta = await enxMeta(db), pd = meta?.pendente; if (!pd || pd.lote !== q.lote) return inval('Importação não iniciada ou já substituída. Recomece.'); const itens = Array.isArray(q.itens) ? q.itens : []; if (!itens.length || itens.length > ENX_CFG.maxLote) return inval('Lote vazio ou acima de ' + ENX_CFG.maxLote + ' produtos.');
+    let ok = 0, rej = 0; const st = [];
+    for (const x of itens) { const p = enxLimpar(x); if (!p) { rej++; continue; } ok++; st.push(db.prepare('INSERT INTO enx_prod(id,nome,seg,grupo,linha,nivel,nmat,dados,lote,em) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,lote) DO UPDATE SET nome=excluded.nome,seg=excluded.seg,grupo=excluded.grupo,linha=excluded.linha,nivel=excluded.nivel,nmat=excluded.nmat,dados=excluded.dados,em=excluded.em').bind(p.id, p.n, p.todos ? '*' : p.seg.join(','), p.g, p.lin, p.nv, p.mat.length, JSON.stringify(p), pd.lote, agora)); }
+    if (st.length) await db.batch(st); pd.recebidos += ok; pd.rejeitados += rej; await enxMetaSet(db, meta); return J({ ok: true, gravados: ok, rejeitados: rej, recebidos: pd.recebidos });
+  }
+  if (op === 'concluir') {
+    const meta = await enxMeta(db), pd = meta?.pendente; if (!pd || pd.lote !== q.lote) return inval('Importação não iniciada ou já substituída.'); const n = (await db.prepare('SELECT COUNT(*) n FROM enx_prod WHERE lote=?').bind(pd.lote).first()).n;
+    if (n < pd.total - pd.rejeitados || n < 1) return J({ ok: false, erro: { codigo: 'incompleto', mensagem: `Importação incompleta: ${n} de ${pd.total} produto(s) gravado(s). O catálogo anterior foi mantido.` } }, 409);
+    await db.prepare('DELETE FROM enx_prod WHERE lote<>?').bind(pd.lote).run(); /* só troca o catálogo depois de receber tudo */
+    await enxMetaSet(db, { lote: pd.lote, estado: 'concluido', coletadoEm: pd.coletadoEm, total: n, rejeitados: pd.rejeitados, importadoEm: agora, por: String(au?.user || '').slice(0, 120) }); return J({ ok: true, ...(await enxResumo(db)) });
+  }
+  if (op === 'limpar') { if (q.confirmar !== 'LIMPAR') return inval('Confirmação ausente.'); await db.prepare('DELETE FROM enx_prod').run(); await enxMetaSet(db, { lote: '', estado: 'vazio', coletadoEm: '', total: 0, importadoEm: '', por: '' }); return J({ ok: true, ...(await enxResumo(db)) }); }
+  return inval('Operação desconhecida.');
+}
+/* leitura pelos executivos: índice leve, ou um produto inteiro por id. Só o catálogo concluído é servido. */
+async function enxPublico(env, url) {
+  const db = admDb(env); if (!db) return J({ ok: true, meta: null, itens: [] }); await admInit(env); const meta = await enxMeta(db), pub = meta?.estado === 'concluido' ? { coletadoEm: meta.coletadoEm, importadoEm: meta.importadoEm, total: meta.total } : null;
+  if (!pub) return J({ ok: true, meta: null, itens: [] }); const id = String(url.searchParams.get('id') || '').toLowerCase();
+  if (id) { if (!/^[a-z0-9][a-z0-9-]{1,90}$/.test(id)) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Identificador inválido.' } }, 400); const r = await db.prepare('SELECT dados FROM enx_prod WHERE id=? AND lote=?').bind(id, meta.lote).first(); if (!r) return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Produto fora do catálogo importado.' } }, 404); return J({ ok: true, meta: pub, produto: JSON.parse(r.dados) }); }
+  return J({ ok: true, meta: pub, itens: (await db.prepare('SELECT id,nome,seg,grupo,linha,nivel,nmat FROM enx_prod WHERE lote=? ORDER BY nome').bind(meta.lote).all()).results || [] });
+}
 /* ===== Busca dedicada: contrato único para provedores de pesquisa =====
    Cada provedor é um adaptador { nome, seg (nome do segredo no servidor), buscar(q, n, chave) → [{ titulo, url, trecho, data }] }.
    Sem segredo configurado não há busca e nada é simulado. A chave nunca sai do servidor. Resultado é INDÍCIO: o executivo confere a fonte. */
@@ -1312,6 +1366,7 @@ async function admInteg(env) {
   for (const f of ((await db.prepare('SELECT id,nome,estado,erro,testada_em,ultima_sinc FROM cat_fontes ORDER BY id').all()).results || [])) itens.push({ id: 'fonte_' + f.id, nome: 'Catálogo — ' + f.nome, estado: mapF[f.estado] || 'intervencao', ultima: f.testada_em || null, codigo: f.estado === 'ok' ? '' : f.estado, obs: (f.erro ? f.erro + ' ' : '') + (f.ultima_sinc ? 'Última leitura: ' + f.ultima_sinc.slice(0, 10) + '.' : 'Nenhuma leitura ainda.') });
   const auto = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='cat_auto'").first(), uAuto = await db.prepare("SELECT ts, erros FROM cat_exec WHERE op='auto' ORDER BY id DESC LIMIT 1").first();
   { const rg = await db.prepare("SELECT COUNT(*) n, SUM(CASE WHEN estado='ok' THEN 1 ELSE 0 END) ok, MAX(vista_em) u FROM reg_fontes WHERE ativo=1").first(); itens.push({ id: 'radar_reg', nome: 'Radar regulatório — fontes oficiais monitoradas', estado: !rg || !rg.n ? 'nao_configurado' : !rg.u ? 'nao_testado' : rg.ok ? 'conectado' : 'intervencao', ultima: rg ? rg.u : null, codigo: '', obs: !rg || !rg.n ? 'Nenhuma fonte cadastrada. Cadastre abaixo, em "Radar regulatório".' : `${rg.ok || 0} de ${rg.n} fonte(s) lida(s) com sucesso. Verificação 1 vez por dia útil; só aponta que a página mudou.` }); }
+  { const ex = await enxMeta(db); itens.push({ id: 'enxoval', nome: 'Catálogo Enxoval (pacote importado)', estado: ex?.estado === 'concluido' ? 'conectado' : 'nao_configurado', ultima: ex?.importadoEm || null, codigo: '', obs: ex?.estado === 'concluido' ? `${ex.total} produto(s), coletados em ${ex.coletadoEm}. O servidor não acessa o Enxoval: o catálogo só muda com nova importação.` : 'Nenhum pacote importado. Importe abaixo, em "Catálogo Enxoval".' }); }
   { const bp = buscaProv(env), uB = await ult('busca_dedicada'); itens.push({ id: 'busca', nome: 'Busca dedicada (provedor de pesquisa)', estado: intEstado(!!bp, uB), ultima: uB ? uB.ts : null, codigo: uB && uB.resultado !== 'ok' ? cod(uB) : '', obs: bp ? `Provedor: ${BUSCA_PROV[bp].nome}. A chave fica só no servidor.` : 'Nenhum provedor configurado. Adaptadores prontos, ainda não homologados com chave real: ' + Object.values(BUSCA_PROV).map(x => `${x.nome} (segredo ${x.seg})`).join(', ') + '.' }); }
   itens.push({ id: 'agendada', nome: 'Leitura agendada das fontes', estado: !(auto && auto.valor === '1') ? 'nao_configurado' : !uAuto ? 'nao_testado' : 'conectado', ultima: uAuto ? uAuto.ts : null, codigo: '', obs: auto && auto.valor === '1' ? '1 lote por horário agendado, em dias úteis.' : 'Desligada. Ligue no bloco do Catálogo de soluções.' });
   let push = { conf: false, subs: 0, ult: null }; try { push.conf = pushOk(env); const r = await db.prepare('SELECT COUNT(*) n, MAX(ultimo_ok) u FROM push_subs').first(); push.subs = r?.n || 0; push.ult = r?.u || null; } catch { /* tabela ainda não criada */ }
@@ -1322,13 +1377,14 @@ async function admInteg(env) {
   return { itens, consumo: Object.keys(COTA_DIA).map(r => { const x = con.find(y => y.rota === r) || {}; return { rota: r, rot: COTA_ROT[r], hoje: x.hoje || 0, sete: x.sete || 0, usuarios: x.usuarios || 0, pico_usuario_hoje: x.pico || 0, limite: cotaMax(env, r) }; }), em: new Date().toISOString() };
 }
 /* Trilha de auditoria das ações administrativas que alteram algo (quem, quando, o quê, resultado). Sem conteúdo de carteira nem segredos. */
-const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'], regfontes: ['estado'] };
+const ADM_AUD_SO_LEITURA = { catalogo: ['estado', 'mapa'], regfontes: ['estado'], enxoval: ['estado', 'lote'] };
 function admAudDescrever(rota, q) {
   const t = (v, n = 80) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').slice(0, n), r = rota.replace('/api/adm/', '');
   if (r === 'roster') return { acao: 'previstos.' + t(q.op || 'add', 20), detalhe: q.op === 'import' ? `${Array.isArray(q.itens) ? q.itens.length : 0} e-mail(s)` : t(q.email) + (q.novo_email ? ' → ' + t(q.novo_email) : '') + (q.tudo ? ' (inclui registro de acesso)' : '') };
   if (r === 'config') return { acao: 'configuracao.alterar', detalhe: Object.keys(q || {}).map(k => t(k, 30)).slice(0, 8).join(', ') };
   if (r === 'purgar') return { acao: 'retencao.aplicar', detalhe: '' };
   if (r === 'catalogo') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.catalogo.includes(op)) return null; return { acao: 'catalogo.' + op, detalhe: [q.fonte && 'fonte ' + t(q.fonte, 20), Array.isArray(q.chaves) && q.chaves.length + ' página(s)', q.estado && '→ ' + t(q.estado, 20), q.ligar != null && (q.ligar === true ? 'ligar' : 'desligar')].filter(Boolean).join(' ') }; }
+  if (r === 'enxoval') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.enxoval.includes(op)) return null; return { acao: 'enxoval.' + op, detalhe: [q.lote && 'lote ' + t(q.lote, 40), q.total != null && (q.total | 0) + ' produto(s)', q.coletadoEm && 'coletado em ' + t(q.coletadoEm, 10)].filter(Boolean).join(' • ') }; }
   if (r === 'regfontes') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.regfontes.includes(op)) return null; return { acao: 'radar_regulatorio.' + op, detalhe: [q.id && 'fonte ' + t(q.id, 30), q.nome && t(q.nome, 60), q.url && t(q.url, 120)].filter(Boolean).join(' • ') }; }
   if (r === 'sugestoes') return { acao: 'sugestao.marcar_lida', detalhe: '' };
   return { acao: t(r, 40), detalhe: '' };
@@ -1348,11 +1404,12 @@ async function admRotaInterna(req, env, au, url) {
     if (url.pathname === '/api/adm/config' && req.method === 'POST') return admConfig(req, env);
     if (url.pathname === '/api/adm/catalogo' && req.method === 'POST') return admCatalogo(req, env);
     if (url.pathname === '/api/adm/regfontes' && req.method === 'POST') return admRegFontes(req, env);
+    if (url.pathname === '/api/adm/enxoval' && req.method === 'POST') return admEnxoval(req, env, au);
     if (url.pathname === '/api/adm/purgar' && req.method === 'POST') return J({ ok: true, ...(await admPurgar(env, true)) });
     return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Rota administrativa inexistente.' } }, 404);
   } catch (e) { return J({ ok: false, erro: { codigo: 'erro_interno', mensagem: 'Falha ao consultar os dados administrativos.' } }, 500); }
 }
-export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto, admRegFontes, regAuto, regPublico, handleBusca, buscaProv, BUSCA_PROV };
+export { admSugerir, admCalc, admEvento, admMetaLimpa, ADM_FUNCS, catRobotsParse, catRobotsOk, admCatalogo, catAuto, admEnxoval, enxPublico, admRegFontes, regAuto, regPublico, handleBusca, buscaProv, BUSCA_PROV };
 
 async function admRota(req, env, au, url) {
   const neg = await admGuard(env, au, url.pathname); if (neg) return neg;

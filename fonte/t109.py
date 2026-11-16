@@ -1,0 +1,66 @@
+# Catálogo Enxoval: importação do pacote REAL pelo administrador, consulta pelo executivo e rascunho na Base
+from t40_lib import *
+import json, uuid, urllib.request, urllib.error
+B='http://localhost:8790'
+def http(method,path,body=None,headers=None):
+    rq=urllib.request.Request(B+path,data=(json.dumps(body).encode() if body is not None else None),method=method,headers={'content-type':'application/json',**(headers or {})})
+    try:
+        with urllib.request.urlopen(rq,timeout=30) as r: return r.status,r.read().decode('utf-8','replace')
+    except urllib.error.HTTPError as e: return e.code,e.read().decode('utf-8','replace')
+J=lambda t: json.loads(t) if t and t[0] in '{[' else {}
+run=uuid.uuid4().hex[:6]; hu={'x-test-user':'ex%s@totvs.com.br'%run,'x-test-sub':'ex'+run}; hadm={'x-test-user':'renan.oscar@totvs.com.br','x-test-sub':'sub-renan-001'}
+http('POST','/api/adm/enxoval',{'op':'limpar','confirmar':'LIMPAR'},hadm)
+s,t=http('POST','/api/adm/enxoval',{'op':'estado'},hu); ck('importação do catálogo é só do administrador', s in (401,403), s)
+s,t=http('POST','/api/adm/enxoval',{'op':'limpar','confirmar':'LIMPAR'},hu); ck('executivo comum não consegue esvaziar o catálogo', s in (401,403), s)
+s,t=http('GET','/api/enxoval',headers=hu); ck('sem pacote importado: executivo recebe lista vazia', s==200 and J(t)['meta'] is None and J(t)['itens']==[], t[:100])
+def sess(h):
+    ctx=b.new_context(viewport={'width':1400,'height':900},extra_http_headers=h); pg=ctx.new_page(); er=[]; pg.on('pageerror',lambda e: er.append(str(e))); pg.route('**/*',route); pg.goto(B+'/'); pg.wait_for_timeout(3500); return pg,er
+P,errs=sess(hu)
+ev(P,"()=>{UI.view='portfolio';render();return 0}"); P.wait_for_function("()=>!!document.querySelector('#pt-abas')",timeout=8000)
+ck('Portfólio ganhou as abas "Minha Base" e "Catálogo Enxoval" (sem tela nova no menu)', ev(P,"()=>[...document.querySelectorAll('#pt-abas button')].map(b=>b.textContent).join('|')")=='Minha Base de Soluções|Catálogo Enxoval')
+P.click('#pt-abas [data-k="enx"]'); P.wait_for_function("()=>!!document.querySelector('#enx-vazio')",timeout=8000)
+ck('catálogo vazio orienta, sem inventar produtos', 'Nenhum catálogo importado' in ev(P,"()=>document.querySelector('#enx-vazio').innerText"))
+# administrador importa o pacote real
+A,ea=sess(hadm); A.on('dialog',lambda d: d.accept())
+ev(A,"()=>{UI.view='adm';render();return 0}"); A.wait_for_function("()=>!!document.querySelector('#adm-enx')",timeout=15000)
+ck('painel: cartão do Catálogo Enxoval no Painel Administrador, vazio', 'Nenhum pacote importado' in ev(A,"()=>document.querySelector('#adm-enx').innerText"))
+open(D+'enx_ruim.json','w').write('{"formato":"outro","produtos":[1]}'); A.set_input_files('#enx_f',D+'enx_ruim.json'); A.click('[data-a="admEnxImp"]'); A.wait_for_timeout(800)
+ck('arquivo que não é pacote do Enxoval é recusado antes de enviar', ev(A,"()=>!ADMV.enxBusy && !(ADMV.enx.meta&&ADMV.enx.meta.estado==='concluido')"))
+A.set_input_files('#enx_f',D+'enx_pacote.json'); A.click('[data-a="admEnxImp"]'); A.wait_for_function("()=>ADMV.enx&&ADMV.enx.meta&&ADMV.enx.meta.estado==='concluido'&&!ADMV.enxBusy",timeout=120000)
+ta=ev(A,"()=>document.querySelector('#adm-enx').innerText")
+ck('pacote real importado: 273 produtos; 163 com ficha técnica, 49 só descrição, 49 só materiais, 12 inativos', '273 produto(s)' in ta and 'Com ficha técnica: 163' in ta and 'só descrição: 49' in ta and 'só materiais: 49' in ta and 'inativos: 12' in ta, ta[-260:])
+ck('painel mostra data da coleta e quem importou', '16/11/2026' in ta and 'renan.oscar@totvs.com.br' in ta, ta[:300])
+aud=http('GET','/api/adm/auditoria',headers=hadm)[1]; ck('importação fica na trilha de auditoria (início e conclusão, não cada lote)', 'enxoval.iniciar' in aud and 'enxoval.concluir' in aud and 'enxoval.lote' not in aud)
+ck('Integrações: Catálogo Enxoval aparece como importado', any(x['id']=='enxoval' and x['estado']=='conectado' and '273' in x['obs'] for x in J(http('GET','/api/adm/integracoes',headers=hadm)[1])['itens']))
+# executivo consulta
+ev(P,"()=>{ENX.idx=null;ENX.t=0;render();return 0}"); P.wait_for_function("()=>!!document.querySelector('#enx table')",timeout=10000)
+tx=ev(P,"()=>document.querySelector('#enx').innerText")
+ck('executivo vê o catálogo com a cobertura real e o aviso de "não confirmado"', '273 produto(s)' in tx and '163 com ficha técnica' in tx and 'não confirmado' in tx and 'coletado em 16/11/2026' in tx, tx[:260])
+ck('lista paginada (50 por página), não as 273 linhas de uma vez', ev(P,"()=>document.querySelectorAll('#enx tbody tr').length")==50 and 'Página 1 de 6' in tx)
+P.fill('[data-i="enxq"]','backoffice protheus'); P.wait_for_timeout(900)
+ck('busca por nome, família e linha; quem casa pelo nome vem primeiro', ev(P,"()=>document.querySelector('#enx tbody tr').cells[0].innerText.split('\\n')[0]")=='TOTVS Backoffice - Linha Protheus')
+P.fill('[data-i="enxq"]',''); P.wait_for_timeout(700); P.select_option('[data-c="enxseg"]','juridico'); P.wait_for_timeout(400)
+ck('filtro por segmento: Jurídico tem 4 produtos', ev(P,"()=>document.querySelectorAll('#enx tbody tr').length")==4)
+P.select_option('[data-c="enxseg"]',''); P.select_option('[data-c="enxnv"]','inativo'); P.wait_for_timeout(400)
+ck('filtro por documentação: 12 inativos', ev(P,"()=>document.querySelectorAll('#enx tbody tr').length")==12)
+P.select_option('[data-c="enxnv"]',''); P.fill('[data-i="enxq"]','backoffice protheus'); P.wait_for_timeout(900); P.click('#enx [data-a="enxAbrir"]'); P.wait_for_function("()=>!!document.querySelector('#enx-ficha h3')",timeout=10000)
+f=ev(P,"()=>document.querySelector('main').innerText")
+ck('ficha: nome, linha, fonte e data da coleta', 'TOTVS Backoffice - Linha Protheus' in f and 'Linha Protheus' in f and 'Abrir ficha técnica' in f and 'coletado em 16/11/2026' in f, f[:200])
+ck('ficha separa o documentado do não confirmado (requisitos e compatibilidade não são presumidos)', 'Requisitos e compatibilidade: não confirmado' in ev(P,"()=>document.querySelector('#enx-topicos').innerText") and 'Benefícios' in f)
+ck('ficha avisa que mostra só o trecho inicial de cada seção', 'Trecho inicial de cada seção' in f and '700 caracteres' in f)
+ck('materiais: só título, selo e link; confidenciais sinalizados', 'Interno confidencial' in f and 'o conteúdo dos materiais não foi lido' in f and 'não devem ser repassados a clientes' in f)
+ck('links de fonte abrem em nova aba e só em https', ev(P,"()=>[...document.querySelectorAll('#enx-ficha a, main table a')].every(a=>a.href.startsWith('https://')&&a.rel.includes('noopener'))"))
+n0=ev(P,"()=>S.solutions.length"); P.click('[data-a="enxTrazer"]'); P.wait_for_timeout(600)
+r=ev(P,"()=>{const r=S.solutions[S.solutions.length-1];return {n:S.solutions.length,nome:r.nome,st:r.status,of:r.oficial,priv:r._priv,or:r.origem,lin:r.linha,nf:r.funcionalidades.length,loc:r.funcionalidades.every(x=>x.loc&&x.f),fo:r.fontes.map(f=>f.u),fd:r.fontes.every(f=>f.d==='2026-11-16'),obs:r.obs,ni:r.integracoes.length}}")
+ck('"Trazer para a minha Base" cria UM rascunho privado, "necessita validação", não oficial', r['n']==n0+1 and r['st']=='NECESSITA VALIDAÇÃO' and r['of'] is False and r['priv'] is True and r['or']=='Catálogo Enxoval' and r['lin']=='Protheus', r)
+ck('cada funcionalidade do rascunho aponta a seção da ficha de onde saiu', r['nf']>0 and r['loc'], r['nf'])
+ck('rascunho guarda as fontes com a data da coleta', any('ficha-tecnica' in u for u in r['fo']) and r['fd'], r['fo'])
+ck('rascunho declara o que NÃO está confirmado e não cria integração presumida', 'NÃO CONFIRMADO' in r['obs'] and 'requisitos e compatibilidade' in r['obs'] and r['ni']==0, r['obs'][:200])
+ck('produto já trazido aparece como "já está na sua Base" e não duplica', ev(P,"()=>{const a=S.solutions.length;ENX_ACT.enxTrazer({dataset:{id:ptUI().esel}});return S.solutions.length===a && /já está na sua Base/.test(document.querySelector('#enx-ficha').innerText)}"))
+P.click('[data-a="enxVoltar"]'); P.fill('[data-i="enxq"]','otimizador de receitas'); P.wait_for_timeout(900); P.click('#enx [data-a="enxAbrir"]'); P.wait_for_function("()=>!!document.querySelector('#enx-ficha h3')",timeout=10000)
+ck('produto inativo: explica e não oferece trazer para a Base', ev(P,"()=>/aparece no Enxoval como inativo/.test(document.querySelector('main').innerText) && !document.querySelector('[data-a=\"enxTrazer\"]')"))
+P.click('[data-a="enxVoltar"]'); P.click('#pt-abas [data-k="base"]'); P.wait_for_timeout(400)
+ck('aba "Minha Base" continua como antes (Portfólio preservado)', ev(P,"()=>/Portfólio TOTVS/.test(document.querySelector('main').innerText) && !!document.querySelector('[data-i=\"ptq\"]')"))
+ck('conteúdo importado nunca vira HTML ativo', ev(P,"()=>!document.querySelector('main script, main img[onerror]')"))
+ck('sem erros de página', not errs and not ea, (errs[:2],ea[:2]))
+print('RESULT t109:', 'FALHAS '+str(F) if F else 'TUDO OK'); p.stop()
