@@ -11,8 +11,8 @@ const ENX_TOPICOS = [['Funcionalidades e processos', /funcionalid|processo|recur
 const enxSegs = s => s === '*' ? ['*'] : String(s || '').split(',').filter(Boolean), enxSegNome = k => k === '*' ? 'Todos os segmentos' : (ENX_SEG[k] || [k])[0];
 async function enxCarregar(forcar) {
   if (!window.__HOSTED__ || ENX.busy || (!forcar && ENX.idx && Date.now() - ENX.t < 600000)) return; ENX.busy = true; ENX.err = '';
-  try { const r = await fetch('/api/enxoval', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); const j = r.ok ? await r.json() : null; if (j && j.ok) { ENX.idx = Array.isArray(j.itens) ? j.itens : []; ENX.meta = j.meta || null; ENX.t = Date.now(); } else ENX.err = 'Não foi possível carregar o catálogo.'; }
-  catch { ENX.err = 'Sem conexão com o servidor. O catálogo volta quando a conexão voltar.'; } finally { ENX.busy = false; if (UI.view === 'portfolio') render(); }
+  try { const r = await fetch('/api/enxoval', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' }); const j = r.ok ? await r.json() : null; if (j && j.ok) { ENX.idx = Array.isArray(j.itens) ? j.itens : []; ENX.meta = j.meta || null; ENX.pesos = j.pesos || null; ENX.hay = null; ENX.t = Date.now(); } else ENX.err = 'Não foi possível carregar o catálogo.'; }
+  catch { ENX.err = 'Sem conexão com o servidor. O catálogo volta quando a conexão voltar.'; } finally { ENX.busy = false; if (UI.view === 'portfolio' || UI.view === 'cliente') render(); }
 }
 async function enxAbrir(id) {
   const U = ptUI(); U.esel = id; if (ENX.det[id] || ENX.detBusy === id) return render(); ENX.detBusy = id; render();

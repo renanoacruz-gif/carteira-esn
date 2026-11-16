@@ -501,6 +501,13 @@ export function enxLimpar(x) {
   const mat = arr(x.mat).slice(0, ENX_CFG.maxMat).map(z => [catTxt(stripTags(arr(z)[0]), 80), ENX_SELO.includes(arr(z)[1]) ? arr(z)[1] : '?', enxUrl(arr(z)[2])]).filter(z => z[0]);
   return { id, n: nome, seg, todos: !!x.todos, g: catTxt(stripTags(x.g), 80), lin: catTxt(stripTags(x.lin), 30), nv: nivel, d: catTxt(stripTags(x.d), 400), ue: enxUrl(x.ue, /^enxoval\.totvs\.com$/i), up: enxUrl(x.up, ENX_TOTVS), uf: enxUrl(x.uf, ENX_TOTVS), sec, mat };
 }
+/* pesos do motor de aderência cliente × solução (somam 100); o administrador ajusta, todos os executivos usam os mesmos */
+const AD_PESOS = { processos: 25, dor: 20, tecnologica: 20, setorial: 15, estrategico: 10, viabilidade: 10 };
+function adPesosOk(p) { if (!p || typeof p !== 'object') return null; const o = {}; let t = 0; for (const k of Object.keys(AD_PESOS)) { const v = +p[k]; if (!Number.isInteger(v) || v < 0 || v > 100) return null; o[k] = v; t += v; } return t === 100 ? o : null; }
+async function adPesosLer(db) { const r = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='ad_pesos'").first(); let p = null; try { p = r ? adPesosOk(JSON.parse(r.valor)) : null; } catch { /* usa o padrão */ } return p || { ...AD_PESOS }; }
+/* resumo de cada produto para o motor: quais tópicos a ficha documenta (pelos títulos) e os títulos de funcionalidade/processo — nunca o texto inteiro */
+const ENX_TP = [/funcionalid|processo|recurso|m[óo]dulo/i, /benef|vantag/i, /setor|segment|para quem|p[úu]blico/i, /integra/i, /contrata|licen|plano/i, /requisit|compatib/i], ENX_IDX = { lote: '', itens: null };
+function enxResumir(dados) { let p; try { p = JSON.parse(dados); } catch { return { tp: '000000', kw: '' }; } const hs = (p.sec || []).map(s => String(s[1] || '')); return { tp: ENX_TP.map(re => hs.some(h => re.test(h)) ? '1' : '0').join(''), kw: [String(p.d || '').slice(0, 200), ...(p.sec || []).filter(s => s[0] >= 3).map(s => String(s[1] || ''))].filter(Boolean).join(' | ').slice(0, 700) }; }
 async function enxMeta(db) { const r = await db.prepare("SELECT valor FROM adm_cfg WHERE chave='enx_meta'").first(); try { return r ? JSON.parse(r.valor) : null; } catch { return null; } }
 async function enxMetaSet(db, m) { await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('enx_meta',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify(m)).run(); }
 async function enxResumo(db) { const meta = await enxMeta(db), niv = {}; for (const r of ((await db.prepare('SELECT nivel, COUNT(*) n FROM enx_prod' + (meta?.lote && meta.estado === 'concluido' ? ' WHERE lote=?' : '') + ' GROUP BY nivel').bind(...(meta?.lote && meta.estado === 'concluido' ? [meta.lote] : [])).all()).results || [])) niv[r.nivel] = r.n; return { meta, niveis: niv, total: Object.values(niv).reduce((a, b) => a + b, 0) }; }
@@ -508,7 +515,8 @@ async function admEnxoval(req, env, au) {
   const db = admDb(env); await admInit(env); if (+(req.headers.get('content-length') || 0) > ENX_CFG.maxCorpo) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Lote acima de 400 KB.' } }, 413);
   let raw = ''; try { raw = await req.text(); } catch { /* vazio */ } if (raw.length > ENX_CFG.maxCorpo) return J({ ok: false, erro: { codigo: 'muito_grande', mensagem: 'Lote acima de 400 KB.' } }, 413);
   let q; try { q = JSON.parse(raw || '{}'); } catch { q = {}; } const op = String(q.op || 'estado'), inval = m => J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: m } }, 400), agora = new Date().toISOString();
-  if (op === 'estado') return J({ ok: true, ...(await enxResumo(db)) });
+  if (op === 'estado') return J({ ok: true, ...(await enxResumo(db)), pesos: await adPesosLer(db), pesosPadrao: AD_PESOS });
+  if (op === 'pesos') { const p = adPesosOk(q.pesos); if (!p) return inval('Os seis pesos devem ser inteiros de 0 a 100 e somar 100.'); await db.prepare("INSERT INTO adm_cfg(chave,valor) VALUES('ad_pesos',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").bind(JSON.stringify(p)).run(); return J({ ok: true, ...(await enxResumo(db)), pesos: p, pesosPadrao: AD_PESOS }); }
   if (op === 'iniciar') {
     const total = q.total | 0, col = String(q.coletadoEm || ''); if (q.formato !== 'enxoval-pacote/1') return inval('Formato de pacote desconhecido.'); if (total < 1 || total > ENX_CFG.maxProd) return inval('Quantidade de produtos fora do limite.'); if (!/^\d{4}-\d{2}-\d{2}$/.test(col) || isNaN(Date.parse(col)) || Date.parse(col) > Date.now() + 864e5) return inval('Data de coleta inválida.');
     const lote = 'enx_' + agora.replace(/\D/g, '').slice(0, 17) + Math.random().toString(36).slice(2, 6), ant = await enxMeta(db);
@@ -534,9 +542,10 @@ async function admEnxoval(req, env, au) {
 /* leitura pelos executivos: índice leve, ou um produto inteiro por id. Só o catálogo concluído é servido. */
 async function enxPublico(env, url) {
   const db = admDb(env); if (!db) return J({ ok: true, meta: null, itens: [] }); await admInit(env); const meta = await enxMeta(db), pub = meta?.estado === 'concluido' ? { coletadoEm: meta.coletadoEm, importadoEm: meta.importadoEm, total: meta.total } : null;
-  if (!pub) return J({ ok: true, meta: null, itens: [] }); const id = String(url.searchParams.get('id') || '').toLowerCase();
+  if (!pub) return J({ ok: true, meta: null, itens: [], pesos: await adPesosLer(db) }); const id = String(url.searchParams.get('id') || '').toLowerCase();
   if (id) { if (!/^[a-z0-9][a-z0-9-]{1,90}$/.test(id)) return J({ ok: false, erro: { codigo: 'requisicao_invalida', mensagem: 'Identificador inválido.' } }, 400); const r = await db.prepare('SELECT dados FROM enx_prod WHERE id=? AND lote=?').bind(id, meta.lote).first(); if (!r) return J({ ok: false, erro: { codigo: 'nao_encontrado', mensagem: 'Produto fora do catálogo importado.' } }, 404); return J({ ok: true, meta: pub, produto: JSON.parse(r.dados) }); }
-  return J({ ok: true, meta: pub, itens: (await db.prepare('SELECT id,nome,seg,grupo,linha,nivel,nmat FROM enx_prod WHERE lote=? ORDER BY nome').bind(meta.lote).all()).results || [] });
+  if (ENX_IDX.lote !== meta.lote || !ENX_IDX.itens) { ENX_IDX.itens = ((await db.prepare('SELECT id,nome,seg,grupo,linha,nivel,nmat,dados FROM enx_prod WHERE lote=? ORDER BY nome').bind(meta.lote).all()).results || []).map(({ dados, ...r }) => ({ ...r, ...enxResumir(dados) })); ENX_IDX.lote = meta.lote; }
+  return J({ ok: true, meta: pub, itens: ENX_IDX.itens, pesos: await adPesosLer(db) });
 }
 /* ===== Busca dedicada: contrato único para provedores de pesquisa =====
    Cada provedor é um adaptador { nome, seg (nome do segredo no servidor), buscar(q, n, chave) → [{ titulo, url, trecho, data }] }.
@@ -626,7 +635,7 @@ function admAudDescrever(rota, q) {
   if (r === 'config') return { acao: 'configuracao.alterar', detalhe: Object.keys(q || {}).map(k => t(k, 30)).slice(0, 8).join(', ') };
   if (r === 'purgar') return { acao: 'retencao.aplicar', detalhe: '' };
   if (r === 'catalogo') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.catalogo.includes(op)) return null; return { acao: 'catalogo.' + op, detalhe: [q.fonte && 'fonte ' + t(q.fonte, 20), Array.isArray(q.chaves) && q.chaves.length + ' página(s)', q.estado && '→ ' + t(q.estado, 20), q.ligar != null && (q.ligar === true ? 'ligar' : 'desligar')].filter(Boolean).join(' ') }; }
-  if (r === 'enxoval') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.enxoval.includes(op)) return null; return { acao: 'enxoval.' + op, detalhe: [q.lote && 'lote ' + t(q.lote, 40), q.total != null && (q.total | 0) + ' produto(s)', q.coletadoEm && 'coletado em ' + t(q.coletadoEm, 10)].filter(Boolean).join(' • ') }; }
+  if (r === 'enxoval') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.enxoval.includes(op)) return null; return { acao: 'enxoval.' + op, detalhe: [q.lote && 'lote ' + t(q.lote, 40), q.total != null && (q.total | 0) + ' produto(s)', q.coletadoEm && 'coletado em ' + t(q.coletadoEm, 10), q.pesos && 'pesos ' + t(JSON.stringify(q.pesos), 120)].filter(Boolean).join(' • ') }; }
   if (r === 'regfontes') { const op = t(q.op || 'estado', 20); if (ADM_AUD_SO_LEITURA.regfontes.includes(op)) return null; return { acao: 'radar_regulatorio.' + op, detalhe: [q.id && 'fonte ' + t(q.id, 30), q.nome && t(q.nome, 60), q.url && t(q.url, 120)].filter(Boolean).join(' • ') }; }
   if (r === 'sugestoes') return { acao: 'sugestao.marcar_lida', detalhe: '' };
   return { acao: t(r, 40), detalhe: '' };

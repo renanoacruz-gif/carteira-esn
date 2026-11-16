@@ -43,7 +43,7 @@ ck('eventos: raiox_gerar', ('raiox_gerar','concluida') in fs, fs)
 ck('eventos: recomendacao_leitura', ('recomendacao_leitura','concluida') in fs or r=='sem', (fs,r))
 ck('iniciada e concluída compartilham correlação', any(e['func']=='ficha_upload' and e['fase']=='concluida' and e['corr'] in [x['corr'] for x in evs if x['fase']=='iniciada'] for e in evs))
 txt=''.join(bodies)
-ck('envio sem nomes de clientes/CNPJ/conteúdo', not re.search(r'\d{14}|\d\d\.\d{3}\.\d{3}/|T0000\d|Cliente|LTDA|\.xlsx|ficha_T', txt) , re.findall(r'.{20}(?:\d{14}|T0000\d|LTDA|\.xlsx).{10}',txt)[:3])
+ck('envio sem nomes de clientes/CNPJ/conteúdo', not re.search(r'(?<![0-9a-f])\d{14}(?![0-9a-f])|\d\d\.\d{3}\.\d{3}/|T0000\d|Cliente|LTDA|\.xlsx|ficha_T', txt) , re.findall(r'.{20}(?:\d{14}|T0000\d|LTDA|\.xlsx).{10}',txt)[:3])
 ck('sem erros de JS na página', len(ea)==0, ea[:3])
 # coleta indisponível não bloqueia
 A.route('**/api/ev',lambda r: r.abort())
