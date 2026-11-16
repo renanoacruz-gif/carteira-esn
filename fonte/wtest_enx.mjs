@@ -30,7 +30,14 @@ ok(env0 === P.length, `${P.length} produtos reais gravados em lotes, nenhum reje
 x = await adm({ op: 'lote', lote, itens: new Array(41).fill({ id: 'p-x', n: 'X' }) }); ok(x.s === 400, 'lote acima de 40 produtos recusado');
 x = await adm({ op: 'concluir', lote }); ok(x.s === 200 && x.j.total === 273 && x.j.niveis.ficha === 163 && x.j.niveis.portal === 49 && x.j.niveis.enxoval === 49 && x.j.niveis.inativo === 12, 'concluído: 273 = 163 ficha + 49 portal + 49 só materiais + 12 inativos');
 ok(x.j.meta.por === 'adm@totvs.com.br' && x.j.meta.coletadoEm === '2026-11-16', 'registra quem importou e a data da coleta');
-x = await pub(); ok(x.j.meta.total === 273 && x.j.itens.length === 273 && !('dados' in x.j.itens[0]) && JSON.stringify(x.j).length < 60000, 'índice leve para o executivo (sem o conteúdo das fichas)');
+x = await pub(); ok(x.j.meta.total === 273 && x.j.itens.length === 273 && !('dados' in x.j.itens[0]) && !('sec' in x.j.itens[0]) && JSON.stringify(x.j).length < 260000, 'índice para o executivo: resumo por produto, sem o texto das fichas');
+ok(x.j.itens.every(i => /^[01]{6}$/.test(i.tp) && i.kw.length <= 700), 'cada produto traz os tópicos documentados (6 marcadores) e os títulos de funcionalidade, limitados');
+ok(JSON.stringify(x.j.pesos) === JSON.stringify({ processos: 25, dor: 20, tecnologica: 20, setorial: 15, estrategico: 10, viabilidade: 10 }), 'pesos padrão do motor: 25/20/20/15/10/10');
+{ let y = await adm({ op: 'pesos', pesos: { processos: 30, dor: 20, tecnologica: 20, setorial: 15, estrategico: 10, viabilidade: 10 } }); ok(y.s === 400, 'pesos que não somam 100 são recusados');
+  y = await adm({ op: 'pesos', pesos: { processos: 25.5, dor: 19.5, tecnologica: 20, setorial: 15, estrategico: 10, viabilidade: 10 } }); ok(y.s === 400, 'pesos não inteiros recusados');
+  y = await adm({ op: 'pesos', pesos: { processos: 110, dor: -10, tecnologica: 0, setorial: 0, estrategico: 0, viabilidade: 0 } }); ok(y.s === 400, 'peso fora de 0–100 recusado');
+  y = await adm({ op: 'pesos', pesos: { processos: 30, dor: 30, tecnologica: 20, setorial: 10, estrategico: 5, viabilidade: 5 } }); ok(y.s === 200 && y.j.pesos.processos === 30 && (await pub()).j.pesos.dor === 30, 'pesos válidos gravados e entregues a todos os executivos');
+  await adm({ op: 'pesos', pesos: { processos: 25, dor: 20, tecnologica: 20, setorial: 15, estrategico: 10, viabilidade: 10 } }); }
 const prot = x.j.itens.find(i => i.id === 'totvs-backoffice-linha-protheus'); ok(prot && prot.linha === 'Protheus' && prot.nivel === 'ficha' && prot.seg === '*', 'Backoffice Linha Protheus: linha, nível e "todos os segmentos"');
 x = await pub('?id=totvs-backoffice-linha-protheus'); ok(x.s === 200 && x.j.produto.sec.length > 5 && x.j.produto.uf.startsWith('https://produtos.totvs.com/ficha-tecnica/') && x.j.produto.mat.some(m => m[1] === 'C'), 'ficha completa por id, com fonte e selo dos materiais');
 x = await pub('?id=nao-existe'); ok(x.s === 404, 'id fora do catálogo → 404'); x = await pub("?id=a'%20OR%201=1"); ok(x.s === 400, 'id malformado → 400');
