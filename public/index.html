@@ -3286,7 +3286,7 @@ async function flush() {
     let left = dirtyC.size + delC.size + Object.values(GCOL).reduce((n, g) => n + (g.ref ? g.d.size + g.x.size : 0), 0);
     const tick = () => { if (--left >= 0 && total > 5) { UI.persist = `salvando ${left}…`; paintStatus(); } }, total = left; if (total > 5) { UI.persist = `salvando ${total}…`; paintStatus(); }
     await poolRun([
-      ...[...dirtyC].map(k => async () => { dirtyC.delete(k); if (S.clients[k]) { try { await CL.doc(k).set(freezeClient(S.clients[k])); } catch (e) { dirtyC.add(k); throw e; } } tick(); }),
+      ...[...dirtyC].map(k => async () => { dirtyC.delete(k); if (S.clients[k]) { try { await sincPushC(k); } catch (e) { dirtyC.add(k); throw e; } } tick(); }),
       ...[...delC].map(k => async () => { delC.delete(k); try { await CL.doc(k).delete(); } catch (e) { delC.add(k); throw e; } tick(); })
     ]);
     for (const id of [...dirtyI]) { dirtyI.delete(id); const it = S.inbox.find(x => x.id === id); if (it) await INB.doc(id).set(clone(it)); }
@@ -3299,8 +3299,8 @@ async function flush() {
       ...[...g.d].map(id => async () => { g.d.delete(id); const r = g.arr().find(x => x.id === id); if (r) { try { await g.ref.doc(id).set(clone(r)); } catch (e) { g.d.add(id); throw e; } } tick(); }),
       ...[...g.x].map(id => async () => { g.x.delete(id); try { await g.ref.doc(id).delete(); } catch (e) { g.x.add(id); throw e; } tick(); })
     ]));
-    if (dirtyMeta) { dirtyMeta = false; await META.set(clone({ meta: { ...S.meta, files: S.meta.files.slice(-400) }, kbExtra: S.kbExtra })); }
-    UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
+    if (dirtyMeta) { dirtyMeta = false; try { await sincPushMeta(); } catch (e) { dirtyMeta = true; throw e; } }
+    { const nc = Object.keys(SINC.conf).length; UI.persist = nc ? `${nc} cliente(s) com alteração em outra sessão: decisão pendente` : 'salvo (carteira privada + catálogo compartilhado)'; }
   } catch (e) { UI.persist = 'ERRO ao salvar: ' + (e.code === 'tempo_esgotado' ? e.message : (e.code || e.message)); toast('Falha ao salvar: ' + (e.message || e.code)); }
   saving = false; paintStatus();
 }
@@ -3326,7 +3326,7 @@ async function initStore() {
       S.pesq = docs(pes).sort(byAt);
       S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = []; /* imagens: sob demanda (ocrimgEnsure) */ ensureIids();
       UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
-      catalogWatch(); reanalyzeAll(false); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
+      catalogWatch(); reanalyzeAll(false); sincIniciar(); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
       if (Object.keys(S.clients).length) UI.view = 'geral';
     } else { UI.persist = 'memória (db indisponível: use Backup JSON)'; loadSolutions([]); }
   } catch (e) { META = null; SOL = PES = null; loadSolutions([]); UI.persist = 'memória (db indisponível: ' + e.message + ') — use Backup JSON'; }
@@ -3690,6 +3690,124 @@ async function importBackup(file, ok) {
   } catch (e) { log('✖ Backup: ' + e.message, 'bad'); toast(e.message); } render();
 }
 
+
+/* ---------- Sincronização entre sessões da carteira privada (rodada 45) ----------
+   Problema resolvido: com duas sessões abertas (celular e computador), a última gravação vencia e a outra se perdia sem aviso.
+   Como funciona (só no hospedado, onde o servidor guarda a versão de cada documento):
+   - cada gravação de cliente e dos ajustes gerais é condicional à versão lida por esta sessão;
+   - se outra sessão gravou antes, compara-se campo a campo com a base lida: o que só o outro lado mudou é incorporado,
+     o que só este lado mudou é mantido; o que os DOIS mudaram vira decisão do executivo (nada é descartado em silêncio);
+   - alterações da outra sessão chegam sozinhas (consulta a cada 45 s e ao voltar para a aba) quando não há edição local pendente.
+   Limite conhecido: exclusão de cliente feita na outra sessão só é percebida ao recarregar ou ao editar o mesmo cliente. */
+const CBASE = new Map(), SINC = { on: false, conf: {}, metaBase: null }, SINC_SEP = '\u0001';
+const SINC_AUTO = ['lastChange', 'changes', 'prevKeys', 'fichaErr']; /* derivados da análise: recalculados, nunca viram decisão */
+const SINC_ROT = { name: 'Nome', code: 'Código', cnpj: 'CNPJ', seg: 'Segmento', city: 'Cidade', size: 'Porte', mrr: 'MRR da planilha', productsRaw: 'Produtos da planilha', churn: 'Risco de churn', nps: 'NPS', notes: 'Observações', custom: 'Campos adicionais', edits: 'Edições manuais', usoConf: 'Uso confirmado', site: 'Site', fatos: 'Fatos e dores', sugFatos: 'Sugestões de fatos', aval: 'Avaliações', valid: 'Validações', dorHip: 'Hipóteses de dor', fichas: 'Fichas de faturamento', docs: 'Documentos', mgmt: 'Gestão da conta', act: 'Ações e acompanhamento', uf: 'UF', regime: 'Regime tributário', release: 'Release', lic: 'Licenciamento', cloud: 'Hospedagem', rel: 'Relacionamento', fis: 'Fiscal', roi: 'ROI', exec: 'Diagnóstico executivo', cdocs: 'Documentos contratuais', ext: 'Ids externos', cad: 'Cadastro', contratos: 'Contratos', cadDec: 'Decisões de cadastro', cadConf: 'Conflitos de cadastro', cnpjCad: 'Consulta de CNPJ', reviewFlags: 'Marcas de revisão', oppKeep: 'Oportunidades mantidas', emp: 'Dados do Empodera', gst: 'Gestão', ptRes: 'Desfechos do portfólio', enxVinc: 'Soluções vinculadas', prFill: 'Preenchimento por print', prImp: 'Prints importados' };
+const sincObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+function sincH(v) { const s = JSON.stringify(v === undefined ? null : v); let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0).toString(36) + '.' + s.length; }
+const SINC_NULO = sincH(null);
+function sincHashes(o, fundo) { const r = {}; for (const k of Object.keys(o || {})) { const v = o[k]; r[k] = sincH(v); if (fundo && sincObj(v)) for (const j of Object.keys(v)) r[k + SINC_SEP + j] = sincH(v[j]); } return r; }
+/* mescla em três vias por campo. L = local, R = remoto, B = hashes da base lida (null = base desconhecida: toda diferença é conflito).
+   Devolve { val: campos a aplicar no local (undefined = remover), tomou: campos vindos do remoto, conf: campos alterados dos dois lados } */
+function sincMerge(L, R, B, fundo) {
+  const val = {}, tomou = [], conf = [], hb = k => B ? (B[k] ?? SINC_NULO) : null;
+  for (const f of new Set([...Object.keys(L || {}), ...Object.keys(R || {})])) {
+    const hl = sincH(L[f]), hr = sincH(R[f]); if (hl === hr) continue;
+    if (!B) { if (!SINC_AUTO.includes(f)) conf.push(f); continue; }
+    const lc = hl !== hb(f), rc = hr !== hb(f);
+    if (rc && !lc) { val[f] = R[f]; tomou.push(f); continue; }
+    if (!rc) continue;
+    if (SINC_AUTO.includes(f)) continue;
+    if (fundo && sincObj(L[f]) && sincObj(R[f])) { /* um nível abaixo (ajustes gerais): só conflita o subitem alterado nos dois lados */
+      const m = { ...L[f] }; let mudou = false;
+      for (const j of new Set([...Object.keys(L[f]), ...Object.keys(R[f])])) {
+        const sl = sincH(L[f][j]), sr = sincH(R[f][j]); if (sl === sr) continue; const sb = hb(f + SINC_SEP + j), slc = sl !== sb, src = sr !== sb;
+        if (src && !slc) { if (j in R[f]) m[j] = R[f][j]; else delete m[j]; mudou = true; } else if (src && slc) conf.push(f + '.' + j);
+      }
+      if (mudou) { val[f] = m; tomou.push(f); } continue;
+    }
+    conf.push(f);
+  }
+  return { val, tomou, conf };
+}
+const sincAplicar = (alvo, val) => { for (const f of Object.keys(val)) { if (val[f] === undefined) delete alvo[f]; else alvo[f] = clone(val[f]); } };
+const sincRot = f => SINC_ROT[f] || f;
+function sincIniciar() { /* chamado ao fim da carga: guarda a base e liga a escuta de outras sessões */
+  SINC.on = !!(META && typeof META.setV === 'function'); if (!SINC.on) return;
+  Object.values(S.clients).forEach(c => CBASE.set(c.key, sincHashes(freezeClient(c))));
+  SINC.metaBase = sincHashes(sincMetaDoc(), true);
+  let t = null, n = 0; const avisar = () => { clearTimeout(t); t = setTimeout(() => { const q = n; n = 0; if (!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) render(); toast(q ? `Carteira atualizada a partir de outra sessão (${q} cliente(s)).` : 'Ajustes gerais atualizados a partir de outra sessão.'); }, 600); };
+  try {
+    CL.onSnapshot?.(snap => { (snap?.docs || []).forEach(d => {
+      const R = clone(d.data()), k = R && R.key; if (!k || dirtyC.has(k) || delC.has(k) || SINC.conf[k]) return; /* com edição local pendente, a mescla acontece na gravação */
+      const ref = CL.doc(k), v = ref.ver(); if (!d.at || (v && d.at <= v)) return; /* é a própria gravação desta sessão (ou mais antiga) */
+      S.clients[k] = R; ref.adotar(d.at); runAnalysis(R); CBASE.set(k, sincHashes(freezeClient(R))); n++; avisar();
+    }); });
+    META.onSnapshot?.(d => {
+      const v = META.ver(); if (dirtyMeta || !d.at || (v && d.at <= v)) return;
+      const R = clone(d.data()); sincMetaAplicar(sincMerge(sincMetaDoc(), sincMetaPlano(R), SINC.metaBase, true).val); META.adotar(d.at); SINC.metaBase = sincHashes(sincMetaDoc(), true); reanalyzeAll(false); avisar();
+    });
+  } catch { /* sem escuta: a mescla continua valendo na gravação */ }
+}
+/* ---- clientes ---- */
+async function sincPushC(k) {
+  const c = S.clients[k], ref = CL.doc(k); if (!SINC.on) { await ref.set(freezeClient(c)); return; }
+  let L = freezeClient(c);
+  for (let t = 0; t < 2; t++) {
+    try { await ref.setV(L); CBASE.set(k, sincHashes(L)); if (SINC.conf[k]) delete SINC.conf[k]; return; }
+    catch (e) {
+      if (e.code !== 'conflito') throw e;
+      if (!e.atual) { sincSegurar(k, { excl: true, at: '', campos: [] }); return; }
+      const m = sincMerge(L, e.atual, CBASE.get(k) || null);
+      sincAplicar(c, m.val); if (m.tomou.length) runAnalysis(c);
+      if (m.conf.length) { sincSegurar(k, { R: e.atual, at: e.at, campos: m.conf }); return; }
+      ref.adotar(e.at); CBASE.set(k, sincHashes(e.atual)); L = freezeClient(c);
+      if (t === 0) { log(`"${c.name}": alterações feitas em outra sessão foram incorporadas (${m.tomou.map(sincRot).join(', ') || 'sem diferença de conteúdo'}).`, 'ok'); setTimeout(() => { toast(`"${c.name}" também foi alterado em outra sessão: as duas alterações foram mantidas.`); render(); }, 0); }
+    }
+  }
+  throw Object.assign(new Error('registro em alteração contínua em outra sessão'), { code: 'conflito' });
+}
+function sincSegurar(k, x) { const a = SINC.conf[k], novo = !a || a.at !== x.at || a.campos.join() !== x.campos.join(); SINC.conf[k] = x; if (novo) setTimeout(() => { const c = S.clients[k]; toast(x.excl ? `"${c?.name || k}" foi excluído em outra sessão. Decida o que fazer na ficha do cliente.` : `"${c?.name || k}" foi alterado em outra sessão nos mesmos campos. Nada foi perdido: decida qual versão vale.`); render(); }, 0); }
+function sincDecidir(k, lado) {
+  const x = SINC.conf[k], c = S.clients[k]; if (!x || !c) return; const ref = CL.doc(k); delete SINC.conf[k];
+  if (x.excl) { if (lado === 'outro') { delete S.clients[k]; dirtyC.delete(k); CBASE.delete(k); ref.adotar(''); if (UI.sel === k) { UI.sel = null; UI.view = 'clientes'; } log(`Cliente "${c.name}" removido desta sessão (já havia sido excluído em outra).`, 'ok'); render(); return; } ref.adotar(''); CBASE.delete(k); touchC(k); render(); return; }
+  if (lado === 'outro') sincAplicar(c, Object.fromEntries(x.campos.map(f => [f, x.R[f]])));
+  ref.adotar(x.at); CBASE.set(k, sincHashes(x.R)); runAnalysis(c, lado === 'outro' ? 'Versão da outra sessão adotada' : ''); touchC(k);
+  log(`"${c.name}": conflito entre sessões resolvido (${lado === 'outro' ? 'versão da outra sessão' : 'versão desta sessão'}) em ${x.campos.map(sincRot).join(', ')}.`, 'ok'); render();
+}
+function sincBanner(c) {
+  const x = SINC.conf[c.key]; if (!x) return '';
+  const bt = `<div class="row" style="margin-top:6px"><button class="btn pri" data-a="sincMeu" data-k="${esc(c.key)}">${x.excl ? 'Manter o cliente' : 'Manter a versão desta sessão'}</button><button class="btn ghost" data-a="sincOutro" data-k="${esc(c.key)}">${x.excl ? 'Remover também aqui' : 'Usar a versão da outra sessão'}</button></div>`;
+  if (x.excl) return `<div class="alert b" role="alert"><b>Este cliente foi excluído em outra sessão.</b><div class="sm">As alterações feitas aqui ainda não foram gravadas. Escolha manter o cliente (ele volta a existir) ou removê-lo também desta sessão.</div>${bt}</div>`;
+  return `<div class="alert b" role="alert"><b>Este cliente foi alterado em outra sessão nos mesmos campos.</b><div class="sm">Campos em conflito: <b>${x.campos.map(f => esc(sincRot(f))).join(', ')}</b>. O restante já foi unido automaticamente. As alterações desta sessão nesses campos <b>ainda não foram gravadas</b>: se você recarregar a página antes de decidir, vale a versão da outra sessão.</div>${bt}</div>`;
+}
+function sincFaixa() {
+  const ks = Object.keys(SINC.conf).filter(k => S.clients[k]); if (!ks.length || (UI.view === 'cliente' && ks.length === 1 && ks[0] === UI.sel)) return '';
+  return `<div class="alert b" role="alert"><b>${ks.length} cliente(s) alterado(s) em outra sessão aguardam a sua decisão.</b> <span class="sm">${ks.slice(0, 6).map(k => `<button class="btn ghost sm" data-a="sincAbrir" data-k="${esc(k)}">${esc(S.clients[k].name)}</button>`).join(' ')}${ks.length > 6 ? ' …' : ''}</span></div>`;
+}
+/* ---- ajustes gerais (um documento só) ---- */
+const sincMetaDoc = () => ({ ...S.meta, files: S.meta.files.slice(-400), '~kbExtra': S.kbExtra });
+const sincMetaPlano = d => ({ ...((d && d.meta) || {}), '~kbExtra': (d && d.kbExtra) || { solutions: [] } });
+function sincMetaAplicar(val) { for (const f of Object.keys(val)) { if (f === '~kbExtra') S.kbExtra = clone(val[f] || { solutions: [] }); else if (val[f] === undefined) delete S.meta[f]; else S.meta[f] = clone(val[f]); } S.meta.weights = { ...DEF_WEIGHTS, ...(S.meta.weights || {}) }; S.meta.files ||= []; S.meta.segOv ||= {}; S.meta.act ||= {}; }
+async function sincPushMeta() {
+  const doc = () => clone({ meta: { ...S.meta, files: S.meta.files.slice(-400) }, kbExtra: S.kbExtra });
+  if (!SINC.on) { await META.set(doc()); return; }
+  for (let t = 0; t < 2; t++) {
+    try { await META.setV(doc()); SINC.metaBase = sincHashes(sincMetaDoc(), true); return; }
+    catch (e) {
+      if (e.code !== 'conflito') throw e;
+      if (!e.atual) { META.adotar(''); continue; }
+      const m = sincMerge(sincMetaDoc(), sincMetaPlano(e.atual), SINC.metaBase, true), cf = m.conf.filter(f => f !== 'lastAnalysis');
+      sincMetaAplicar(m.val); META.adotar(e.at); SINC.metaBase = sincHashes(sincMetaPlano(e.atual), true);
+      if (t === 0 && (m.tomou.length || cf.length)) { if (cf.length) log(`Ajustes gerais alterados nas duas sessões (${cf.join(', ')}): mantida a versão desta sessão nesses itens; os demais foram unidos.`, 'warn'); setTimeout(() => { if (cf.length) toast(`${cf.length} ajuste(s) geral(is) também alterado(s) em outra sessão: mantida a versão desta sessão. Detalhe no registro de atividades.`); reanalyzeAll(false); render(); }, 0); }
+    }
+  }
+  throw Object.assign(new Error('ajustes gerais em alteração contínua em outra sessão'), { code: 'conflito' });
+}
+const SINC_ACT = {
+  sincMeu: t => sincDecidir(t.dataset.k, 'meu'),
+  sincOutro: t => { const x = SINC.conf[t.dataset.k]; if (x && !confirm(x.excl ? 'Remover este cliente também desta sessão? As alterações feitas aqui serão descartadas.' : 'Usar a versão da outra sessão nos campos em conflito? As alterações desta sessão nesses campos serão descartadas.')) return; sincDecidir(t.dataset.k, 'outro'); },
+  sincAbrir: t => { UI.sel = t.dataset.k; UI.view = 'cliente'; render(); },
+};
 
 /* ===== AÇÕES: contratos, evidências, perfil fiscal, marcos, regulatório, ROI, diagnóstico ===== */
 const CDOC_K = { contrato: 'Contrato', aditivo: 'Aditivo', matriz: 'Matriz de acesso' };
@@ -4971,7 +5089,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = '37814490eb9b';
+const BUILD = '9278ec30d2ff';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -5465,7 +5583,7 @@ if (HOST && !window.claude) {
     catch { throw estourou ? Object.assign(new Error('O servidor demorou a responder.'), { code: 'tempo_esgotado' }) : Object.assign(new Error('Sem conexão com o servidor.'), { code: 'rede' }); }
     if (r.type === 'opaqueredirect' || r.status === 302) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' });
     let j; try { j = await r.json(); } catch { if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' }); throw Object.assign(new Error('Resposta inválida do servidor (HTTP ' + r.status + ').'), { code: 'http_' + r.status }); }
-    if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual });
+    if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual, at: j.at });
     return j;
     } finally { clearTimeout(tm); }
   };
@@ -5478,18 +5596,20 @@ if (HOST && !window.claude) {
   };
   let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { if (hkDono(j.id) === 'apagadas') setTimeout(() => toast('As chaves de IA guardadas neste navegador eram de outra conta e foram apagadas.'), 1500); } catch { /* opcional */ } try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
   const lastGet = {};
+  /* Versão por documento (carimbo do servidor) para gravação condicional da carteira privada. VER só muda em leitura inicial, gravação aceita ou adoção explícita (adotar): receber uma alteração de outra sessão NÃO atualiza a versão sozinha, para nunca sobrescrever o que ainda não foi mesclado. */
+  const VER = new Map(), CHEIO = new Set();
   const col = path => ({
     path,
     doc: id => doc(path + '/' + segEnc(id)),
     get: async () => {
-      const docs = []; let after = '', agora = ''; for (let i = 0; i < 400; i++) { const j = await api('/api/db', { op: 'list', path, after, limit: 200 }); agora = j.agora; docs.push(...j.docs.map(d => ({ id: segDec(d.id), data: () => d.data }))); if (!j.mais) break; after = j.depois; }
-      lastGet[path] = agora; return { docs };
+      const docs = []; let after = '', agora = ''; for (let i = 0; i < 400; i++) { const j = await api('/api/db', { op: 'list', path, after, limit: 200 }); agora = j.agora; docs.push(...j.docs.map(d => { VER.set(path + '/' + d.id, d.at); return { id: segDec(d.id), at: d.at, data: () => d.data }; })); if (!j.mais) break; after = j.depois; }
+      lastGet[path] = agora; CHEIO.add(path); return { docs };
     },
     onSnapshot: cb => {
       let parar = false, ocupado = false, since = lastGet[path] ? new Date(Date.parse(lastGet[path]) - 3000).toISOString() : new Date(Date.now() - 3000).toISOString();
       const tick = async () => {
         if (parar || ocupado || document.hidden) return; ocupado = true;
-        try { let after = '', novos = [], agora = ''; for (let i = 0; i < 50; i++) { const j = await api('/api/db', { op: 'list', path, after, since, limit: 200 }); agora = j.agora; novos.push(...j.docs.map(d => ({ id: segDec(d.id), data: () => d.data }))); if (!j.mais) break; after = j.depois; } since = new Date(Date.parse(agora) - 3000).toISOString(); if (novos.length) cb({ docs: novos }); } catch { /* tenta no próximo ciclo */ }
+        try { let after = '', novos = [], agora = ''; for (let i = 0; i < 50; i++) { const j = await api('/api/db', { op: 'list', path, after, since, limit: 200 }); agora = j.agora; novos.push(...j.docs.map(d => ({ id: segDec(d.id), at: d.at, data: () => d.data }))); if (!j.mais) break; after = j.depois; } since = new Date(Date.parse(agora) - 3000).toISOString(); if (novos.length) cb({ docs: novos }); } catch { /* tenta no próximo ciclo */ }
         ocupado = false;
       };
       const iv = setInterval(tick, 45000), vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
@@ -5498,9 +5618,18 @@ if (HOST && !window.claude) {
   });
   const doc = path => ({
     path,
-    get: async () => { const j = await api('/api/db', { op: 'get', path }); return { exists: !!j.exists, data: () => j.data }; },
-    set: async d => { await api('/api/db', { op: 'set', path, data: d }); },
-    delete: async () => { await api('/api/db', { op: 'delete', path }); },
+    get: async () => { const j = await api('/api/db', { op: 'get', path }); VER.set(path, j.at || ''); return { exists: !!j.exists, at: j.at || '', data: () => j.data }; },
+    set: async d => { const j = await api('/api/db', { op: 'set', path, data: d }); if (j.at) VER.set(path, j.at); },
+    /* gravação condicional: recusa (code 'conflito', com .atual e .at) se outra sessão gravou depois da versão conhecida aqui. Sem versão conhecida (documento nunca lido), grava como antes. */
+    setV: async d => { const pai = path.slice(0, path.lastIndexOf('/')), base = VER.has(path) ? VER.get(path) : (CHEIO.has(pai) ? '' : undefined); const j = await api('/api/db', base === undefined ? { op: 'set', path, data: d } : { op: 'set', path, data: d, base }); if (j.at) VER.set(path, j.at); return j.at || ''; },
+    ver: () => VER.get(path), adotar: at => { VER.set(path, at || ''); },
+    onSnapshot: cb => { /* documento único (ajustes gerais): consulta só o que mudou desde a última leitura */
+      const pai = path.slice(0, path.lastIndexOf('/')); let parar = false, ocupado = false, since = new Date(Date.now() - 3000).toISOString();
+      const tick = async () => { if (parar || ocupado || document.hidden) return; ocupado = true; try { const j = await api('/api/db', { op: 'list', path: pai, since, limit: 5 }); since = new Date(Date.parse(j.agora) - 3000).toISOString(); const d = j.docs.find(x => pai + '/' + x.id === path); if (d) cb({ exists: true, at: d.at, data: () => d.data }); } catch { /* tenta no próximo ciclo */ } ocupado = false; };
+      const iv = setInterval(tick, 45000), vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
+      return () => { parar = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+    },
+    delete: async () => { await api('/api/db', { op: 'delete', path }); VER.delete(path); },
     collection: n => col(path + '/' + n),
   });
   const norm = p => String(p).split('/').map(segEnc).join('/');
@@ -7230,7 +7359,7 @@ const VIEWS = [['importar', 'Importar'], ['geral', 'Visão geral'], ['forecast',
 function render() {
   onbVisto(); paintShell();
   const V = { importar: vImport, oport: vOport, geral: vGeral, forecast: vForecast, mrr: vMrr, portfolio: vPortfolio, clientes: vClientes, cliente: vCliente, diag: vDiag, segmentos: vSeg, plano: vPlano, criterios: vCrit, base: vBase, solucoes: vSolucoes, ia: vIA, refs: vRefs, consol: vConsol, conta: vConta, dados: vDados, integra: vIntegra, cnpj: vCnpj, mercado: vMercado, pend: vPend, adm: vAdm }[UI.view];
-  $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + (window.__HOSTED__ ? hkBanner() : '') + V();
+  $('#app').innerHTML = (UI.busy ? `<div class="alert i busy" role="status"><b>${esc(UI.busy)}</b></div><div class="skeleton" aria-hidden="true"><i class="sk h70"></i><i class="sk h160"></i></div>` : '') + (window.__HOSTED__ ? hkBanner() : '') + sincFaixa() + V();
   paintModal();
 }
 const needData = () => `<div class="card empty"><h2>Nenhum dado importado</h2><p>Importe a planilha da carteira para iniciar. Nenhum dado de exemplo é carregado.</p><button class="btn pri" data-a="nav" data-v="importar">Ir para Importar</button></div>`;
@@ -7689,7 +7818,7 @@ function vCliente(all) {
   const c = S.clients[UI.sel]; if (!c) return clients().length ? `<div class="card empty"><h2>Selecione um cliente</h2><p>Abra um cliente pela aba Clientes.</p><button class="btn pri" data-a="nav" data-v="clientes">Ver clientes</button></div>` : needData();
   consInit(c); const tab = all ? null : (UI.ctab || 'raiox');
   let h = `<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" data-a="nav" data-v="clientes">← Clientes</button><h2>${esc(c.name)}</h2>${fPill(c)} ${docPill(c)}${shForaPill(c)}<span class="sp"></span><button class="btn ghost" data-a="pesqCli" data-k="${kk(c)}">Pesquisar soluções para este cliente</button><button class="btn ghost" data-a="expCli" data-k="${kk(c)}">Relatório do cliente (HTML)</button><button class="btn" data-a="briefOpen" data-k="${kk(c)}">Briefing pré-reunião</button><button class="btn pri" data-a="ctab" data-v="diagnostico">Gerar diagnóstico executivo</button></div>
-  ${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
+  ${sincBanner(c)}${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
   if (!all) { const G = cGrupoDe(tab), resto = CTABS.filter(([k]) => !CGRUPOS.some(g => g[2].includes(k))).map(x => x[0]);
     h += `<div class="cgrp" role="tablist" aria-label="Grupos da ficha">${CGRUPOS.map(g => `<button data-a="ctab" data-v="${g[2][0]}" data-g="${g[0]}" class="${G[0] === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div><div class="ctabs">${[...G[2], ...resto].map(k => CTABS.find(x => x[0] === k)).filter(Boolean).map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`; }
   const T = { portfolio: () => adTab(c) + ptTab(c), gestao: () => empGestaoTab(c), validacao: () => valTab(c), raiox: () => adResumoCard(c) + rxTab(c), resumo: () => adResumoCard(c) + resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c) + ptDiagCard(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
@@ -12618,7 +12747,7 @@ const ACT = {
   r24All: () => { UI.r24 = true; refApproveOfficial(new Set(REF24.all.map(x => x.id))); },
 };
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target; if (!(t instanceof HTMLElement) || !t.matches('[data-a][tabindex]')) return; e.preventDefault(); t.click(); });
-Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ADM_REG_ACT, ADM_ENX_ACT, ENX_ACT, AD_ACT, RGF_ACT, BD_ACT, ATU_ACT, PT_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
+Object.assign(ACT, CONSOL_ACT, SHELL_ACT, PROD_ACT, ACCT_ACT, DM_ACT, LOTE_ACT, IA_ACT, CN_ACT, TD_ACT, MK_ACT, PEND_ACT, OC_ACT, OP_ACT, PR_ACT, ADM_ACT, ADM_CAT_ACT, ADM_REG_ACT, ADM_ENX_ACT, ENX_ACT, AD_ACT, SINC_ACT, RGF_ACT, BD_ACT, ATU_ACT, PT_ACT, LEM_ACT, ONB_ACT, ONDA2_ACT, ONDA3_ACT, SOLX_ACT); telActWire();
 /* Um clique = uma operação: ativações idênticas (mesma ação e alvo) em <350 ms são ignoradas */
 let lastClk = { k: '', t: 0 };
 document.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (!t || !ACT[t.dataset.a]) return; if (t.dataset.a === 'open' && e.target.closest('.noopen')) return;

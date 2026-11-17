@@ -62,7 +62,7 @@ async function flush() {
     let left = dirtyC.size + delC.size + Object.values(GCOL).reduce((n, g) => n + (g.ref ? g.d.size + g.x.size : 0), 0);
     const tick = () => { if (--left >= 0 && total > 5) { UI.persist = `salvando ${left}…`; paintStatus(); } }, total = left; if (total > 5) { UI.persist = `salvando ${total}…`; paintStatus(); }
     await poolRun([
-      ...[...dirtyC].map(k => async () => { dirtyC.delete(k); if (S.clients[k]) { try { await CL.doc(k).set(freezeClient(S.clients[k])); } catch (e) { dirtyC.add(k); throw e; } } tick(); }),
+      ...[...dirtyC].map(k => async () => { dirtyC.delete(k); if (S.clients[k]) { try { await sincPushC(k); } catch (e) { dirtyC.add(k); throw e; } } tick(); }),
       ...[...delC].map(k => async () => { delC.delete(k); try { await CL.doc(k).delete(); } catch (e) { delC.add(k); throw e; } tick(); })
     ]);
     for (const id of [...dirtyI]) { dirtyI.delete(id); const it = S.inbox.find(x => x.id === id); if (it) await INB.doc(id).set(clone(it)); }
@@ -75,8 +75,8 @@ async function flush() {
       ...[...g.d].map(id => async () => { g.d.delete(id); const r = g.arr().find(x => x.id === id); if (r) { try { await g.ref.doc(id).set(clone(r)); } catch (e) { g.d.add(id); throw e; } } tick(); }),
       ...[...g.x].map(id => async () => { g.x.delete(id); try { await g.ref.doc(id).delete(); } catch (e) { g.x.add(id); throw e; } tick(); })
     ]));
-    if (dirtyMeta) { dirtyMeta = false; await META.set(clone({ meta: { ...S.meta, files: S.meta.files.slice(-400) }, kbExtra: S.kbExtra })); }
-    UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
+    if (dirtyMeta) { dirtyMeta = false; try { await sincPushMeta(); } catch (e) { dirtyMeta = true; throw e; } }
+    { const nc = Object.keys(SINC.conf).length; UI.persist = nc ? `${nc} cliente(s) com alteração em outra sessão: decisão pendente` : 'salvo (carteira privada + catálogo compartilhado)'; }
   } catch (e) { UI.persist = 'ERRO ao salvar: ' + (e.code === 'tempo_esgotado' ? e.message : (e.code || e.message)); toast('Falha ao salvar: ' + (e.message || e.code)); }
   saving = false; paintStatus();
 }
@@ -102,7 +102,7 @@ async function initStore() {
       S.pesq = docs(pes).sort(byAt);
       S.marcos = docs(marcos); S.regs = docs(regs); S.merges = docs(merges).sort(byAt); S.msnap = docs(msnap); S.intlog = docs(intlog).sort(byAt); S.cnpj = docs(cnpj).sort(byAt); S.insights = docs(insights).sort(byAt); S.ocr = docs(ocr).sort(byAt); S.ocrimg = []; /* imagens: sob demanda (ocrimgEnsure) */ ensureIids();
       UI.persist = 'salvo (carteira privada + catálogo compartilhado)';
-      catalogWatch(); reanalyzeAll(false); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
+      catalogWatch(); reanalyzeAll(false); sincIniciar(); setTimeout(() => { try { radarAuto(); } catch { } }, 4000);
       if (Object.keys(S.clients).length) UI.view = 'geral';
     } else { UI.persist = 'memória (db indisponível: use Backup JSON)'; loadSolutions([]); }
   } catch (e) { META = null; SOL = PES = null; loadSolutions([]); UI.persist = 'memória (db indisponível: ' + e.message + ') — use Backup JSON'; }
