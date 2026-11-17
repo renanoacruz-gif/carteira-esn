@@ -16,13 +16,15 @@ const AD_SIGLA = new Set('wms mes aps tms oms yms crm pdv pos pms edi tef esg lg
 const adTok = t => new Set(norm(t || '').split(/[^a-z0-9]+/).filter(w => (w.length >= 5 && !AD_STOP.has(w)) || AD_SIGLA.has(w)));
 function adHay(p) { const H = ENX.hay ||= new Map(); let h = H.get(p.id); if (!h) { const l = t => ' ' + norm(t).replace(/[^a-z0-9]+/g, ' ') + ' '; h = { nome: normName(p.nome), tit: l(`${p.nome} ${p.grupo || ''}`), txt: l(`${p.nome} ${p.grupo || ''} ${p.kw || ''}`) }; H.set(p.id, h); } return h; }
 const adHits = (toks, h, campo = 'txt') => [...toks].filter(w => h[campo].includes(AD_SIGLA.has(w) ? ' ' + w + ' ' : ' ' + w)); /* a palavra precisa começar igual; "manutencao" casa "manutencoes" */
+/* texto bruto de produtos do cliente (coluna Produtos da planilha + descrição dos itens das fichas válidas): só é usado para casar nomes alternativos cadastrados pelo executivo */
+const adBruto = c => ' ' + normName([c.productsRaw || '', ...(typeof fichasOk === 'function' ? fichasOk(c) : c.fichas || []).flatMap(f => (f.items || []).map(i => i.desc || ''))].join(' | ').slice(0, 60000)) + ' ';
 function adCtx(c) {
   const dores = (c.dorHip || []).map(h => ({ rot: 'Hipótese sua', frase: String(h.frase || ''), sol: S.solutions.find(r => r.id === h.solId)?.nome || '' })); if (c.gst?.oportunidade) dores.push({ rot: 'Oportunidade que você anotou', frase: String(c.gst.oportunidade), sol: '' });
   dores.forEach(x => { x.tok = adTok(x.frase + ' ' + x.sol); x.solN = x.sol ? normName(x.sol) : ''; });
   const opps = (c.opps || []).map(o => ({ titulo: String(o.title || o.titulo || o.nome || o.need || 'oportunidade do motor').slice(0, 90), tok: adTok(`${o.nome || o.title || o.titulo || ''} ${(o.sols || []).map(s => s.nome || s.name || '').join(' ')}`) })).filter(o => o.tok.size); /* só o nome da oportunidade e das soluções ligadas: o texto longo casaria com qualquer produto */
   const fatos = (c.fatos || []).map(f => ({ titulo: String(f.titulo || '').slice(0, 90), tok: adTok(f.titulo) })).filter(f => f.tok.size);
   const tem = (c.productsIdent || []).filter(p => p.nivel !== 'texto' || p.conf).map(p => normName(p.nome || '')).filter(n => n.length >= 6);
-  return { c, segId: c.segInfo?.id || '', segNome: c.segInfo?.id && typeof segName === 'function' ? segName(c.segInfo.id) : '', linhas: baseLines(c), dores, opps, fatos, tem, vinc: c.enxVinc || {}, P: adPesos() };
+  return { c, segId: c.segInfo?.id || '', segNome: c.segInfo?.id && typeof segName === 'function' ? segName(c.segInfo.id) : '', linhas: baseLines(c), dores, opps, fatos, tem, vinc: c.enxVinc || {}, alias: S.meta.enxAlias || {}, bruto: Object.keys(S.meta.enxAlias || {}).length ? adBruto(c) : '', P: adPesos() };
 }
 function adCalc(X, p) {
   const c = X.c, h = adHay(p), D = {}, set = (k, nota, motivo) => { D[k] = { nota, motivo }; }, segs = enxSegs(p.seg), kbSegs = segs.map(k => (ENX_SEG[k] || [])[1]).filter(Boolean);
@@ -47,9 +49,10 @@ function adCalc(X, p) {
   if (c.emp?.ausente) set('viabilidade', 0, 'Cliente ausente da última base da carteira.'); else if (c.emp && (c.emp.mrrP || 0) > 0) set('viabilidade', 100, 'Cliente ativo na carteira, com receita recorrente.'); else if (c.emp) set('viabilidade', 50, 'Cliente na carteira, sem receita recorrente registrada.'); else set('viabilidade', null, 'Sem dados da carteira para avaliar.');
   let sw = 0, sn = 0; for (const [k] of AD_DIM) if (D[k].nota != null) { sw += X.P[k]; sn += X.P[k] * D[k].nota; }
   const ad = sw ? Math.round(sn / sw) : null, cob = sw, conf = p.nivel === 'ficha' && cob >= 70 && D.dor.nota != null ? 'alta' : (p.nivel === 'ficha' || p.nivel === 'portal') && cob >= 40 ? 'media' : 'baixa';
-  const v = X.vinc[p.id] || null, possui = X.tem.some(n => n === h.nome || (h.nome.length >= 8 && (n.includes(h.nome) || h.nome.includes(n))));
+  const v = X.vinc[p.id] || null, pNome = X.tem.some(n => n === h.nome || (h.nome.length >= 8 && (n.includes(h.nome) || h.nome.includes(n))));
+  const pAlias = !pNome && (X.alias[p.id] || []).map(a => normName(a)).find(a => a.length >= 4 && X.bruto.includes(' ' + a + ' ')), possui = pNome || !!pAlias || v?.st === 'possui';
   const evid = (D.processos.nota ?? 0) >= 60 || (D.dor.nota ?? 0) >= 60; let cls, porque;
-  if (possui) { cls = 'possui'; porque = 'O cliente já tem um produto com este nome nos itens identificados. Avalie ampliação de uso, não nova contratação.'; }
+  if (possui) { cls = 'possui'; porque = pNome ? 'O cliente já tem um produto com este nome nos itens identificados. Avalie ampliação de uso, não nova contratação.' : pAlias ? `A planilha ou as fichas deste cliente trazem o nome alternativo que você cadastrou para este produto (“${pAlias}”). Avalie ampliação de uso, não nova contratação.` : `Você informou em ${fmtD(String(v.em || '').slice(0, 10))} que o cliente já possui esta solução. Não há item correspondente nas fichas.`; }
   else if (v?.st === 'descartada') { cls = 'nao_rec'; porque = `Você descartou esta solução para o cliente em ${fmtD(String(v.em || '').slice(0, 10))}.`; }
   else if (bloqueio) { cls = 'nao_rec'; porque = 'Bloqueio técnico: ' + bloqueio; }
   else if (v?.st === 'validada') { cls = 'confirmada'; porque = `Você confirmou necessidade e compatibilidade em ${fmtD(String(v.em || '').slice(0, 10))}.`; }
@@ -76,10 +79,10 @@ const adKpi = x => `<div class="ad-kpi sm"><span>Aderência <b>${x.ad == null ? 
 const adDims = x => `<details class="pt-ex"><summary class="sm">Ver critérios, evidências e perguntas</summary><ul class="ad-dim sm">${x.dims.map(d => `<li><b>${esc(d.rot)}</b> (peso ${d.peso}): ${d.nota == null ? '<span class="pill p-off">sem informação</span>' : `<b>${d.nota}/100</b>`} <span class="muted">— ${esc(d.motivo)}</span></li>`).join('')}</ul><div class="sm" style="margin-top:6px"><b>Perguntas de descoberta</b><ol style="margin:4px 0 0 18px">${adPerguntas(x).map(q => `<li>${esc(q)}</li>`).join('')}</ol></div><div class="sm muted" style="margin-top:6px">Aderência não é probabilidade de fechamento. Fonte do produto: Catálogo Enxoval (${esc(ENX_NV[x.p.nivel]?.[0] || x.p.nivel)}), coletado em ${esc(fmtD(ENX.meta?.coletadoEm || ''))}.</div></details>`;
 function adAcoes(c, x) {
   const k = esc(c.key), id = esc(x.p.id), b = (a, t, cl = 'ghost') => `<button class="btn sm ${cl}" data-a="${a}" data-k="${k}" data-id="${id}">${t}</button>`, v = x.vinc?.st;
-  if (x.cls === 'possui') return b('adFicha', 'Ver ficha');
+  if (x.cls === 'possui') return (v === 'possui' ? b('adSoltar', 'Desfazer “já possui”') : '') + b('adFicha', 'Ver ficha');
   if (v === 'descartada') return b('adSoltar', 'Desfazer descarte') + b('adFicha', 'Ver ficha');
   if (v === 'vinculada' || v === 'validada') return (v === 'vinculada' ? b('adValidar', 'Confirmar aderência', 'pri') : '') + b('adSemana', 'Levar para a semana') + b('adFicha', 'Ver ficha') + b('adSoltar', 'Desvincular');
-  return (x.bloqueio ? '' : b('adVinc', 'Vincular ao cliente', 'pri')) + b('adFicha', 'Ver ficha') + (x.bloqueio ? '' : b('adDesc', 'Descartar'));
+  return (x.bloqueio ? '' : b('adVinc', 'Vincular ao cliente', 'pri')) + b('adFicha', 'Ver ficha') + b('adPossui', 'Cliente já possui') + (x.bloqueio ? '' : b('adDesc', 'Descartar'));
 }
 const adLinha = (c, x) => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><div><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${x.vinc?.st === 'vinculada' ? ' ' + pill('vinculada', 'info') : ''}${eloPills(c, x.p.nome)}</div>${x.p.grupo ? `<div class="sm muted">${esc(x.p.grupo)}${x.p.linha ? ' · Linha ' + esc(x.p.linha) : ''}</div>` : ''}${adKpi(x)}<div class="sm" style="margin-top:4px">${esc(x.porque)}</div>${adDims(x)}</div><div class="ad-acts">${adAcoes(c, x)}</div></div>`;
 /* visão inversa, no fim da ficha do produto no Catálogo Enxoval: quais clientes da carteira são aderentes a ESTA solução */
@@ -103,7 +106,7 @@ function adCatNaBase(U) {
   if (!window.__HOSTED__) return []; enxCarregar(); if (U.tipo && U.tipo !== 'produto') return []; const ts = norm(U.q || '').split(/\s+/).filter(t => t.length > 1);
   return adCatAtivos().map(p => { if (U.linha && (p.linha || '') !== U.linha) return null; if (!ts.length) return { p, w: 0 }; const h = adHay(p); if (!ts.every(t => h.txt.includes(t))) return null; return { p, w: ts.reduce((a, t) => a + (h.tit.includes(t) ? 3 : 1), 0) }; }).filter(Boolean).sort((a, b) => b.w - a.w || a.p.nome.localeCompare(b.p.nome, 'pt'));
 }
-function adPossuiN(p) { const h = adHay(p); let n = 0; for (const c of clients()) if ((c.productsIdent || []).some(i => (i.nivel !== 'texto' || i.conf) && (k => k.length >= 6 && (k === h.nome || (h.nome.length >= 8 && (k.includes(h.nome) || h.nome.includes(k)))))(normName(i.nome || '')))) n++; return n; }
+function adPossuiN(p) { const h = adHay(p), al = ((S.meta.enxAlias || {})[p.id] || []).map(a => normName(a)).filter(a => a.length >= 4); let n = 0; for (const c of clients()) if (c.enxVinc?.[p.id]?.st === 'possui' || (al.length && (b => al.some(a => b.includes(' ' + a + ' ')))(adBruto(c))) || (c.productsIdent || []).some(i => (i.nivel !== 'texto' || i.conf) && (k => k.length >= 6 && (k === h.nome || (h.nome.length >= 8 && (k.includes(h.nome) || h.nome.includes(k)))))(normName(i.nome || '')))) n++; return n; }
 const adCatLinha = (p, nCli) => `<tr data-enx="${esc(p.id)}"><td><b>${esc(p.nome)}</b> ${pill('Catálogo Enxoval', 'info')}${p.grupo ? `<div class="sm muted">${esc(p.grupo)}</div>` : ''}</td><td class="sm">Produto</td><td class="sm">${esc(p.linha || '—')}${p.grupo ? ' · ' + esc(p.grupo) : ''}</td><td>${pill(ENX_NV[p.nivel]?.[0] || p.nivel, ENX_NV[p.nivel]?.[1] || 'off')}</td><td class="num">${adPossuiN(p)}${nCli ? ` <span class="muted sm">de ${nCli}</span>` : ''}</td><td><button class="btn sm pri" data-a="ptSel" data-id="enx:${esc(p.id)}">Onde posso vender?</button></td></tr>`;
 const adBarra = x => x.ad == null ? '<span class="muted">—</span>' : `<span class="pt-sc" title="Aderência (só critérios com informação)"><span class="pt-bar"><i style="width:${x.ad}%"></i></span><b>${x.ad}</b></span>`;
 function adOnde(id) {
@@ -141,12 +144,14 @@ function adTab(c) {
   ${base.length ? base.slice(0, lim).map(x => adLinha(c, x)).join('') + (base.length > lim ? `<div class="row" style="margin-top:8px"><button class="btn sm ghost" data-a="adMais">Mostrar mais (${base.length - lim} restante(s))</button></div>` : '') : `<p class="sm muted" style="margin-top:8px">${U.cls || ws.length ? 'Nenhum produto com esse filtro.' : 'Nenhuma recomendação: faltam dados do cliente para o motor cruzar. Veja “Dados insuficientes”.'}</p>`}</div>`;
 }
 function adMarcar(key, id, st) {
-  const c = S.clients[key], p = (ENX.idx || []).find(x => x.id === id); if (!c || !p) return null; c.enxVinc ||= {};
-  if (!st) delete c.enxVinc[id]; else { const x = adCalc(adCtx(c), p); c.enxVinc[id] = { st, nome: p.nome.slice(0, 160), em: nowISO(), ad: x.ad, cob: x.cob }; }
+  const c = S.clients[key], p = (ENX.idx || []).find(x => x.id === id); if (!c) return null; c.enxVinc ||= {};
+  if (!st) { delete c.enxVinc[id]; touchC(key); return p || { nome: '' }; } /* desfazer funciona mesmo se o produto saiu do catálogo */
+  if (!p) return null; { const x = adCalc(adCtx(c), p); c.enxVinc[id] = { st, nome: p.nome.slice(0, 160), em: nowISO(), ad: x.ad, cob: x.cob, cat: ENX.meta?.importadoEm || '' }; } /* cat = versão do catálogo no momento da marcação (para pedir revisão quando ele for reimportado) */
   touchC(key); return p;
 }
 const AD_ACT = {
   adVinc: t => { const p = adMarcar(t.dataset.k, t.dataset.id, 'vinculada'); if (p) { render(); toast(`${p.nome} vinculada a este cliente. Ela fica no topo das recomendações até você confirmar ou descartar.`); } },
+  adPossui: t => { const p = adMarcar(t.dataset.k, t.dataset.id, 'possui'); if (p) { render(); toast(`Registrado: o cliente já possui ${p.nome}. Ela sai das recomendações deste cliente.`); } },
   adDesc: t => { const p = adMarcar(t.dataset.k, t.dataset.id, 'descartada'); if (p) { render(); toast('Descartada para este cliente. Não será recomendada de novo.'); } },
   adSoltar: t => { if (adMarcar(t.dataset.k, t.dataset.id, '')) { render(); toast('Vínculo removido.'); } },
   adValidar: t => { if (!confirm('Confirmar aderência significa que VOCÊ validou com o cliente a necessidade e a compatibilidade técnica desta solução. Confirmar?')) return; const p = adMarcar(t.dataset.k, t.dataset.id, 'validada'); if (p) { render(); toast('Aderência confirmada por você.'); } },
