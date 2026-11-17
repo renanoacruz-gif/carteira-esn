@@ -48,7 +48,7 @@ ck('menu: Portfólio TOTVS dentro de Base de Soluções', ev(P,"NAV.find(x=>x[0]
 ev(P,"UI.view='portfolio';UI.pt=null;render();0"); P.wait_for_timeout(400)
 tx=lambda: ev(P,"document.querySelector('#app').innerText")
 n=ev(P,"activeSols().length")
-ck('lista paginada (50 por página) com total da Base', ('%d solução(ões) na Base'%n) in tx() and ev(P,"document.querySelectorAll('#app [data-a=ptSel]').length")==min(50,n) and ('Página 1 de %d'%((n+49)//50)) in tx(), n)
+ck('lista paginada (50 por página) com total da Base', ('%d solução(ões) na Base'%n) in tx() and (lambda m: ev(P,"document.querySelectorAll('#app [data-a=ptSel]').length")==min(50,n+m) and ('Página 1 de %d'%((n+m+49)//50)) in tx())(ev(P,"adCatTotal()")), n)  # a lista agora soma os produtos do Catálogo Enxoval, quando importado
 P.fill('[data-i=ptq]','zzfunc tributos'); P.wait_for_timeout(700)
 ck('busca por funcionalidade (todas as palavras)', ev(P,"document.querySelectorAll('#app [data-a=ptSel]').length")==1 and 'ZZ Módulo Fiscal Protheus' in tx())
 ck('foco preservado na busca', ev(P,"document.activeElement?.dataset?.i")=='ptq')
