@@ -109,7 +109,7 @@ document.addEventListener('change', async e => {
   if (c === 'prtxt') { prTexto(t.dataset.id, v); return; }
   if (c === 'lkopt') { LK_OPT()[t.dataset.f] = Math.max(0, +v || 0); return; }
   if (c === 'valOrig' && files?.length) { valOrig(t.dataset.k, t.dataset.id, files[0]); t.value = ''; return; }
-  if (enxChange(t, c, v) || ptChange(t, c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
+  if (enxChange(t, c, v) || eloChange(t, c, v) || ptChange(t, c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
   switch (c) {
     case 'attach': await ingest(files, t.dataset.t, t.dataset.k); t.value = ''; break;
     case 'wsheet': { const w = UI.wiz; w.si = +v; w.h = detectHeader(w.sheets[w.si].rows); w.map = autoMap((w.sheets[w.si].rows[w.h] || []).map(String)); render(); break; }

@@ -89,7 +89,7 @@ function vOport() {
   const uniq = fn => [...new Set(act.map(fn))].sort((a, b) => String(a).localeCompare(String(b))), sel = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
   const nI = rows.filter(x => x.cl === 'identificada').length, nH = rows.filter(x => x.cl === 'hipotese').length;
   return `<div class="alert i sm"><b>Como ler.</b> ${pill('Oportunidade identificada', 'ok')} tem dado objetivo do cliente ou o mesmo indício em 2+ fontes; ${pill('Hipótese de investigação', 'warn')} é plausível, mas ainda sem confirmação — <b>não é oportunidade comercial confirmada</b>. Ausência na ficha não prova ausência de contratação. Sua leitura (Faz sentido, Investigar, Já atendida, Descartar) ajusta as próximas análises e evita repetir recomendações.</div>
-  ${utilHtml()}
+  ${utilHtml()}${eloVincOport()}
   <div class="filters"><input type="text" data-c="opf" data-f="q" value="${esc(f.q)}" placeholder="Buscar cliente, oportunidade, processo…" aria-label="Buscar oportunidades" style="min-width:220px">
   <select data-c="opf" data-f="cl" aria-label="Classificação">${sel('', 'Identificadas e hipóteses', f.cl)}${sel('identificada', 'Só identificadas', f.cl)}${sel('hipotese', 'Só hipóteses', f.cl)}${sel('nao', 'Não priorizadas', f.cl)}</select>
   <select data-c="opf" data-f="seg" aria-label="Segmento">${sel('', 'Todos os segmentos', f.seg)}${uniq(x => opSeg(x.c)).map(s => sel(s, opSegL(s), f.seg)).join('')}</select>
