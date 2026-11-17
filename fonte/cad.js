@@ -95,7 +95,7 @@ const DQF = { sem_ficha: 'Sem ficha', sem_segmento: 'Sem segmento', sem_hosp: 'S
 function fontesRevisar(c) { return hasDecl(c) || (c.reviewFlags || []).length > 0 || evCand(c.rel).length > 0 || (c.fis?.cand || []).some(e => e.st === 'candidato') || (c.cad && Object.values(c.cad).some(x => x?.v != null && isStale(x.at))); }
 function dqTest(c, k) {
   switch (k) { case 'sem_ficha': return c.fstat?.k === 'nao_carregada'; case 'sem_segmento': return !c.segInfo?.id; case 'sem_hosp': return !compTest(c, 'hosp'); case 'sem_release': return !relConf(c); case 'sem_regime': return !compTest(c, 'regime'); case 'sem_contrato': return !ctHas(c);
-    case 'com_conflitos': return (c.conflicts || []).length > 0 || (c.cadConf || []).some(x => !x.res) || mrrOf(c).div; case 'fontes_revisar': return fontesRevisar(c); }
+    case 'com_conflitos': return (c.conflicts || []).length > 0 || (c.cadConf || []).some(x => !x.res) || !!mrrEmpDiv(c) || mrrOf(c).div; case 'fontes_revisar': return fontesRevisar(c); }
   return true;
 }
 

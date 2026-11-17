@@ -2903,7 +2903,7 @@ const DQF = { sem_ficha: 'Sem ficha', sem_segmento: 'Sem segmento', sem_hosp: 'S
 function fontesRevisar(c) { return hasDecl(c) || (c.reviewFlags || []).length > 0 || evCand(c.rel).length > 0 || (c.fis?.cand || []).some(e => e.st === 'candidato') || (c.cad && Object.values(c.cad).some(x => x?.v != null && isStale(x.at))); }
 function dqTest(c, k) {
   switch (k) { case 'sem_ficha': return c.fstat?.k === 'nao_carregada'; case 'sem_segmento': return !c.segInfo?.id; case 'sem_hosp': return !compTest(c, 'hosp'); case 'sem_release': return !relConf(c); case 'sem_regime': return !compTest(c, 'regime'); case 'sem_contrato': return !ctHas(c);
-    case 'com_conflitos': return (c.conflicts || []).length > 0 || (c.cadConf || []).some(x => !x.res) || mrrOf(c).div; case 'fontes_revisar': return fontesRevisar(c); }
+    case 'com_conflitos': return (c.conflicts || []).length > 0 || (c.cadConf || []).some(x => !x.res) || !!mrrEmpDiv(c) || mrrOf(c).div; case 'fontes_revisar': return fontesRevisar(c); }
   return true;
 }
 
@@ -5089,7 +5089,7 @@ document.addEventListener('click', e => { if (!e.target.closest('.top-q')) { con
 window.matchMedia('(max-width: 900px)').addEventListener?.('change', () => { UI.sbOpen = false; paintShell(); });
 
 /* Atualizar ferramenta: compara a versão carregada com a publicada e recarrega sem precisar reinstalar o atalho da tela inicial. */
-const BUILD = '9278ec30d2ff';
+const BUILD = '9e3a0e9d12c5';
 const ATU = { nova: false, busy: false, em: 0 };
 async function atuCheck() {
   if (!window.__HOSTED__) return false;
@@ -7548,6 +7548,7 @@ function clientBanner(c) {
   const parts = [];
   if (partial(c)) parts.push(`<div class="alert b"><b>Análise parcial: contratação e faturamento ainda não conferidos.</b><div class="sm">${c.fstat.k === 'nao_carregada' ? esc(MSG_SEM_FICHA) : esc(c.fstat.l + ': ' + (c.fstat.why[0] || ''))} Ausência de ficha ou de item faturado não prova que o cliente não possui uma solução.</div></div>`);
   else if (c.fstat.k !== 'disponivel') parts.push(`<div class="alert"><b>Ficha: ${esc(c.fstat.l)}.</b> ${esc(c.fstat.why[0] || '')}</div>`);
+  { const m = mrrEmpAlerta(c); if (m) parts.push(m); }
   const fl = c.reviewFlags || []; if (fl.length) parts.push(`<div class="alert i"><b>Base de Soluções atualizada:</b> ${fl.length} diagnóstico(s) podem precisar de revisão (${fl.slice(0, 3).map(x => esc(x.nome)).join(', ')}${fl.length > 3 ? '…' : ''}). Análises anteriores continuam registradas em “O que mudou”.</div>`);
   return parts.join('');
 }
@@ -7821,7 +7822,7 @@ function vCliente(all) {
   ${sincBanner(c)}${statusStrip(c)}${clientBanner(c)}${partialDeps(c)}`;
   if (!all) { const G = cGrupoDe(tab), resto = CTABS.filter(([k]) => !CGRUPOS.some(g => g[2].includes(k))).map(x => x[0]);
     h += `<div class="cgrp" role="tablist" aria-label="Grupos da ficha">${CGRUPOS.map(g => `<button data-a="ctab" data-v="${g[2][0]}" data-g="${g[0]}" class="${G[0] === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div><div class="ctabs">${[...G[2], ...resto].map(k => CTABS.find(x => x[0] === k)).filter(Boolean).map(([k, l]) => `<button data-a="ctab" data-v="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`; }
-  const T = { portfolio: () => adTab(c) + ptTab(c), gestao: () => empGestaoTab(c), validacao: () => valTab(c), raiox: () => adResumoCard(c) + rxTab(c), resumo: () => adResumoCard(c) + resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c) + ptDiagCard(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
+  const T = { portfolio: () => adTab(c) + ptTab(c), gestao: () => fcCard(c) + vincCard(c) + empGestaoTab(c), validacao: () => valTab(c), raiox: () => fcCard(c, true) + adResumoCard(c) + rxTab(c), resumo: () => fcCard(c, true) + adResumoCard(c) + resumoTab(c), cadastro: () => tabCadastro(c), fichas: () => fichasSection(c) + prPanel(c), contratacao: () => tabContratacao(c), tecnologia: () => tabTecnologia(c), regulatorio: () => tabRegulatorio(c), roi: () => tabRoi(c), ecossistema: () => tabEco(c), diagnostico: () => tabDiag(c) + ptDiagCard(c), briefing: () => tabBrief(c), reuniao: () => tabReuniao(c) };
   if (all) h += ['raiox', 'resumo', 'cadastro', 'fichas', 'contratacao', 'tecnologia', 'regulatorio', 'roi', 'ecossistema'].map(k => `<h2 style="margin:18px 0 6px">${CTABS.find(x => x[0] === k)[1]}</h2>` + T[k]()).join('');
   else h += T[tab]();
   return h;
@@ -8292,7 +8293,7 @@ function vOport() {
   const uniq = fn => [...new Set(act.map(fn))].sort((a, b) => String(a).localeCompare(String(b))), sel = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
   const nI = rows.filter(x => x.cl === 'identificada').length, nH = rows.filter(x => x.cl === 'hipotese').length;
   return `<div class="alert i sm"><b>Como ler.</b> ${pill('Oportunidade identificada', 'ok')} tem dado objetivo do cliente ou o mesmo indício em 2+ fontes; ${pill('Hipótese de investigação', 'warn')} é plausível, mas ainda sem confirmação — <b>não é oportunidade comercial confirmada</b>. Ausência na ficha não prova ausência de contratação. Sua leitura (Faz sentido, Investigar, Já atendida, Descartar) ajusta as próximas análises e evita repetir recomendações.</div>
-  ${utilHtml()}
+  ${utilHtml()}${eloVincOport()}
   <div class="filters"><input type="text" data-c="opf" data-f="q" value="${esc(f.q)}" placeholder="Buscar cliente, oportunidade, processo…" aria-label="Buscar oportunidades" style="min-width:220px">
   <select data-c="opf" data-f="cl" aria-label="Classificação">${sel('', 'Identificadas e hipóteses', f.cl)}${sel('identificada', 'Só identificadas', f.cl)}${sel('hipotese', 'Só hipóteses', f.cl)}${sel('nao', 'Não priorizadas', f.cl)}</select>
   <select data-c="opf" data-f="seg" aria-label="Segmento">${sel('', 'Todos os segmentos', f.seg)}${uniq(x => opSeg(x.c)).map(s => sel(s, opSegL(s), f.seg)).join('')}</select>
@@ -9092,6 +9093,7 @@ function briefBlocks(M) {
   if (Qs.length) { H('Perguntas de descoberta (do cadastro do cliente)'); B.push({ k: 'list', items: Qs }); }
   { const rt = typeof rtLista === 'function' ? rtLista(c) : [], rn = typeof rnvItens === 'function' ? rnvItens().filter(x => x.c === c && x.d >= 0) : [];
     if (rt.length || rn.length) { H('Combinados em aberto e datas confirmadas'); B.push({ k: 'list', items: [...rt.slice(0, 8).map(r => `${r.texto}${r.prazo ? ` — prazo ${fmtD(r.prazo)}` : ''}${r.resp ? ` (${r.resp})` : ''}`), ...rn.slice(0, 4).map(x => `${x.kind} confirmada em ${fmtD(x.iso)} (${x.d} dia(s))`)] }); } }
+  { const el = eloBrief(c); if (el.length) { H('Já em pauta com este cliente (Forecast e soluções vinculadas)'); B.push({ k: 'list', items: el }); } }
   const pend = []; if (c.fstat?.why) pend.push(...[].concat(c.fstat.why).map(String).slice(0, 3)); if (M.textOnly) pend.push('Ficha sem colunas: reenviar em XLSX/CSV.');
   if (pend.length) { H('Pendências de dados'); B.push({ k: 'list', items: pend }); }
   B.push({ k: 'foot', t: `Fontes: ficha(s) de faturamento ${M.files.join('; ') || '—'}${M.comp ? ' · competência ' + M.comp.split('-').reverse().join('/') : ''}; cadastro e contratos da carteira. Gerado localmente em ${new Date().toLocaleDateString('pt-BR')}, sem IA e sem envio de dados. Não constitui proposta comercial.`, sig: [E.nome, E.contato].filter(Boolean).join(' · ') });
@@ -9983,7 +9985,7 @@ function ptTab(c) {
   const chip = (k, t) => `<button class="btn sm ${U.ccls === k ? 'pri' : 'ghost'}" data-a="ptCCls" data-k="${k}">${esc(t)} (${k ? n(k) : all.length})</button>`;
   return `<div class="card"><h3>Portfólio TOTVS neste cliente</h3><p class="sm muted">Cada solução da Base classificada para ${esc(c.name)}. A classificação usa só o que está registrado; “validar” indica o que precisa de confirmação antes de afirmar ao cliente.</p>
   <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">${chip('', 'Todas')}${PT_ORD.filter(k => n(k)).map(k => chip(k, PT_CLS[k][0])).join('')}<span class="sp"></span><input type="text" data-i="ptcq" value="${esc(U.cq || '')}" placeholder="Buscar solução" style="min-width:200px"></div>
-  ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b><div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}${ptResSel(c, x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
+  ${lista.length ? `<div class="tw"><table><thead><tr><th style="min-width:220px">Solução</th><th>Classificação</th><th>Aderência</th><th style="min-width:280px">Explicação</th></tr></thead><tbody>${lista.slice(0, 200).map(x => `<tr><td><b>${esc(x.r.nome)}</b>${eloPills(c, x.r.nome)}<div class="sm muted">${esc(TIPOS[x.r.tipo] || x.r.tipo)}${x.r.linha ? ' · ' + esc(x.r.linha) : ''}</div></td><td>${ptPill(x)}</td><td>${ptBarra(x)}</td><td><div class="pt-xp"><div class="sm">${esc(x.porque)}</div>${ptExpl(x)}${ptResSel(c, x)}</div></td></tr>`).join('')}</tbody></table></div>${lista.length > 200 ? `<p class="sm muted">Mostrando as 200 primeiras de ${lista.length}. Use a busca para refinar.</p>` : ''}` : '<p class="sm muted">Nenhuma solução neste filtro.</p>'}</div>`;
 }
 /* ---------- Diagnóstico e briefing: soluções candidatas, só com conteúdo registrado ---------- */
 function ptCandidatas(c, n = 5) { return ptCliente(c).filter(x => x.cls === 'potencial' || x.cls === 'validar').sort(ptRank).slice(0, n); }
@@ -10008,7 +10010,7 @@ function ptDiagCard(c) {
   const li = (a, vazio) => a.length ? `<ul class="sm" style="margin:2px 0 0 16px">${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : `<div class="sm muted">${esc(vazio)}</div>`;
   return `<div class="card" id="pt-diag"><h3>Soluções candidatas do Portfólio TOTVS <span class="muted sm">(uso interno — ${cs.length} de maior aderência)</span></h3>
   <p class="sm muted">Consulta toda a Base de Soluções. Mostra só o que está registrado; o que não se sabe aparece em “Pendências”. Nenhum benefício, preço, integração ou retorno é presumido.</p>
-  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${x.r.atend ? pill(ATEND_SOL[x.r.atend], x.r.atend === 'gap' ? 'bad' : 'info') : ''}${ptBarra(x)}<span class="sp"></span>${ptResSel(c, x)}<button class="btn sm" data-a="ptSemana" data-k="${esc(c.key)}" data-id="${esc(x.r.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
+  ${cs.map(x => { const f = ptFicha(c, x); return `<div class="pt-cand"><div class="row" style="gap:8px;flex-wrap:wrap"><b>${esc(x.r.nome)}</b>${ptPill(x)}${eloPills(c, x.r.nome)}${x.r.atend ? pill(ATEND_SOL[x.r.atend], x.r.atend === 'gap' ? 'bad' : 'info') : ''}${ptBarra(x)}<span class="sp"></span>${ptResSel(c, x)}<button class="btn sm" data-a="ptSemana" data-k="${esc(c.key)}" data-id="${esc(x.r.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="ptAbrirSol" data-id="${esc(x.r.id)}">Abrir na Base</button></div>
     <div class="grid g2" style="margin-top:6px"><div><div class="pt-h">Dor que resolve (registrada)</div>${li(f.dores, f.fin ? '' : 'Não registrada na Base.')}${!f.dores.length && f.fin ? `<div class="sm">Finalidade registrada: ${esc(f.fin)}</div>` : ''}<div class="pt-h">Evidência de aderência</div>${li(f.evid, '—')}<div class="pt-h">Pré-requisitos e dependências registrados</div>${li([...f.pre, ...f.dep], 'Não registrados.')}${f.restr.length ? `<div class="pt-h">Restrições registradas</div>${li(f.restr, '')}` : ''}</div>
     <div><div class="pt-h">Pendências (ainda não conhecido)</div>${li(f.pend, 'Nenhuma pendência de informação.')}<div class="pt-h">Perguntas de descoberta</div>${li(f.perg, '')}<div class="pt-h">Fonte oficial</div>${f.of.length ? `<ul class="sm" style="margin:2px 0 0 16px">${f.of.map(o => `<li><a href="${esc(o.u)}" target="_blank" rel="noopener noreferrer">${esc(o.t || o.u)}</a></li>`).join('')}</ul>` : '<div class="sm muted">Sem fonte oficial vinculada.</div>'}<div class="pt-h">Próxima ação</div><div class="sm">${esc(f.acao)}</div></div></div>${ptExpl(x)}</div>`; }).join('')}</div>`;
 }
@@ -10178,7 +10180,7 @@ function adAcoes(c, x) {
   if (v === 'vinculada' || v === 'validada') return (v === 'vinculada' ? b('adValidar', 'Confirmar aderência', 'pri') : '') + b('adSemana', 'Levar para a semana') + b('adFicha', 'Ver ficha') + b('adSoltar', 'Desvincular');
   return (x.bloqueio ? '' : b('adVinc', 'Vincular ao cliente', 'pri')) + b('adFicha', 'Ver ficha') + (x.bloqueio ? '' : b('adDesc', 'Descartar'));
 }
-const adLinha = (c, x) => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><div><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${x.vinc?.st === 'vinculada' ? ' ' + pill('vinculada', 'info') : ''}</div>${x.p.grupo ? `<div class="sm muted">${esc(x.p.grupo)}${x.p.linha ? ' · Linha ' + esc(x.p.linha) : ''}</div>` : ''}${adKpi(x)}<div class="sm" style="margin-top:4px">${esc(x.porque)}</div>${adDims(x)}</div><div class="ad-acts">${adAcoes(c, x)}</div></div>`;
+const adLinha = (c, x) => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><div><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${x.vinc?.st === 'vinculada' ? ' ' + pill('vinculada', 'info') : ''}${eloPills(c, x.p.nome)}</div>${x.p.grupo ? `<div class="sm muted">${esc(x.p.grupo)}${x.p.linha ? ' · Linha ' + esc(x.p.linha) : ''}</div>` : ''}${adKpi(x)}<div class="sm" style="margin-top:4px">${esc(x.porque)}</div>${adDims(x)}</div><div class="ad-acts">${adAcoes(c, x)}</div></div>`;
 /* visão inversa, no fim da ficha do produto no Catálogo Enxoval: quais clientes da carteira são aderentes a ESTA solução */
 function adSolucao(id) { const p = (ENX.idx || []).find(x => x.id === id); return p && p.nivel !== 'inativo' ? clients().map(c => ({ c, ...adCalc(adCtx(c), p) })) : null; }
 function adClientesCard(id) {
@@ -10217,7 +10219,7 @@ function adOnde(id) {
 /* cartão que abre a ficha do cliente: vinculadas + as 3 mais aderentes */
 function adResumoCard(c) {
   if (!window.__HOSTED__) return ''; enxCarregar(); const all = adCliente(c); if (!all) return ENX.idx && !ENX.meta ? '<div class="card" id="ad-res"><h3>Soluções recomendadas</h3><p class="sm muted">O Catálogo Enxoval ainda não foi importado. Depois da importação, as soluções recomendadas para este cliente aparecem aqui.</p></div>' : '';
-  const vinc = all.filter(x => x.vinc && x.vinc.st !== 'descartada').sort(adRank), rec = all.filter(x => AD_REC.includes(x.cls) && !x.vinc).sort(adRank), mini = x => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${adKpi(x)}<div class="sm muted">${esc(x.porque)}</div></div><div class="ad-acts">${x.vinc ? '' : `<button class="btn sm pri" data-a="adVinc" data-k="${esc(c.key)}" data-id="${esc(x.p.id)}">Vincular ao cliente</button>`}</div></div>`;
+  const vinc = all.filter(x => x.vinc && x.vinc.st !== 'descartada').sort(adRank), rec = all.filter(x => AD_REC.includes(x.cls) && !x.vinc).sort(adRank), mini = x => `<div class="ad-row" data-ad="${esc(x.p.id)}"><div class="ad-m"><b>${esc(x.p.nome)}</b> ${pill(AD_CLS[x.cls][0], AD_CLS[x.cls][1])}${eloPills(c, x.p.nome)}${adKpi(x)}<div class="sm muted">${esc(x.porque)}</div></div><div class="ad-acts">${x.vinc ? '' : `<button class="btn sm pri" data-a="adVinc" data-k="${esc(c.key)}" data-id="${esc(x.p.id)}">Vincular ao cliente</button>`}</div></div>`;
   return `<div class="card" id="ad-res"><div class="row"><h3>Soluções recomendadas</h3><span class="sp"></span><button class="btn sm ghost" data-a="ctab" data-v="portfolio">Ver todas (${rec.length + vinc.length})</button></div>
   ${vinc.length ? `<div class="sm muted" style="margin-top:4px">Vinculadas por você (${vinc.length})</div>${vinc.slice(0, 5).map(mini).join('')}` : ''}
   ${rec.length ? `<div class="sm muted" style="margin-top:${vinc.length ? 10 : 4}px">Mais aderentes pelo que está registrado</div>${rec.slice(0, 3).map(mini).join('')}` : vinc.length ? '' : '<p class="sm" style="margin-top:6px">Nenhuma solução do catálogo tem indício suficiente para este cliente. Faltam dados: classifique o segmento, anexe fichas ou registre uma dor para o motor ter o que cruzar.</p>'}
@@ -10227,10 +10229,12 @@ function adResumoCard(c) {
 function adTab(c) {
   if (!window.__HOSTED__) return ''; enxCarregar(); const all = adCliente(c); if (!all) return ENX.idx && !ENX.meta ? '<div class="card" id="ad-tab"><h3>Soluções recomendadas (Catálogo Enxoval)</h3><p class="sm muted">Catálogo ainda não importado pelo administrador.</p></div>' : '';
   const U = adUI(), n = k => all.filter(x => x.cls === k).length, ws = norm(U.q || '').split(/\s+/).filter(Boolean), vinc = all.filter(x => x.vinc && x.vinc.st !== 'descartada').sort(adRank);
+  const fcAb = fcDoCliente(c).filter(o => ELO_ABERTA.includes(o.status)), neg = fcAb.length ? all.filter(x => !x.vinc && x.cls !== 'possui' && fcAb.some(o => eloCasa(x.p.nome, o.produto))).sort(adRank) : [];
   const base = all.filter(x => (U.cls ? x.cls === U.cls : AD_REC.includes(x.cls)) && (!ws.length || ws.every(w => adHay(x.p).txt.includes(w)))).sort(adRank), lim = 15 + (U.mais || 0) * 30;
   const chip = (k, t, q) => `<button class="btn sm ${U.cls === k ? 'pri' : 'ghost'}" data-a="adCls" data-v="${k}">${esc(t)} (${q})</button>`, P = adPesos();
   return `<div class="card" id="ad-tab"><h3>Soluções recomendadas <span class="muted sm">(Catálogo Enxoval, ${all.length} produto(s) avaliados)</span></h3>
   <p class="sm muted">Cada produto do catálogo avaliado contra o que está registrado de ${esc(c.name)}. <b>Aderência</b> usa só critérios com informação; <b>cobertura</b> mostra quanto do cenário é conhecido; critério sem dado aparece como “sem informação”, não como zero. Pesos: ${AD_DIM.map(([k, r]) => `${esc(r.replace(/^Aderência /, '').replace(/^aos /, ''))} ${P[k]}`).join(' · ')}.</p>
+  ${neg.length ? `<h4 style="margin-top:10px" id="ad-neg">Já em negociação no seu Forecast (${neg.length})</h4><p class="sm muted">Produto do catálogo com nome correspondente a uma oportunidade em aberto que você vinculou a este cliente. Trate como negociação em curso, não como oferta nova.</p>${neg.slice(0, 8).map(x => adLinha(c, x)).join('')}` : ''}
   ${vinc.length ? `<h4 style="margin-top:10px">Vinculadas a este cliente (${vinc.length})</h4>${vinc.map(x => adLinha(c, x)).join('')}` : ''}
   <div class="row" style="gap:6px;flex-wrap:wrap;margin:12px 0 4px">${chip('', 'Recomendadas', all.filter(x => AD_REC.includes(x.cls)).length)}${AD_ORD.filter(k => n(k)).map(k => chip(k, AD_CLS[k][0], n(k))).join('')}<span class="sp"></span><input type="text" data-i="adq" value="${esc(U.q || '')}" placeholder="Buscar produto" style="min-width:200px"></div>
   ${base.length ? base.slice(0, lim).map(x => adLinha(c, x)).join('') + (base.length > lim ? `<div class="row" style="margin-top:8px"><button class="btn sm ghost" data-a="adMais">Mostrar mais (${base.length - lim} restante(s))</button></div>` : '') : `<p class="sm muted" style="margin-top:8px">${U.cls || ws.length ? 'Nenhum produto com esse filtro.' : 'Nenhuma recomendação: faltam dados do cliente para o motor cruzar. Veja “Dados insuficientes”.'}</p>`}</div>`;
@@ -10250,6 +10254,78 @@ const AD_ACT = {
   adCMais: () => { adUI().cmais = (adUI().cmais || 0) + 1; render(); },
   adCls: t => { const U = adUI(); U.cls = t.dataset.v || ''; U.mais = 0; render(); }, adMais: () => { adUI().mais = (adUI().mais || 0) + 1; render(); }
 };
+
+/* ---------- Elo entre módulos (rodada 45, etapa 2) ----------
+   Liga o que antes vivia isolado, sem criar dado novo:
+   - negociações do Forecast (só as que VOCÊ vinculou ao cliente em Meu Forecast) aparecem na ficha, no briefing e ao lado das recomendações;
+   - soluções vinculadas ao cliente (Catálogo Enxoval) aparecem em Gestão da conta e em Oportunidades;
+   - o desfecho (ganhou / perdeu / não aderiu) é um só por produto e cliente, lido pelos dois motores de recomendação;
+   - MRR do cadastro × MRR pagante do Empodera: divergência sinalizada, nunca somada.
+   Regras: valores do Forecast vêm da sua planilha e não são somados a potenciais; correspondência de produto é por nome (indício, não confirmação). */
+const ELO_ABERTA = ['EM ASSINATURA', 'EM ABERTO'];
+const eloLimpa = t => norm(t || '').replace(/[^a-z0-9]+/g, ' ').replace(/\b(totvs|linha|protheus|rm|datasul|modulo|modulos|sistema|solucao|de|da|do|e|para)\b/g, ' ').replace(/\s+/g, ' ').trim();
+function eloCasa(nomeSol, prodFc) { /* nome da solução × texto "produto" da planilha de Forecast */
+  const a = eloLimpa(nomeSol), b = eloLimpa(prodFc); if (a && a === b) return true; /* siglas curtas (RH, WMS) só casam como palavra inteira */
+  if (a.length < 3 || b.length < 3) return norm(nomeSol || '').trim() !== '' && norm(nomeSol).trim() === norm(prodFc || '').trim();
+  return (' ' + b + ' ').includes(' ' + a + ' ') || (' ' + a + ' ').includes(' ' + b + ' ');
+}
+function fcDoCliente(c) { const L = S.meta.fcLink || {}; return (S.meta.fcData?.opps || []).filter(o => L[o.id] === c.key).sort((a, b) => ELO_ABERTA.includes(b.status) - ELO_ABERTA.includes(a.status) || String(b.data || '').localeCompare(String(a.data || ''))); }
+const eloNeg = (c, nome) => fcDoCliente(c).filter(o => eloCasa(nome, o.produto));
+function eloDesfecho(c, nome) { /* um desfecho por produto e cliente: vale o registro mais recente, venha da Base ou do catálogo */
+  const k = normName(nome); let best = null; const cand = (st, em, origem) => { if (PT_RES[st] && (!best || String(em || '') > String(best.em || ''))) best = { st, em, origem }; };
+  for (const v of Object.values(c.enxVinc || {})) if (v.res && normName(v.nome || '') === k) cand(v.res.st, v.res.em, 'catálogo');
+  for (const [id, x] of Object.entries(c.ptRes || {})) { const r = S.solutions.find(s => s.id === id); if (r && normName(r.nome) === k) cand(x.st, x.em, 'Base'); }
+  return best;
+}
+function eloPills(c, nome) {
+  const ng = eloNeg(c, nome), d = eloDesfecho(c, nome), out = [], dt = o => o.data ? ' · ' + fmtD(o.data) : '';
+  const ab = ng.find(o => ELO_ABERTA.includes(o.status)), gh = ng.find(o => o.status === 'GANHA'), pd = ng.find(o => o.status === 'PERDIDA');
+  if (ab) out.push(`<span class="pill p-warn" title="Oportunidade vinculada por você no Forecast: ${esc(ab.produto)}${dt(ab)}. Correspondência pelo nome do produto.">em negociação no Forecast (${esc(fcStLabel[ab.status].toLowerCase())})</span>`);
+  else if (gh) out.push(`<span class="pill p-ok" title="Consta como ganha no Forecast: ${esc(gh.produto)}${dt(gh)}. Confirme na ficha de faturamento.">ganha no Forecast</span>`);
+  else if (pd) out.push(`<span class="pill p-off" title="Consta como perdida no Forecast: ${esc(pd.produto)}${dt(pd)}.">perdida no Forecast</span>`);
+  if (d) out.push(`<span class="pill p-${d.st === 'ganhou' ? 'ok' : 'off'}" title="Desfecho registrado por você em ${fmtD(String(d.em || '').slice(0, 10))} (${esc(d.origem)}).">desfecho: ${esc(PT_RES[d.st].toLowerCase())}</span>`);
+  return out.length ? ' ' + out.join(' ') : '';
+}
+/* ---- Forecast na ficha do cliente ---- */
+function fcCard(c, compacto) {
+  const D = S.meta.fcData; if (!D) return ''; const os = fcDoCliente(c);
+  if (!os.length) return compacto ? '' : `<div class="card" id="elo-fc"><h3>Negociações no Forecast</h3><p class="sm muted">Nenhuma oportunidade do seu Forecast está vinculada a este cliente. O vínculo é feito por você em <a href="#" data-a="nav" data-v="forecast">Meu Forecast</a> (nunca automático).</p></div>`;
+  const ab = os.filter(o => ELO_ABERTA.includes(o.status)), lista = compacto ? os.slice(0, 3) : os;
+  return `<div class="card" id="elo-fc"><div class="row"><h3>Negociações no Forecast <span class="muted sm">(${os.length})</span></h3><span class="sp"></span><button class="btn sm ghost" data-a="nav" data-v="forecast">Abrir Meu Forecast</button></div>
+  <div class="tw"><table><thead><tr><th>Produto (planilha)</th><th>Status</th><th>Previsão</th><th class="r">Total</th></tr></thead><tbody>${lista.map(o => `<tr><td>${esc(o.produto || '—')}</td><td>${pill(fcStLabel[o.status], fcStPill[o.status])}</td><td class="sm">${o.data ? fmtD(o.data) : '—'}</td><td class="r">${fmtBRL(o.total)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="sm muted" style="margin-top:6px">${ab.length ? `${ab.length} em andamento. ` : ''}Fonte: sua planilha de Forecast, sincronizada em ${fmtD(String(D.syncedAt || '').slice(0, 10))}. Valores da planilha: não entram em potenciais nem em estimativas desta ferramenta.${compacto && os.length > 3 ? ` Mostrando 3 de ${os.length}.` : ''}</p></div>`;
+}
+/* ---- soluções vinculadas: Gestão da conta e Oportunidades ---- */
+const eloVincs = c => Object.entries(c.enxVinc || {}).filter(([, v]) => v.st === 'vinculada' || v.st === 'validada').map(([id, v]) => ({ id, ...v })).sort((a, b) => String(b.em || '').localeCompare(String(a.em || '')));
+const eloResSel = (c, v) => `<label class="sm pt-res">Desfecho <select data-c="adres" data-k="${esc(c.key)}" data-id="${esc(v.id)}" aria-label="Desfecho da solução vinculada"><option value="">sem registro</option>${Object.entries(PT_RES).map(([k, l]) => `<option value="${k}" ${v.res?.st === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+function vincCard(c) {
+  const vs = eloVincs(c); if (!vs.length) return '';
+  return `<div class="card" id="elo-vinc"><div class="row"><h3>Soluções vinculadas a este cliente <span class="muted sm">(${vs.length})</span></h3><span class="sp"></span><button class="btn sm ghost" data-a="ctab" data-v="portfolio">Ver recomendações</button></div>
+  ${vs.map(v => `<div class="ad-row" data-vinc="${esc(v.id)}"><div class="ad-m"><div><b>${esc(v.nome || v.id)}</b> ${pill(v.st === 'validada' ? 'aderência confirmada por você' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}</div><div class="sm muted">Desde ${fmtD(String(v.em || '').slice(0, 10))}${v.ad != null ? ` · aderência ${v.ad}/100 e cobertura ${v.cob}% no momento do vínculo` : ''}${v.rev ? ' · <b>catálogo atualizado depois do vínculo: revise</b>' : ''}</div></div><div class="ad-acts">${eloResSel(c, v)}<button class="btn sm ghost" data-a="adSemana" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="adFicha" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Ver ficha</button></div></div>`).join('')}
+  <p class="sm muted" style="margin-top:6px">Vínculo é uma marcação sua, não uma venda: o desfecho registra o que aconteceu e vale para as duas listas de recomendação.</p></div>`;
+}
+function eloVincOport() { /* painel Oportunidades: o que você já vinculou, em toda a carteira */
+  const rows = clients().flatMap(c => eloVincs(c).map(v => ({ c, v }))); if (!rows.length) return '';
+  return `<details class="card" id="elo-op" ${UI.eloOp ? 'open' : ''}><summary><b>Soluções vinculadas por você</b> <span class="muted sm">(${rows.length} em ${new Set(rows.map(r => r.c.key)).size} cliente(s))</span></summary>
+  <div class="tw" style="margin-top:8px"><table><thead><tr><th style="min-width:200px">Cliente</th><th style="min-width:220px">Solução</th><th>Situação</th><th>Desde</th></tr></thead><tbody>${rows.slice(0, 200).map(({ c, v }) => `<tr><td><a href="#" data-a="open" data-k="${esc(c.key)}"><b>${esc(c.name)}</b></a></td><td>${esc(v.nome || v.id)}</td><td>${pill(v.st === 'validada' ? 'aderência confirmada' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}</td><td class="sm">${fmtD(String(v.em || '').slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>
+  <p class="sm muted" style="margin-top:6px">Marcações suas a partir do Catálogo Enxoval. Não são oportunidades do motor nem entram no Forecast.</p></details>`;
+}
+function eloResSet(key, id, st) { const c = S.clients[key], v = c?.enxVinc?.[id]; if (!v) return; if (PT_RES[st]) v.res = { st, em: nowISO() }; else delete v.res; touchC(key); }
+function eloChange(t, c, v) { if (c !== 'adres') return false; eloResSet(t.dataset.k, t.dataset.id, v); render(); toast(v ? 'Desfecho registrado.' : 'Desfecho removido.'); return true; }
+/* ---- MRR do cadastro × Empodera ---- */
+function mrrEmpDiv(c) {
+  const e = c.emp; if (!e || e.ausente || c.mrr == null || e.mrrP == null) return null;
+  const a = +c.mrr, b = +e.mrrP; if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1) * 100 > mrrTol() ? { cad: a, emp: b, data: (e.hist || []).slice(-1)[0]?.[0] || '' } : null;
+}
+function mrrEmpAlerta(c) { const d = mrrEmpDiv(c); return d ? `<div class="alert b" id="elo-mrr"><b>MRR divergente entre fontes.</b> <span class="sm">Cadastro (planilha): <b>${fmtBRL(d.cad)}</b> · Empodera (MRR pagante${d.data ? ', ' + fmtD(d.data) : ''}): <b>${fmtBRL(d.emp)}</b>. Os dois valores nunca são somados: Visão geral e Clientes usam o do cadastro; Forecast e Carteira & MRR usam o do Empodera. Reimporte a fonte desatualizada para alinhar.</span></div>` : ''; }
+/* ---- briefing ---- */
+function eloBrief(c) {
+  const os = fcDoCliente(c), vs = eloVincs(c), L = [];
+  if (os.length) L.push('Forecast (sua planilha): ' + os.slice(0, 6).map(o => `${o.produto || 'produto não informado'} — ${fcStLabel[o.status]}${o.data ? ', ' + fmtD(o.data) : ''}, ${fmtBRL(o.total)}`).join('; ') + (os.length > 6 ? `; mais ${os.length - 6}` : '') + '.');
+  if (vs.length) L.push('Soluções vinculadas por você: ' + vs.slice(0, 8).map(v => `${v.nome || v.id} (${v.st === 'validada' ? 'aderência confirmada' : 'vinculada'}${v.res ? ', desfecho: ' + PT_RES[v.res.st].toLowerCase() : ''})`).join('; ') + '.');
+  return L;
+}
 
 /* ===== Rodada 18 §B: sinais da ficha de faturamento no motor de oportunidades =====
    Reutiliza briefRaw/brClassRow (Briefing): mesma leitura de colunas, mesmo critério de Ativo/Cancelado/Excedente — sem extrator paralelo.
@@ -12770,7 +12846,7 @@ document.addEventListener('change', async e => {
   if (c === 'prtxt') { prTexto(t.dataset.id, v); return; }
   if (c === 'lkopt') { LK_OPT()[t.dataset.f] = Math.max(0, +v || 0); return; }
   if (c === 'valOrig' && files?.length) { valOrig(t.dataset.k, t.dataset.id, files[0]); t.value = ''; return; }
-  if (enxChange(t, c, v) || ptChange(t, c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
+  if (enxChange(t, c, v) || eloChange(t, c, v) || ptChange(t, c, v) || admChange(t, c, v) || iaChange(t, c, v) || cnChange(t, c, v) || mkChange(t, c, v) || smChange(t, c, v) || ocChange(t, c, v)) return;
   switch (c) {
     case 'attach': await ingest(files, t.dataset.t, t.dataset.k); t.value = ''; break;
     case 'wsheet': { const w = UI.wiz; w.si = +v; w.h = detectHeader(w.sheets[w.si].rows); w.map = autoMap((w.sheets[w.si].rows[w.h] || []).map(String)); render(); break; }
