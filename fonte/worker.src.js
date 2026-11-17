@@ -636,7 +636,7 @@ async function handleDb(req, env, au) {
   const compart = !privado && (op === 'set' || op === 'delete'); /* catálogo compartilhado: escrita só em <coleção>/<id> */
   if (compart && seg.length !== 2) return E('caminho_invalido', 'Escrita no catálogo exige o caminho <coleção>/<id>.');
   try {
-    if (op === 'get') { const r = await env.DB.prepare('SELECT data FROM docs WHERE path=?').bind(path).first(); return J({ ok: true, exists: !!r, data: r ? JSON.parse(r.data) : null }); }
+    if (op === 'get') { const r = await env.DB.prepare('SELECT data, updated_at FROM docs WHERE path=?').bind(path).first(); return J({ ok: true, exists: !!r, data: r ? JSON.parse(r.data) : null, at: r ? r.updated_at : '' }); }
     if (op === 'list') { /* paginação por cursor (path do último) + opção "since" para sincronizar só o que mudou */
       const lim = Math.min(+q.limit || 200, 500), after = String(q.after || ''), since = String(q.since || '');
       const r = await env.DB.prepare('SELECT path, data, updated_at FROM docs WHERE parent=? AND path>? AND updated_at>? ORDER BY path LIMIT ?').bind(path, after, since, lim + 1).all();
@@ -647,7 +647,7 @@ async function handleDb(req, env, au) {
     }
     if (op === 'set') {
       if (!q.data || typeof q.data !== 'object' || Array.isArray(q.data)) return E('requisicao_invalida', 'Documento inválido.');
-      let d = q.data; const id = seg[seg.length - 1], ex = await env.DB.prepare('SELECT data, owner FROM docs WHERE path=?').bind(path).first(), cur = ex ? JSON.parse(ex.data) : null;
+      let d = q.data; const id = seg[seg.length - 1], ex = await env.DB.prepare('SELECT data, owner, updated_at FROM docs WHERE path=?').bind(path).first(), cur = ex ? JSON.parse(ex.data) : null;
       if (catalogo) {
         if (d.id !== id) return E('requisicao_invalida', 'O id do registro não confere com o caminho.');
         if (!Number.isFinite(+d.cv) || +d.cv < 0 || +d.cv > (cur ? (+cur.cv || 0) : 0) + 1000) return E('requisicao_invalida', 'Versão (cv) inválida.');
@@ -656,8 +656,19 @@ async function handleDb(req, env, au) {
         d = { ...d, alteradoPor: seed ? 'base inicial' : me, criadoPor: cur ? cur.criadoPor : (seed ? 'base inicial' : me) };
       }
       const txt = JSON.stringify(d); if (new TextEncoder().encode(txt).length > 1900000) return E('muito_grande', 'Documento acima do limite do banco (≈1,9 MB).', 413);
-      await env.DB.prepare('INSERT INTO docs(path,parent,owner,data,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at').bind(path, seg.slice(0, -1).join('/'), privado ? me : (ex?.owner || me), txt, new Date().toISOString()).run();
-      return J({ ok: true });
+      /* carimbo sempre crescente por documento: é a versão usada no controle de concorrência da carteira privada */
+      let agora = new Date().toISOString(); if (ex && ex.updated_at >= agora) { const t = Date.parse(ex.updated_at); agora = new Date((Number.isFinite(t) ? t : Date.now()) + 1).toISOString(); }
+      const pai = seg.slice(0, -1).join('/');
+      if (privado && typeof q.base === 'string') { /* gravação condicional: só grava se o documento ainda está na versão que esta sessão leu ('' = ainda não existia). Atômica no banco. */
+        if (q.base.length > 40) return E('requisicao_invalida', 'Versão de base inválida.');
+        const r = q.base === ''
+          ? await env.DB.prepare('INSERT INTO docs(path,parent,owner,data,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(path) DO NOTHING').bind(path, pai, me, txt, agora).run()
+          : await env.DB.prepare('UPDATE docs SET data=?, updated_at=? WHERE path=? AND updated_at=?').bind(txt, agora, path, q.base).run();
+        if (!(r.meta && r.meta.changes > 0)) { const at = await env.DB.prepare('SELECT data, updated_at FROM docs WHERE path=?').bind(path).first(); return E('conflito', 'O registro foi alterado em outra sessão.', 409, { atual: at ? JSON.parse(at.data) : null, at: at ? at.updated_at : '' }); }
+        return J({ ok: true, at: agora });
+      }
+      await env.DB.prepare('INSERT INTO docs(path,parent,owner,data,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at').bind(path, pai, privado ? me : (ex?.owner || me), txt, agora).run();
+      return J({ ok: true, at: agora });
     }
     if (op === 'delete') {
       if (catalogo) { const ex = await env.DB.prepare('SELECT data FROM docs WHERE path=?').bind(path).first(); if (ex) { const c = JSON.parse(ex.data); if (!au.admin && String(c.criadoPor || '').toLowerCase() !== me) return E('proibido', 'Só quem criou o registro (ou um admin da base) pode excluí-lo. Use "arquivar" para tirar da lista.', 403); } }

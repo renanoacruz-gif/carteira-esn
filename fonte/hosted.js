@@ -26,7 +26,7 @@ if (HOST && !window.claude) {
     catch { throw estourou ? Object.assign(new Error('O servidor demorou a responder.'), { code: 'tempo_esgotado' }) : Object.assign(new Error('Sem conexão com o servidor.'), { code: 'rede' }); }
     if (r.type === 'opaqueredirect' || r.status === 302) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' });
     let j; try { j = await r.json(); } catch { if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Sessão do Cloudflare Access expirada: recarregue a página para entrar de novo.'), { code: 'sessao_expirada' }); throw Object.assign(new Error('Resposta inválida do servidor (HTTP ' + r.status + ').'), { code: 'http_' + r.status }); }
-    if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual });
+    if (!j.ok) throw Object.assign(new Error(j.erro?.mensagem || 'Erro no servidor.'), { code: j.erro?.codigo || 'erro', atual: j.atual, at: j.at });
     return j;
     } finally { clearTimeout(tm); }
   };
@@ -39,18 +39,20 @@ if (HOST && !window.claude) {
   };
   let _me = null; const eu = async () => (_me ||= api('/api/me').then(j => { if (!j.id) throw Object.assign(new Error('Entre pelo Cloudflare Access com seu e-mail corporativo.'), { code: 'sem_identidade' }); try { if (hkDono(j.id) === 'apagadas') setTimeout(() => toast('As chaves de IA guardadas neste navegador eram de outra conta e foram apagadas.'), 1500); } catch { /* opcional */ } try { admPainelOn(j.painel === true); telWire(); telAvisoUmaVez(); } catch { /* painel e telemetria são opcionais */ } return j; }).catch(e => { _me = null; throw e; }));
   const lastGet = {};
+  /* Versão por documento (carimbo do servidor) para gravação condicional da carteira privada. VER só muda em leitura inicial, gravação aceita ou adoção explícita (adotar): receber uma alteração de outra sessão NÃO atualiza a versão sozinha, para nunca sobrescrever o que ainda não foi mesclado. */
+  const VER = new Map(), CHEIO = new Set();
   const col = path => ({
     path,
     doc: id => doc(path + '/' + segEnc(id)),
     get: async () => {
-      const docs = []; let after = '', agora = ''; for (let i = 0; i < 400; i++) { const j = await api('/api/db', { op: 'list', path, after, limit: 200 }); agora = j.agora; docs.push(...j.docs.map(d => ({ id: segDec(d.id), data: () => d.data }))); if (!j.mais) break; after = j.depois; }
-      lastGet[path] = agora; return { docs };
+      const docs = []; let after = '', agora = ''; for (let i = 0; i < 400; i++) { const j = await api('/api/db', { op: 'list', path, after, limit: 200 }); agora = j.agora; docs.push(...j.docs.map(d => { VER.set(path + '/' + d.id, d.at); return { id: segDec(d.id), at: d.at, data: () => d.data }; })); if (!j.mais) break; after = j.depois; }
+      lastGet[path] = agora; CHEIO.add(path); return { docs };
     },
     onSnapshot: cb => {
       let parar = false, ocupado = false, since = lastGet[path] ? new Date(Date.parse(lastGet[path]) - 3000).toISOString() : new Date(Date.now() - 3000).toISOString();
       const tick = async () => {
         if (parar || ocupado || document.hidden) return; ocupado = true;
-        try { let after = '', novos = [], agora = ''; for (let i = 0; i < 50; i++) { const j = await api('/api/db', { op: 'list', path, after, since, limit: 200 }); agora = j.agora; novos.push(...j.docs.map(d => ({ id: segDec(d.id), data: () => d.data }))); if (!j.mais) break; after = j.depois; } since = new Date(Date.parse(agora) - 3000).toISOString(); if (novos.length) cb({ docs: novos }); } catch { /* tenta no próximo ciclo */ }
+        try { let after = '', novos = [], agora = ''; for (let i = 0; i < 50; i++) { const j = await api('/api/db', { op: 'list', path, after, since, limit: 200 }); agora = j.agora; novos.push(...j.docs.map(d => ({ id: segDec(d.id), at: d.at, data: () => d.data }))); if (!j.mais) break; after = j.depois; } since = new Date(Date.parse(agora) - 3000).toISOString(); if (novos.length) cb({ docs: novos }); } catch { /* tenta no próximo ciclo */ }
         ocupado = false;
       };
       const iv = setInterval(tick, 45000), vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
@@ -59,9 +61,18 @@ if (HOST && !window.claude) {
   });
   const doc = path => ({
     path,
-    get: async () => { const j = await api('/api/db', { op: 'get', path }); return { exists: !!j.exists, data: () => j.data }; },
-    set: async d => { await api('/api/db', { op: 'set', path, data: d }); },
-    delete: async () => { await api('/api/db', { op: 'delete', path }); },
+    get: async () => { const j = await api('/api/db', { op: 'get', path }); VER.set(path, j.at || ''); return { exists: !!j.exists, at: j.at || '', data: () => j.data }; },
+    set: async d => { const j = await api('/api/db', { op: 'set', path, data: d }); if (j.at) VER.set(path, j.at); },
+    /* gravação condicional: recusa (code 'conflito', com .atual e .at) se outra sessão gravou depois da versão conhecida aqui. Sem versão conhecida (documento nunca lido), grava como antes. */
+    setV: async d => { const pai = path.slice(0, path.lastIndexOf('/')), base = VER.has(path) ? VER.get(path) : (CHEIO.has(pai) ? '' : undefined); const j = await api('/api/db', base === undefined ? { op: 'set', path, data: d } : { op: 'set', path, data: d, base }); if (j.at) VER.set(path, j.at); return j.at || ''; },
+    ver: () => VER.get(path), adotar: at => { VER.set(path, at || ''); },
+    onSnapshot: cb => { /* documento único (ajustes gerais): consulta só o que mudou desde a última leitura */
+      const pai = path.slice(0, path.lastIndexOf('/')); let parar = false, ocupado = false, since = new Date(Date.now() - 3000).toISOString();
+      const tick = async () => { if (parar || ocupado || document.hidden) return; ocupado = true; try { const j = await api('/api/db', { op: 'list', path: pai, since, limit: 5 }); since = new Date(Date.parse(j.agora) - 3000).toISOString(); const d = j.docs.find(x => pai + '/' + x.id === path); if (d) cb({ exists: true, at: d.at, data: () => d.data }); } catch { /* tenta no próximo ciclo */ } ocupado = false; };
+      const iv = setInterval(tick, 45000), vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
+      return () => { parar = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+    },
+    delete: async () => { await api('/api/db', { op: 'delete', path }); VER.delete(path); },
     collection: n => col(path + '/' + n),
   });
   const norm = p => String(p).split('/').map(segEnc).join('/');
