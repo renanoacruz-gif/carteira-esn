@@ -9,7 +9,7 @@ function clientBanner(c) {
   const parts = [];
   if (partial(c)) parts.push(`<div class="alert b"><b>Análise parcial: contratação e faturamento ainda não conferidos.</b><div class="sm">${c.fstat.k === 'nao_carregada' ? esc(MSG_SEM_FICHA) : esc(c.fstat.l + ': ' + (c.fstat.why[0] || ''))} Ausência de ficha ou de item faturado não prova que o cliente não possui uma solução.</div></div>`);
   else if (c.fstat.k !== 'disponivel') parts.push(`<div class="alert"><b>Ficha: ${esc(c.fstat.l)}.</b> ${esc(c.fstat.why[0] || '')}</div>`);
-  { const m = mrrEmpAlerta(c); if (m) parts.push(m); }
+  { const m = mrrEmpAlerta(c); if (m) parts.push(m); const rv = eloRevAlerta(c); if (rv) parts.push(rv); }
   const fl = c.reviewFlags || []; if (fl.length) parts.push(`<div class="alert i"><b>Base de Soluções atualizada:</b> ${fl.length} diagnóstico(s) podem precisar de revisão (${fl.slice(0, 3).map(x => esc(x.nome)).join(', ')}${fl.length > 3 ? '…' : ''}). Análises anteriores continuam registradas em “O que mudou”.</div>`);
   return parts.join('');
 }

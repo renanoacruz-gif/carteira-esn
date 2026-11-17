@@ -44,13 +44,13 @@ const eloResSel = (c, v) => `<label class="sm pt-res">Desfecho <select data-c="a
 function vincCard(c) {
   const vs = eloVincs(c); if (!vs.length) return '';
   return `<div class="card" id="elo-vinc"><div class="row"><h3>Soluções vinculadas a este cliente <span class="muted sm">(${vs.length})</span></h3><span class="sp"></span><button class="btn sm ghost" data-a="ctab" data-v="portfolio">Ver recomendações</button></div>
-  ${vs.map(v => `<div class="ad-row" data-vinc="${esc(v.id)}"><div class="ad-m"><div><b>${esc(v.nome || v.id)}</b> ${pill(v.st === 'validada' ? 'aderência confirmada por você' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}</div><div class="sm muted">Desde ${fmtD(String(v.em || '').slice(0, 10))}${v.ad != null ? ` · aderência ${v.ad}/100 e cobertura ${v.cob}% no momento do vínculo` : ''}${v.rev ? ' · <b>catálogo atualizado depois do vínculo: revise</b>' : ''}</div></div><div class="ad-acts">${eloResSel(c, v)}<button class="btn sm ghost" data-a="adSemana" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="adFicha" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Ver ficha</button></div></div>`).join('')}
+  ${vs.map(v => `<div class="ad-row" data-vinc="${esc(v.id)}"><div class="ad-m"><div><b>${esc(v.nome || v.id)}</b> ${pill(v.st === 'validada' ? 'aderência confirmada por você' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}</div><div class="sm muted">Desde ${fmtD(String(v.em || '').slice(0, 10))}${v.ad != null ? ` · aderência ${v.ad}/100 e cobertura ${v.cob}% no momento do vínculo` : ''}</div>${eloRevLinha(c, v)}</div><div class="ad-acts">${eloResSel(c, v)}<button class="btn sm ghost" data-a="adSemana" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Levar para a semana</button><button class="btn sm ghost" data-a="adFicha" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Ver ficha</button></div></div>`).join('')}
   <p class="sm muted" style="margin-top:6px">Vínculo é uma marcação sua, não uma venda: o desfecho registra o que aconteceu e vale para as duas listas de recomendação.</p></div>`;
 }
 function eloVincOport() { /* painel Oportunidades: o que você já vinculou, em toda a carteira */
   const rows = clients().flatMap(c => eloVincs(c).map(v => ({ c, v }))); if (!rows.length) return '';
   return `<details class="card" id="elo-op" ${UI.eloOp ? 'open' : ''}><summary><b>Soluções vinculadas por você</b> <span class="muted sm">(${rows.length} em ${new Set(rows.map(r => r.c.key)).size} cliente(s))</span></summary>
-  <div class="tw" style="margin-top:8px"><table><thead><tr><th style="min-width:200px">Cliente</th><th style="min-width:220px">Solução</th><th>Situação</th><th>Desde</th></tr></thead><tbody>${rows.slice(0, 200).map(({ c, v }) => `<tr><td><a href="#" data-a="open" data-k="${esc(c.key)}"><b>${esc(c.name)}</b></a></td><td>${esc(v.nome || v.id)}</td><td>${pill(v.st === 'validada' ? 'aderência confirmada' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}</td><td class="sm">${fmtD(String(v.em || '').slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>
+  <div class="tw" style="margin-top:8px"><table><thead><tr><th style="min-width:200px">Cliente</th><th style="min-width:220px">Solução</th><th>Situação</th><th>Desde</th></tr></thead><tbody>${rows.slice(0, 200).map(({ c, v }) => `<tr><td><a href="#" data-a="open" data-k="${esc(c.key)}"><b>${esc(c.name)}</b></a></td><td>${esc(v.nome || v.id)}</td><td>${pill(v.st === 'validada' ? 'aderência confirmada' : 'vinculada', v.st === 'validada' ? 'ok' : 'info')}${eloPills(c, v.nome || '')}${eloRev(c, v) ? ' ' + pill('revisar: catálogo mudou', 'warn') : ''}</td><td class="sm">${fmtD(String(v.em || '').slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>
   <p class="sm muted" style="margin-top:6px">Marcações suas a partir do Catálogo Enxoval. Não são oportunidades do motor nem entram no Forecast.</p></details>`;
 }
 function eloResSet(key, id, st) { const c = S.clients[key], v = c?.enxVinc?.[id]; if (!v) return; if (PT_RES[st]) v.res = { st, em: nowISO() }; else delete v.res; touchC(key); }
@@ -69,3 +69,34 @@ function eloBrief(c) {
   if (vs.length) L.push('Soluções vinculadas por você: ' + vs.slice(0, 8).map(v => `${v.nome || v.id} (${v.st === 'validada' ? 'aderência confirmada' : 'vinculada'}${v.res ? ', desfecho: ' + PT_RES[v.res.st].toLowerCase() : ''})`).join('; ') + '.');
   return L;
 }
+
+/* ---- etapa 3: catálogo reimportado → vínculos pedem revisão; nomes alternativos para reconhecer "já possui" ---- */
+function eloRev(c, v) { /* só aponta mudança material; nada é alterado sozinho */
+  if (!ENX.idx || !ENX.meta) return null; const p = ENX.idx.find(x => x.id === v.id);
+  if (!p) return { fora: true, motivos: ['o produto não está mais no catálogo importado'] };
+  if (p.nivel === 'inativo') return { fora: true, motivos: ['o produto passou a constar como inativo no catálogo'] };
+  if (!v.cat || v.cat === ENX.meta.importadoEm) return null;
+  const m = [], x = adCalc(adCtx(c), p);
+  if (v.nome && normName(v.nome) !== normName(p.nome)) m.push(`o nome mudou para “${p.nome}”`);
+  if (x.bloqueio) m.push('agora há bloqueio técnico: ' + x.bloqueio);
+  if (v.ad != null && x.ad != null && Math.abs(x.ad - v.ad) >= 10) m.push(`a aderência passou de ${v.ad} para ${x.ad}`);
+  if (v.cob != null && Math.abs((x.cob || 0) - v.cob) >= 10) m.push(`a cobertura passou de ${v.cob}% para ${x.cob}%`);
+  return m.length ? { motivos: m, ad: x.ad, cob: x.cob, nome: p.nome } : null;
+}
+function eloRevLinha(c, v) { const r = eloRev(c, v); return r ? `<div class="alert sm" style="margin-top:6px" data-rev="${esc(v.id)}"><b>Revise este vínculo:</b> catálogo ${r.fora ? 'atual' : 'reimportado em ' + fmtD(String(ENX.meta.importadoEm || '').slice(0, 10))} — ${r.motivos.map(esc).join('; ')}. ${r.fora ? `<button class="btn sm ghost" data-a="adSoltar" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Desvincular</button>` : `<button class="btn sm" data-a="eloRevOk" data-k="${esc(c.key)}" data-id="${esc(v.id)}">Marcar como revisado</button>`}</div>` : ''; }
+const eloRevN = c => eloVincs(c).filter(v => eloRev(c, v)).length;
+function eloRevAlerta(c) { const n = ENX.idx && ENX.meta ? eloRevN(c) : 0; return n ? `<div class="alert i" id="elo-rev"><b>Catálogo Enxoval atualizado:</b> ${n} solução(ões) vinculada(s) a este cliente mudaram desde o vínculo. <a href="#" data-a="ctab" data-v="gestao">Revisar em Gestão da conta</a>.</div>` : ''; }
+function eloAliasCard(p) {
+  const al = (S.meta.enxAlias || {})[p.id] || [];
+  return `<div class="card" id="elo-alias"><h3>Como este produto aparece nas suas fichas</h3><p class="sm muted">Se as fichas de faturamento usam outro nome para este produto, cadastre aqui (separe por vírgula). Cliente com esse item passa a constar como “Já possui”, em vez de receber a recomendação como produto novo. Vale só para a sua carteira.</p>
+  <div class="row" style="gap:6px;flex-wrap:wrap"><input type="text" id="elo_al" value="${esc(al.join(', '))}" placeholder="ex.: SIGAWMS, Gestão de Armazém" style="min-width:320px;flex:1" maxlength="400" aria-label="Nomes alternativos"><button class="btn sm pri" data-a="eloAliasSalvar" data-id="${esc(p.id)}">Salvar nomes</button></div>
+  ${al.length ? `<p class="sm" style="margin-top:6px">${al.map(a => pill(a, 'info')).join(' ')}</p>` : ''}</div>`;
+}
+function eloAliasSet(id, txt) {
+  const vistos = new Set(), al = String(txt || '').split(/[,;\n]+/).map(a => a.replace(/[<>]/g, '').trim().slice(0, 60)).filter(a => { const k = normName(a); if (k.length < 4 || vistos.has(k)) return false; vistos.add(k); return true; }).slice(0, 8);
+  S.meta.enxAlias ||= {}; if (al.length) S.meta.enxAlias[id] = al; else delete S.meta.enxAlias[id]; touchMeta(); return al;
+}
+const ELO_ACT = {
+  eloRevOk: t => { const c = S.clients[t.dataset.k], v = c?.enxVinc?.[t.dataset.id]; if (!v) return; const r = eloRev(c, { id: t.dataset.id, ...v }); v.cat = ENX.meta?.importadoEm || ''; if (r && !r.fora) { v.ad = r.ad; v.cob = r.cob; v.nome = String(r.nome).slice(0, 160); } v.revEm = nowISO(); touchC(c.key); render(); toast('Vínculo revisado com o catálogo atual.'); },
+  eloAliasSalvar: t => { const al = eloAliasSet(t.dataset.id, $('#elo_al')?.value); render(); toast(al.length ? `${al.length} nome(s) alternativo(s) salvo(s). As recomendações já consideram.` : 'Nomes alternativos removidos.'); },
+};
